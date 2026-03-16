@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 export async function POST(request: Request) {
   try {
@@ -40,23 +45,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-      {
-        cookies: {
-          get(name: string) {
-            return undefined;
-          },
-          set(_name: string, _value: string, _options: CookieOptions) {
-            // pas de gestion de cookies côté API pour cette route
-          },
-          remove(_name: string, _options: CookieOptions) {
-            // pas de gestion de cookies côté API pour cette route
-          },
-        },
-      },
-    );
+    console.log("Update called for userId:", userId);
 
     const { error } = await supabase
       .from("sophrologues")
@@ -76,6 +65,7 @@ export async function POST(request: Request) {
       .eq("user_id", userId);
 
     if (error) {
+      console.error("Supabase update error:", error);
       return NextResponse.json(
         {
           error:
@@ -87,6 +77,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error("Sophrologue update - unexpected exception:", error);
     return NextResponse.json(
       {
         error:
