@@ -20,9 +20,6 @@ export async function POST(request: Request) {
       city,
       postalCode,
       phone,
-      availability,
-      sessionTypes,
-      minBookingDelay,
     } = body as {
       userId?: string;
       bio?: string;
@@ -33,9 +30,6 @@ export async function POST(request: Request) {
       city?: string;
       postalCode?: string;
       phone?: string;
-      availability?: unknown;
-      sessionTypes?: unknown;
-      minBookingDelay?: string;
     };
 
     if (!userId) {
@@ -51,16 +45,13 @@ export async function POST(request: Request) {
       .from("sophrologues")
       .update({
         bio,
-        specialties,
-        rpps,
-        teleconsultation_url: teleconsultationUrl,
-        address,
-        city,
-        postal_code: postalCode,
-        phone,
-        availability,
-        session_types: sessionTypes,
-        min_booking_delay: minBookingDelay,
+        specialites: specialties,
+        numero_rpps: rpps,
+        lien_teleconsultation: teleconsultationUrl,
+        adresse: address,
+        ville: city,
+        code_postal: postalCode,
+        telephone: phone,
       })
       .eq("user_id", userId);
 
