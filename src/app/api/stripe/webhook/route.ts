@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { generateAndStoreFacture } from '@/lib/factures/generate'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -70,6 +71,19 @@ export async function POST(request: NextRequest) {
       console.error('Error inserting paiement:', paiementError)
     } else {
       console.log('Paiement inserted successfully')
+
+      // Génération automatique de la facture PDF (appel direct, sans HTTP)
+      try {
+        console.log('[Webhook] Démarrage génération facture pour séance:', seance_id)
+        const result = await generateAndStoreFacture(seance_id)
+        if (result.success) {
+          console.log('[Webhook] Facture générée avec succès:', result.facture_url)
+        } else {
+          console.error('[Webhook] Échec génération facture:', result.error)
+        }
+      } catch (factureErr) {
+        console.error('[Webhook] Erreur inattendue lors de la génération de facture:', factureErr)
+      }
     }
   }
 
