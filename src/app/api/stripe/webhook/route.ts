@@ -1,81 +1,77 @@
-import { headers } from "next/headers";
-import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
+import { createClient } from '@supabase/supabase-js'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-export async function POST(request: Request) {
-  const body = await request.text();
-  const headersList = await headers();
-  const signature = headersList.get("stripe-signature");
+export async function POST(request: NextRequest) {
+  const body = await request.text()
+  const signature = request.headers.get('stripe-signature')
 
   if (!signature) {
-    console.error("Webhook: missing stripe-signature header");
-    return new Response("Webhook Error: missing signature", { status: 400 });
+    return NextResponse.json({ error: 'No signature' }, { status: 400 })
   }
 
-  let event: Stripe.Event;
+  let event: Stripe.Event
+
   try {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!,
-    );
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
   } catch (err) {
-    console.error("Stripe webhook signature verification failed:", err);
-    return new Response("Webhook Error: invalid signature", { status: 400 });
+    console.error('Webhook signature verification failed:', err)
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  try {
-    if (event.type === "payment_intent.succeeded") {
-      const pi = event.data.object as Stripe.PaymentIntent;
-      const { seance_id, sophrologue_id, patient_id } = pi.metadata ?? {};
+  console.log('Webhook event received:', event.type)
 
-      if (!seance_id) {
-        console.error("Webhook: missing seance_id in metadata", pi.metadata);
-        return new Response("OK", { status: 200 });
-      }
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent
+    const { seance_id, sophrologue_id, patient_id } = paymentIntent.metadata
 
-      const { error: updateError } = await supabase
-        .from("seances")
-        .update({ statut: "confirmee" })
-        .eq("id", seance_id);
+    console.log('Payment succeeded for seance:', seance_id)
 
-      if (updateError) {
-        console.error("Webhook: failed to update seance status", updateError);
-      }
+    const { error: seanceError } = await supabase
+      .from('seances')
+      .update({ statut: 'confirmee' })
+      .eq('id', seance_id)
 
-      const amountTotal = (pi.amount_received || pi.amount || 0) / 100;
-      const commission = Math.round(amountTotal * 0.03 * 100) / 100;
-      const montantSophrologue =
-        Math.round((amountTotal - commission) * 100) / 100;
+    if (seanceError) {
+      console.error('Error updating seance:', seanceError)
+    } else {
+      console.log('Seance updated to confirmee')
+    }
 
-      const { error: paymentError } = await supabase.from("paiements").insert({
+    const montant_total = paymentIntent.amount / 100
+    const commission = montant_total * 0.03
+
+    const { error: paiementError } = await supabase
+      .from('paiements')
+      .insert({
         seance_id,
         sophrologue_id,
         patient_id,
-        montant_total: amountTotal,
+        stripe_payment_intent_id: paymentIntent.id,
+        montant_total,
         commission_calymia: commission,
-        montant_sophrologue: montantSophrologue,
-        statut: "reussi",
-        stripe_payment_intent_id: pi.id,
-      });
+        montant_sophrologue: montant_total - commission,
+        statut: 'reussi',
+        type: 'total',
+      })
 
-      if (paymentError) {
-        console.error("Webhook: failed to insert paiement", paymentError);
-      }
+    if (paiementError) {
+      console.error('Error inserting paiement:', paiementError)
+    } else {
+      console.log('Paiement inserted successfully')
     }
-
-    return new Response("OK", { status: 200 });
-  } catch (error) {
-    console.error("Webhook handler error:", error);
-    return new Response("Webhook Error: internal error", { status: 500 });
   }
+
+  return NextResponse.json({ received: true })
 }
