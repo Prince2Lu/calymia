@@ -7,10 +7,12 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PaymentForm } from "@/components/booking/PaymentForm";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 type SophrologueLite = {
+  id: string | number;
   prenom: string | null;
   nom: string | null;
 };
@@ -102,6 +104,8 @@ export default function ReserverPage() {
   const [loading, setLoading] = useState(false);
 
   const [sophrologue, setSophrologue] = useState<SophrologueLite | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [seanceId, setSeanceId] = useState<string | number | null>(null);
 
   const supabase = useMemo(
     () =>
@@ -119,7 +123,7 @@ export default function ReserverPage() {
       if (!slug) return;
       const { data } = await supabase
         .from("sophrologues")
-        .select("prenom, nom")
+        .select("id, prenom, nom")
         .eq("slug", slug)
         .eq("actif", true)
         .maybeSingle<SophrologueLite>();
@@ -161,7 +165,7 @@ export default function ReserverPage() {
     return buildHourlySlots(selectedDay);
   }, [availableDaysSet, selectedDay]);
 
-  const progress = (step / 3) * 100;
+  const progress = (step / 4) * 100;
 
   const goBack = () => {
     setError(null);
@@ -178,12 +182,10 @@ export default function ReserverPage() {
       setStep(2);
       return;
     }
-    if (step === 2) {
-      setStep(3);
-    }
+    if (step === 2) return;
   };
 
-  const confirmBooking = async () => {
+  const createPaymentIntent = async () => {
     setError(null);
     if (!selectedSlot) {
       setError("Merci de sélectionner un créneau.");
@@ -202,10 +204,45 @@ export default function ReserverPage() {
       setError("Merci d’accepter le consentement RGPD pour continuer.");
       return;
     }
+    if (!sophrologue?.id) {
+      setError("Impossible d’identifier le sophrologue. Merci de réessayer.");
+      return;
+    }
 
-    // TODO (plus tard) : création d'une réservation en base + email/SMS.
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
+    const montant = 60; // placeholder (types de séances à venir)
+    const payload = {
+      sophrologue_id: sophrologue.id,
+      type_seance_nom: "Séance 60 min",
+      montant,
+      debut_at: selectedSlot.toISOString(),
+      patient_prenom: patient.prenom,
+      patient_nom: patient.nom,
+      patient_email: patient.email,
+      patient_telephone: patient.telephone,
+    };
+
+    const res = await fetch("/api/reservations/create-payment-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await res.json().catch(() => null)) as
+      | { clientSecret?: string; seance_id?: string | number; error?: string }
+      | null;
+
+    if (!res.ok || !data?.clientSecret || data.seance_id == null) {
+      setError(
+        data?.error ??
+          "Impossible d'initialiser le paiement. Merci de réessayer.",
+      );
+      setLoading(false);
+      return;
+    }
+
+    setClientSecret(data.clientSecret);
+    setSeanceId(data.seance_id);
     setLoading(false);
     setStep(3);
   };
@@ -229,7 +266,7 @@ export default function ReserverPage() {
 
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs font-medium text-slate-600">
-            {["Créneau", "Infos patient", "Confirmation"].map((t, i) => {
+            {["Créneau", "Infos patient", "Paiement", "Confirmation"].map((t, i) => {
               const n = (i + 1) as Step;
               const active = n === step;
               const done = n < step;
@@ -249,7 +286,7 @@ export default function ReserverPage() {
                   <span className="ml-2 hidden text-slate-700 sm:inline">
                     {t}
                   </span>
-                  {n < 3 ? (
+                  {n < 4 ? (
                     <div className="ml-2 hidden h-0.5 flex-1 rounded bg-slate-200 sm:block">
                       <div
                         className={`h-0.5 rounded ${
@@ -274,13 +311,15 @@ export default function ReserverPage() {
           <CardTitle>
             {step === 1 && "Étape 1 — Choix du créneau"}
             {step === 2 && "Étape 2 — Informations patient"}
-            {step === 3 && "Étape 3 — Confirmation"}
+            {step === 3 && "Étape 3 — Paiement"}
+            {step === 4 && "Étape 4 — Confirmation"}
           </CardTitle>
           <CardDescription className="mt-1">
             {step === 1 && "Sélectionnez un créneau sur les 4 prochaines semaines."}
             {step === 2 &&
               "Renseignez vos informations pour confirmer la réservation."}
-            {step === 3 && "Votre réservation est confirmée."}
+            {step === 3 && "Procédez au paiement sécurisé pour confirmer la séance."}
+            {step === 4 && "Votre réservation est confirmée."}
           </CardDescription>
 
           <div className="mt-6 space-y-6">
@@ -464,15 +503,50 @@ export default function ReserverPage() {
                 <Button
                   type="button"
                   className="w-full bg-[#1E3A5F] hover:bg-[#2E75B6]"
-                  onClick={confirmBooking}
+                  onClick={createPaymentIntent}
                   disabled={loading}
                 >
-                  {loading ? "Confirmation..." : "Confirmer la réservation"}
+                  {loading ? "Initialisation du paiement..." : "Continuer vers le paiement"}
                 </Button>
               </section>
             ) : null}
 
             {step === 3 ? (
+              <section className="space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
+                  <p>
+                    <span className="font-semibold text-[#1E3A5F]">Créneau</span>{" "}
+                    :{" "}
+                    {selectedSlot
+                      ? `${formatDateFR(selectedSlot)} à ${formatTime(
+                          selectedSlot,
+                        )}`
+                      : "—"}
+                  </p>
+                  <p className="mt-1">
+                    <span className="font-semibold text-[#1E3A5F]">
+                      Sophrologue
+                    </span>{" "}
+                    : {sophrologueName}
+                  </p>
+                </div>
+
+                {clientSecret && seanceId != null ? (
+                  <PaymentForm
+                    amount={60}
+                    clientSecret={clientSecret}
+                    seanceId={seanceId}
+                    onSuccess={() => setStep(4)}
+                  />
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    Initialisation du paiement en cours…
+                  </p>
+                )}
+              </section>
+            ) : null}
+
+            {step === 4 ? (
               <section className="space-y-4">
                 <div className="rounded-2xl border border-[#27AE60]/25 bg-[#27AE60]/10 p-4">
                   <p className="text-lg font-semibold text-[#1E3A5F]">
@@ -525,7 +599,7 @@ export default function ReserverPage() {
             >
               Retour
             </Button>
-            {step < 2 ? (
+            {step === 1 ? (
               <Button
                 type="button"
                 onClick={goNext}
@@ -543,6 +617,15 @@ export default function ReserverPage() {
               >
                 Modifier le créneau
               </Button>
+            ) : step === 3 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setStep(2)}
+                disabled={loading}
+              >
+                Modifier les infos
+              </Button>
             ) : (
               <Button
                 type="button"
@@ -551,6 +634,8 @@ export default function ReserverPage() {
                   setStep(1);
                   setSelectedSlot(null);
                   setError(null);
+                  setClientSecret(null);
+                  setSeanceId(null);
                 }}
               >
                 Nouvelle réservation
