@@ -1,27 +1,521 @@
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+"use client";
 
-export default function SeancesPage() {
+import { useEffect, useState, useCallback } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Loader2,
+  Mail,
+  Phone,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  CalendarDays,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Seance = {
+  id: string;
+  debut_at: string;
+  fin_at: string;
+  statut: string;
+  patient: { prenom: string | null; nom: string | null; email: string | null; telephone: string | null } | null;
+  type_seance: { nom: string | null } | null;
+  paiement: { montant_total: number | null } | null;
+};
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8h → 19h
+const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const MONTHS_FR = [
+  "janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  // Monday = 0 offset
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function isSameDay(a: Date, b: Date) {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10">
-        <div className="space-y-2">
-          <Badge>Calymia</Badge>
-          <h1 className="text-3xl font-semibold text-primary">Séances</h1>
-          <p className="text-sm text-slate-600">
-            Planifiez, suivez et documentez vos séances de sophrologie.
-          </p>
-        </div>
-
-        <Card>
-          <CardTitle>Agenda et historique</CardTitle>
-          <CardDescription>
-            Cette page affichera votre agenda, les prochaines séances et
-            l’historique des rendez-vous passés.
-          </CardDescription>
-        </Card>
-      </div>
-    </main>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
   );
 }
 
+function formatWeekRange(monday: Date): string {
+  const sunday = addDays(monday, 6);
+  const d1 = monday.getDate();
+  const d2 = sunday.getDate();
+  const m1 = MONTHS_FR[monday.getMonth()];
+  const m2 = MONTHS_FR[sunday.getMonth()];
+  const y = sunday.getFullYear();
+  if (monday.getMonth() === sunday.getMonth()) {
+    return `${d1} – ${d2} ${m1} ${y}`;
+  }
+  return `${d1} ${m1} – ${d2} ${m2} ${y}`;
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function formatDateLong(iso: string) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+// ─── Statut styles ────────────────────────────────────────────────────────────
+
+type StatutStyle = { bg: string; text: string; ring: string; label: string };
+
+function statutStyle(statut: string): StatutStyle {
+  switch (statut) {
+    case "confirmee":
+      return { bg: "bg-[#27AE60]/10", text: "text-[#27AE60]", ring: "ring-[#27AE60]/25", label: "Confirmée" };
+    case "en_attente":
+      return { bg: "bg-amber-50", text: "text-amber-700", ring: "ring-amber-200", label: "En attente" };
+    case "annulee":
+      return { bg: "bg-slate-100", text: "text-slate-500", ring: "ring-slate-200", label: "Annulée" };
+    case "terminee":
+      return { bg: "bg-[#2E75B6]/10", text: "text-[#2E75B6]", ring: "ring-[#2E75B6]/25", label: "Terminée" };
+    default:
+      return { bg: "bg-slate-100", text: "text-slate-500", ring: "ring-slate-200", label: statut };
+  }
+}
+
+// ─── Drawer latéral ───────────────────────────────────────────────────────────
+
+type DrawerProps = {
+  seance: Seance;
+  onClose: () => void;
+  onMarkDone: (id: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
+};
+
+function SeanceDrawer({ seance, onClose, onMarkDone, onCancel }: DrawerProps) {
+  const [acting, setActing] = useState<"done" | "cancel" | null>(null);
+  const st = statutStyle(seance.statut);
+
+  const nomPatient =
+    `${seance.patient?.prenom ?? ""} ${seance.patient?.nom ?? ""}`.trim() || "Patient inconnu";
+
+  const montant = Array.isArray(seance.paiement)
+    ? (seance.paiement[0]?.montant_total ?? null)
+    : (seance.paiement?.montant_total ?? null);
+
+  const typeNom = Array.isArray(seance.type_seance)
+    ? (seance.type_seance[0]?.nom ?? "Séance")
+    : (seance.type_seance?.nom ?? "Séance");
+
+  const email = seance.patient?.email ?? null;
+  const tel = seance.patient?.telephone ?? null;
+
+  const handleDone = async () => {
+    setActing("done");
+    await onMarkDone(seance.id);
+    setActing(null);
+  };
+
+  const handleCancel = async () => {
+    setActing("cancel");
+    await onCancel(seance.id);
+    setActing(null);
+  };
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-30 bg-black/20"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col bg-white shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h2 className="text-base font-semibold text-[#1E3A5F]">Détails de la séance</h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-5">
+          {/* Statut badge */}
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ${st.bg} ${st.text} ${st.ring}`}
+          >
+            {st.label}
+          </span>
+
+          {/* Patient */}
+          <section className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Patient</p>
+            <p className="text-lg font-semibold text-[#1E3A5F]">{nomPatient}</p>
+            {email && (
+              <a href={`mailto:${email}`} className="flex items-center gap-2 text-sm text-[#2E75B6] hover:underline">
+                <Mail className="h-4 w-4" /> {email}
+              </a>
+            )}
+            {tel && (
+              <a href={`tel:${tel}`} className="flex items-center gap-2 text-sm text-slate-600 hover:underline">
+                <Phone className="h-4 w-4 text-slate-400" /> {tel}
+              </a>
+            )}
+          </section>
+
+          {/* Séance */}
+          <section className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Séance</p>
+            <DrawerRow label="Type" value={typeNom} />
+            <DrawerRow
+              label="Date"
+              value={formatDateLong(seance.debut_at)}
+              icon={<CalendarDays className="h-4 w-4 text-slate-400" />}
+            />
+            <DrawerRow
+              label="Heure"
+              value={`${formatTime(seance.debut_at)} – ${formatTime(seance.fin_at)}`}
+              icon={<Clock className="h-4 w-4 text-slate-400" />}
+            />
+            {montant !== null && (
+              <DrawerRow label="Montant" value={`${montant.toFixed(2)} €`} />
+            )}
+          </section>
+        </div>
+
+        {/* Actions */}
+        {seance.statut === "confirmee" && (
+          <div className="space-y-2 border-t border-slate-100 px-6 py-4">
+            <Button
+              className="w-full"
+              onClick={handleDone}
+              disabled={acting !== null}
+            >
+              {acting === "done" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Marquer comme terminée
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-red-200 text-red-600 hover:bg-red-50"
+              onClick={handleCancel}
+              disabled={acting !== null}
+            >
+              {acting === "cancel" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Annuler la séance
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+
+function DrawerRow({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
+      <div>
+        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-sm font-medium text-slate-800">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
+
+export default function SeancesPage() {
+  const [sophrologueId, setSophrologueId] = useState<string | null>(null);
+  const [seances, setSeances] = useState<Seance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [selected, setSelected] = useState<Seance | null>(null);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  // Les 7 jours de la semaine affichée
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Bornes de la semaine pour la requête Supabase
+  const weekEnd = addDays(weekStart, 7);
+
+  const loadSeances = useCallback(
+    async (sid: string, from: Date, to: Date) => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("seances")
+        .select(
+          "id, debut_at, fin_at, statut, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom), paiement:paiements(montant_total)",
+        )
+        .eq("sophrologue_id", sid)
+        .gte("debut_at", from.toISOString())
+        .lt("debut_at", to.toISOString())
+        .order("debut_at")
+        .returns<Seance[]>();
+
+      setSeances(data ?? []);
+      setLoading(false);
+    },
+    [supabase],
+  );
+
+  // Init : récupérer le sophrologueId
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const { data: s } = await supabase
+        .from("sophrologues")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle<{ id: string }>();
+
+      if (!s || cancelled) return;
+      setSophrologueId(s.id);
+      await loadSeances(s.id, weekStart, weekEnd);
+    };
+    init();
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recharger quand la semaine change
+  useEffect(() => {
+    if (!sophrologueId) return;
+    loadSeances(sophrologueId, weekStart, weekEnd);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart, sophrologueId]);
+
+  // Navigation semaines
+  const prevWeek = () => setWeekStart((d) => addDays(d, -7));
+  const nextWeek = () => setWeekStart((d) => addDays(d, 7));
+  const goToday = () => setWeekStart(startOfWeek(new Date()));
+
+  // Séances filtrées par jour + heure
+  function seancesFor(day: Date, hour: number): Seance[] {
+    return seances.filter((s) => {
+      const d = new Date(s.debut_at);
+      return isSameDay(d, day) && d.getHours() === hour;
+    });
+  }
+
+  // Actions drawer
+  const handleMarkDone = async (id: string) => {
+    await fetch("/api/seances/update-statut", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seance_id: id, statut: "terminee" }),
+    });
+    setSeances((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, statut: "terminee" } : s)),
+    );
+    setSelected((prev) => (prev?.id === id ? { ...prev, statut: "terminee" } : prev));
+  };
+
+  const handleCancel = async (id: string) => {
+    await fetch("/api/reservations/annuler", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seance_id: id }),
+    });
+    setSeances((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, statut: "annulee" } : s)),
+    );
+    setSelected((prev) => (prev?.id === id ? { ...prev, statut: "annulee" } : prev));
+  };
+
+  const today = new Date();
+
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-8">
+        {/* ── En-tête ──────────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold text-[#1E3A5F]">Mon agenda</h1>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={goToday}>
+              Aujourd'hui
+            </Button>
+            <div className="flex items-center rounded-lg border border-slate-200 bg-white shadow-sm">
+              <button
+                onClick={prevWeek}
+                className="flex h-9 w-9 items-center justify-center rounded-l-lg text-slate-500 hover:bg-slate-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="px-4 text-sm font-medium text-slate-700">
+                {formatWeekRange(weekStart)}
+              </span>
+              <button
+                onClick={nextWeek}
+                className="flex h-9 w-9 items-center justify-center rounded-r-lg text-slate-500 hover:bg-slate-50"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Grille semaine ───────────────────────────────────────────── */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-[#2E75B6]" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="min-w-[700px]">
+              {/* Header jours */}
+              <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-200">
+                <div className="py-3" />
+                {weekDays.map((day, i) => {
+                  const isToday = isSameDay(day, today);
+                  return (
+                    <div
+                      key={i}
+                      className="border-l border-slate-100 py-3 text-center"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {DAYS_FR[i]}
+                      </p>
+                      <p
+                        className={`mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
+                          isToday
+                            ? "bg-[#2E75B6] text-white"
+                            : "text-slate-700"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Lignes horaires */}
+              {HOURS.map((hour) => (
+                <div
+                  key={hour}
+                  className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-100 last:border-0"
+                >
+                  {/* Label heure */}
+                  <div className="flex items-start justify-end pr-3 pt-2">
+                    <span className="text-xs text-slate-400">{hour}h</span>
+                  </div>
+
+                  {/* Cellules jours */}
+                  {weekDays.map((day, di) => {
+                    const slots = seancesFor(day, hour);
+                    return (
+                      <div
+                        key={di}
+                        className="min-h-[52px] border-l border-slate-100 p-1"
+                      >
+                        {slots.map((s) => {
+                          const st = statutStyle(s.statut);
+                          const nomPatient =
+                            `${s.patient?.prenom ?? ""} ${s.patient?.nom ?? ""}`.trim() ||
+                            "Patient";
+                          const typeNom = Array.isArray(s.type_seance)
+                            ? (s.type_seance[0]?.nom ?? "Séance")
+                            : (s.type_seance?.nom ?? "Séance");
+                          return (
+                            <button
+                              key={s.id}
+                              onClick={() => setSelected(s)}
+                              className={`w-full rounded-lg px-2 py-1.5 text-left ring-1 transition-opacity hover:opacity-80 ${st.bg} ${st.ring}`}
+                            >
+                              <p className={`truncate text-xs font-semibold ${st.text}`}>
+                                {nomPatient}
+                              </p>
+                              <p className="truncate text-[10px] text-slate-500">
+                                {formatTime(s.debut_at)} · {typeNom}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Drawer ───────────────────────────────────────────────────────── */}
+      {selected && (
+        <SeanceDrawer
+          seance={selected}
+          onClose={() => setSelected(null)}
+          onMarkDone={handleMarkDone}
+          onCancel={handleCancel}
+        />
+      )}
+    </main>
+  );
+}
