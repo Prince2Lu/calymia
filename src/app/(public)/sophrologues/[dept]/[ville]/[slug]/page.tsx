@@ -122,7 +122,7 @@ export default async function SophrologueProfilPage({
 }: {
   params: Promise<{ dept: string; ville: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { dept, ville, slug } = await params;
   const { data } = await fetchSophrologueBySlug(slug);
 
   if (!data) notFound();
@@ -216,7 +216,7 @@ export default async function SophrologueProfilPage({
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a
-                  href="#planning"
+                  href={`/sophrologues/${dept}/${ville}/${slug}/reserver`}
                   className="inline-flex items-center justify-center rounded-md font-medium bg-[#27AE60] text-white hover:bg-green-700 h-10 px-6 py-2 text-sm"
                 >
                   Prendre rendez-vous
