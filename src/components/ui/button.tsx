@@ -1,45 +1,31 @@
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none",
-  {
-    variants: {
-      variant: {
-        primary:
-          "bg-primary text-white hover:bg-primary/90 focus-visible:ring-primary",
-        outline:
-          "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 focus-visible:ring-primary",
-        ghost:
-          "bg-transparent text-slate-900 hover:bg-slate-100 focus-visible:ring-primary",
-      },
-      size: {
-        sm: "h-8 px-3 text-xs",
-        md: "h-10 px-4",
-        lg: "h-11 px-6 text-base",
-      },
-    },
-    defaultVariants: {
-      variant: "primary",
-      size: "md",
-    },
-  },
-);
-
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "default" | "outline" | "ghost";
+  size?: "default" | "sm" | "lg";
+}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
+  ({ className, variant = "default", size = "default", ...props }, ref) => (
     <button
       ref={ref}
-      className={cn(buttonVariants({ variant, size }), className)}
+      className={cn(
+        "inline-flex items-center justify-center rounded-md font-medium transition-colors",
+        variant === "default" &&
+          "bg-[#1E3A5F] text-white hover:bg-[#2E75B6]",
+        variant === "outline" &&
+          "border border-[#1E3A5F] text-[#1E3A5F] hover:bg-gray-50",
+        variant === "ghost" && "hover:bg-gray-100",
+        size === "default" && "h-10 px-4 py-2 text-sm",
+        size === "sm" && "h-8 px-3 text-xs",
+        size === "lg" && "h-12 px-6 text-base",
+        className,
+      )}
       {...props}
     />
   ),
 );
-
 Button.displayName = "Button";
 
