@@ -284,6 +284,7 @@ export default function SeancesPage() {
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<Seance | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -375,16 +376,48 @@ export default function SeancesPage() {
     setSelected((prev) => (prev?.id === id ? { ...prev, statut: "terminee" } : prev));
   };
 
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const handleCancel = async (id: string) => {
-    await fetch("/api/reservations/annuler", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seance_id: id }),
-    });
-    setSeances((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, statut: "annulee" } : s)),
-    );
-    setSelected((prev) => (prev?.id === id ? { ...prev, statut: "annulee" } : prev));
+    try {
+      const res = await fetch("/api/reservations/annuler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seance_id: id, annule_par: "sophrologue" }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        showToast(json.error ?? "L'annulation a échoué.", "error");
+        return;
+      }
+
+      // Mise à jour optimiste de l'état local
+      setSeances((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, statut: "annulee" } : s)),
+      );
+      setSelected((prev) =>
+        prev?.id === id ? { ...prev, statut: "annulee" } : prev,
+      );
+
+      const remboursé = json.montant_rembourse;
+      showToast(
+        remboursé > 0
+          ? `Séance annulée. Remboursement de ${remboursé.toFixed(2)} € initié.`
+          : "Séance annulée (aucun remboursement applicable).",
+        "success",
+      );
+
+      // Recharger le calendrier pour refléter l'état réel Supabase
+      if (sophrologueId) {
+        await loadSeances(sophrologueId, weekStart, weekEnd);
+      }
+    } catch {
+      showToast("Erreur réseau lors de l'annulation.", "error");
+    }
   };
 
   const today = new Date();
@@ -515,6 +548,19 @@ export default function SeancesPage() {
           onMarkDone={handleMarkDone}
           onCancel={handleCancel}
         />
+      )}
+
+      {/* ── Toast ────────────────────────────────────────────────────────── */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium shadow-lg transition-all ${
+            toast.type === "success"
+              ? "bg-[#27AE60] text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
       )}
     </main>
   );
