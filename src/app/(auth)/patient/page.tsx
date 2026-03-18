@@ -311,10 +311,16 @@ function InfoSection({ patient }: { patient: Patient }) {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
+type AuthUserMeta = {
+  id: string;
+  email: string | undefined;
+  user_metadata: Record<string, string>;
+};
+
 export default function PatientSpacePage() {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [notPatient, setNotPatient] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUserMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [upcomingSeances, setUpcomingSeances] = useState<Seance[]>([]);
@@ -355,6 +361,12 @@ export default function PatientSpacePage() {
         }
         return;
       }
+
+      setAuthUser({
+        id: user.id,
+        email: user.email,
+        user_metadata: (user.user_metadata as Record<string, string>) ?? {},
+      });
 
       console.log("[patient/page] Auth user email:", user.email);
 
@@ -419,8 +431,9 @@ export default function PatientSpacePage() {
       }
 
       if (!patientData) {
-        console.log("[patient/page] Aucune fiche client trouvée pour cet utilisateur");
-        setNotPatient(true);
+        // New client — no patient record yet (registered but hasn't booked)
+        // Show the full dashboard with empty sections
+        console.log("[patient/page] Aucune fiche patient — nouveau client sans réservation");
         setLoading(false);
         clearTimeout(timeout);
         return;
@@ -521,42 +534,12 @@ export default function PatientSpacePage() {
     );
   }
 
-  if (notPatient) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-md text-center space-y-5">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F0F7F4]">
-            <CalendarDays className="h-8 w-8 text-[#426F59]" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-[#1E3A5F]">
-              Bienvenue sur votre espace client
-            </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Vous n'avez pas encore de réservation. Trouvez un sophrologue
-              près de chez vous et réservez votre première séance.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <a
-              href="/"
-              className="btn-primary inline-flex items-center justify-center gap-2 rounded-lg bg-[#426F59] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-[#355849] hover:shadow-md"
-            >
-              Trouver un sophrologue
-            </a>
-            <p className="text-xs text-slate-400">
-              Vous êtes sophrologue ?{" "}
-              <a href="/dashboard" className="underline">
-                Accédez à votre tableau de bord
-              </a>
-            </p>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  const prenom = patient?.prenom ?? "vous";
+  // Derive display name: patient record → auth metadata → email prefix → fallback
+  const prenom =
+    patient?.prenom ||
+    authUser?.user_metadata?.prenom ||
+    (authUser?.email ? authUser.email.split("@")[0] : null) ||
+    "vous";
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -581,12 +564,18 @@ export default function PatientSpacePage() {
           </div>
 
           {upcomingSeances.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-8 text-slate-500">
-              <Calendar className="h-5 w-5 shrink-0 text-slate-300" />
-              <p className="text-sm">
-                Aucun rendez-vous à venir. Prenez rendez-vous avec votre
-                sophrologue pour commencer.
-              </p>
+            <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-8">
+              <div className="flex items-center gap-3 text-slate-500">
+                <Calendar className="h-5 w-5 shrink-0 text-slate-300" />
+                <p className="text-sm">Aucun rendez-vous à venir.</p>
+              </div>
+              <a
+                href="/"
+                className="btn-primary inline-flex items-center gap-2 rounded-lg bg-[#426F59] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#355849] hover:shadow-md"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Trouver un sophrologue
+              </a>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -691,7 +680,27 @@ export default function PatientSpacePage() {
         </section>
 
         {/* ── Section 4 : Mes informations ──────────────────────────────── */}
-        {patient && <InfoSection patient={patient} />}
+        {patient ? (
+          <InfoSection patient={patient} />
+        ) : (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Mes informations
+            </h2>
+            <div className="flex items-start gap-3">
+              <Mail className="mt-1 h-4 w-4 shrink-0 text-[#426F59]" />
+              <div>
+                <p className="mb-1 text-xs text-slate-400">Email</p>
+                <p className="text-sm font-medium text-slate-800">
+                  {authUser?.email ?? "—"}
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-slate-400">
+              Vos informations complètes seront disponibles après votre première réservation.
+            </p>
+          </section>
+        )}
       </div>
     </main>
   );

@@ -202,11 +202,18 @@ function ClientForm({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    // Create the auth account via the API route (service role auto-confirms)
+    // Create the auth account + patient record via service role
     const res = await fetch("/api/auth/create-client-account", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, patient_email: email }),
+      body: JSON.stringify({
+        email,
+        password,
+        patient_email: email,
+        prenom,
+        nom,
+        create_patient_record: true,
+      }),
     });
     const data = (await res.json().catch(() => null)) as
       | { success?: boolean; error?: string }

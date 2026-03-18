@@ -8,7 +8,21 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { email, password, patient_email } = await request.json();
+    const {
+      email,
+      password,
+      patient_email,
+      prenom,
+      nom,
+      create_patient_record,
+    } = await request.json() as {
+      email?: string;
+      password?: string;
+      patient_email?: string;
+      prenom?: string;
+      nom?: string;
+      create_patient_record?: boolean;
+    };
 
     if (!email || !password) {
       return NextResponse.json(
@@ -24,16 +38,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create auth user (auto-confirm email)
+    const normalisedEmail = email.trim().toLowerCase();
+
+    // ── Create auth user (auto-confirm) ───────────────────────────────────
     const { data, error } = await supabase.auth.admin.createUser({
-      email: email.trim().toLowerCase(),
+      email: normalisedEmail,
       password,
       email_confirm: true,
     });
 
     if (error) {
       console.error("[create-client-account] createUser error:", error);
-      // Supabase returns a 422 or message containing "already" when email is taken
       if (
         error.status === 422 ||
         error.message.toLowerCase().includes("already") ||
@@ -45,20 +60,48 @@ export async function POST(request: Request) {
     }
 
     const userId = data.user.id;
-    console.log("[create-client-account] Compte créé:", userId, "pour", email);
+    console.log("[create-client-account] Compte créé:", userId, "pour", normalisedEmail);
 
-    // Link the patient record (use patient_email which may differ from login email)
+    // ── Option A: link an existing patient record by email ────────────────
     const lookupEmail = (patient_email ?? email).trim().toLowerCase();
-    const { error: updateError } = await supabase
+    const { error: linkError } = await supabase
       .from("patients")
       .update({ user_id: userId })
       .eq("email", lookupEmail)
-      .is("user_id", null); // only link if not already linked
+      .is("user_id", null);
 
-    if (updateError) {
-      console.error("[create-client-account] Liaison patient échouée:", updateError);
+    if (linkError) {
+      console.warn("[create-client-account] Liaison patient existant échouée:", linkError.message);
     } else {
-      console.log("[create-client-account] Patient lié pour email:", lookupEmail);
+      console.log("[create-client-account] Patient existant lié pour:", lookupEmail);
+    }
+
+    // ── Option B: create a fresh patient record (direct registration) ─────
+    // Requires: ALTER TABLE patients ALTER COLUMN sophrologue_id DROP NOT NULL;
+    if (create_patient_record) {
+      const { error: insertError } = await supabase
+        .from("patients")
+        .insert({
+          user_id: userId,
+          email: normalisedEmail,
+          prenom: prenom?.trim() || null,
+          nom: nom?.trim() || null,
+          // sophrologue_id intentionally omitted — linked at first booking.
+          // This requires sophrologue_id to be nullable in the DB schema.
+          // Run: ALTER TABLE patients ALTER COLUMN sophrologue_id DROP NOT NULL;
+        });
+
+      if (insertError) {
+        // Non-blocking: account is created regardless. Most likely cause is
+        // sophrologue_id NOT NULL constraint — run the migration above.
+        console.error(
+          "[create-client-account] Création fiche patient échouée:",
+          insertError.message,
+          "→ Vérifiez que sophrologue_id est nullable (voir commentaire ci-dessus)",
+        );
+      } else {
+        console.log("[create-client-account] Fiche patient créée pour:", normalisedEmail);
+      }
     }
 
     return NextResponse.json({ success: true });
