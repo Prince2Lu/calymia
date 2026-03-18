@@ -11,6 +11,8 @@ import {
   User,
   ChevronRight,
   Users,
+  AlertTriangle,
+  ArrowUpRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -195,9 +197,12 @@ function NouveauPatientModal({ onClose, sophrologueId, onCreated }: ModalProps) 
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
+const LIMITE_ESSENTIEL = 15;
+
 export default function ClientsPage() {
   const router = useRouter();
   const [sophrologueId, setSophrologueId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filtered, setFiltered] = useState<Patient[]>([]);
   const [search, setSearch] = useState("");
@@ -279,12 +284,13 @@ export default function ClientsPage() {
 
       const { data: sophrologue } = await supabase
         .from("sophrologues")
-        .select("id")
+        .select("id, plan")
         .eq("user_id", user.id)
-        .maybeSingle<{ id: string }>();
+        .maybeSingle<{ id: string; plan: string | null }>();
 
       if (!sophrologue || cancelled) return;
       setSophrologueId(sophrologue.id);
+      setPlan(sophrologue.plan ?? null);
       await loadPatients(sophrologue.id);
     };
     init();
@@ -298,6 +304,9 @@ export default function ClientsPage() {
     setPatients((prev) => [...prev, enriched]);
   };
 
+  const isEssentiel = plan?.toLowerCase() === "essentiel";
+  const limitReached = isEssentiel && patients.length >= LIMITE_ESSENTIEL;
+
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-10">
@@ -310,17 +319,58 @@ export default function ClientsPage() {
             <p className="mt-1 text-sm text-slate-500">
               {loading
                 ? "Chargement…"
-                : `${patients.length} patient${patients.length !== 1 ? "s" : ""} au total`}
+                : `${patients.length} patient${patients.length !== 1 ? "s" : ""} au total${isEssentiel ? ` / ${LIMITE_ESSENTIEL} (plan Essentiel)` : ""}`}
             </p>
           </div>
-          <Button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2"
-          >
-            <UserPlus className="h-4 w-4" />
-            Nouveau patient
-          </Button>
+          {!limitReached ? (
+            <Button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2"
+            >
+              <UserPlus className="h-4 w-4" />
+              Nouveau patient
+            </Button>
+          ) : (
+            <a
+              href="/parametres"
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              Passer au plan Professionnel
+            </a>
+          )}
         </div>
+
+        {/* ── Bannière limite plan Essentiel ───────────────────────────── */}
+        {limitReached && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">
+                Limite de {LIMITE_ESSENTIEL} patients atteinte
+              </p>
+              <p className="mt-0.5 text-sm text-amber-700">
+                Votre plan Essentiel est limité à {LIMITE_ESSENTIEL} patients actifs. Passez au plan{" "}
+                <a href="/parametres" className="font-medium underline">
+                  Professionnel
+                </a>{" "}
+                pour en ajouter davantage.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Avertissement approche de la limite ──────────────────────── */}
+        {isEssentiel && !limitReached && patients.length >= LIMITE_ESSENTIEL - 3 && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-5 py-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <p className="text-sm text-amber-700">
+              Il vous reste{" "}
+              <strong>{LIMITE_ESSENTIEL - patients.length}</strong> place
+              {LIMITE_ESSENTIEL - patients.length > 1 ? "s" : ""} avant la limite du plan Essentiel.
+            </p>
+          </div>
+        )}
 
         {/* ── Barre de recherche ───────────────────────────────────────── */}
         <div className="relative max-w-sm">

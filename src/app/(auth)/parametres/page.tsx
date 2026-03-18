@@ -1,31 +1,829 @@
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import {
+  Loader2,
+  Save,
+  Plus,
+  Trash2,
+  Pencil,
+  X,
+  Check,
+  ToggleLeft,
+  ToggleRight,
+  User,
+  Clock,
+  CalendarDays,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-export default function ParametresPage() {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Sophrologue = {
+  id: string;
+  user_id: string; // auth.users UUID — used for WHERE clause in updates
+  prenom: string | null;
+  nom: string | null;
+  email: string | null;
+  telephone: string | null;
+  bio: string | null;
+  specialites: string[] | null;
+  numero_rpps: string | null;
+  lien_teleconsultation: string | null;
+  adresse: string | null;
+  ville: string | null;
+  code_postal: string | null;
+};
+
+type TypeSeance = {
+  id: string;
+  nom: string;
+  duree_minutes: number;
+  tarif: number;
+  actif: boolean;
+};
+
+type Dispo = {
+  jour_semaine: number; // 0=Lun … 6=Dim
+  heure_debut: string;  // "09:00"
+  heure_fin: string;    // "18:00"
+  actif: boolean;
+};
+
+type ParamsCabinet = {
+  delai_min_reservation_heures: number;
+};
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+const DUREES = [30, 45, 60, 90];
+const DELAIS = [
+  { label: "6 heures", value: 6 },
+  { label: "12 heures", value: 12 },
+  { label: "24 heures", value: 24 },
+  { label: "48 heures", value: 48 },
+];
+
+// ─── Helper toast ─────────────────────────────────────────────────────────────
+
+function useToast() {
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const show = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
+  };
+  return { toast, show };
+}
+
+function Toast({ toast }: { toast: { msg: string; ok: boolean } | null }) {
+  if (!toast) return null;
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
-        <div className="space-y-2">
-          <Badge>Calymia</Badge>
-          <h1 className="text-3xl font-semibold text-primary">Paramètres</h1>
-          <p className="text-sm text-slate-600">
-            Configurez votre compte, votre profil public et vos préférences.
-          </p>
-        </div>
-
-        <Card>
-          <CardTitle>Identité professionnelle</CardTitle>
-          <CardDescription>
-            Nom affiché, spécialités, présentation courte, etc.
-          </CardDescription>
-          <div className="mt-4 space-y-3">
-            <Input placeholder="Nom complet du sophrologue" />
-            <Input placeholder="Spécialités (stress, sommeil, préparation...)" />
-          </div>
-        </Card>
-      </div>
-    </main>
+    <div
+      className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium shadow-lg ${
+        toast.ok ? "bg-[#27AE60] text-white" : "bg-red-600 text-white"
+      }`}
+    >
+      {toast.msg}
+    </div>
   );
 }
 
+// ─── Tab navigation ───────────────────────────────────────────────────────────
+
+type Tab = "profil" | "seances" | "disponibilites";
+
+function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: "profil", label: "Mon profil", icon: <User className="h-4 w-4" /> },
+    { key: "seances", label: "Types de séances", icon: <Clock className="h-4 w-4" /> },
+    { key: "disponibilites", label: "Disponibilités", icon: <CalendarDays className="h-4 w-4" /> },
+  ];
+  return (
+    <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            active === t.key
+              ? "bg-white text-[#1E3A5F] shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          {t.icon}
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Onglet 1 : Mon profil ────────────────────────────────────────────────────
+
+function TabProfil({
+  sophrologue,
+  onSaved,
+  showToast,
+}: {
+  sophrologue: Sophrologue;
+  onSaved: (s: Sophrologue) => void;
+  showToast: (msg: string, ok?: boolean) => void;
+}) {
+  const [form, setForm] = useState({
+    prenom: sophrologue.prenom ?? "",
+    nom: sophrologue.nom ?? "",
+    email: sophrologue.email ?? "",
+    telephone: sophrologue.telephone ?? "",
+    bio: sophrologue.bio ?? "",
+    specialites: (sophrologue.specialites ?? []).join(", "),
+    numero_rpps: sophrologue.numero_rpps ?? "",
+    lien_teleconsultation: sophrologue.lien_teleconsultation ?? "",
+    adresse: sophrologue.adresse ?? "",
+    ville: sophrologue.ville ?? "",
+    code_postal: sophrologue.code_postal ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    console.log("[TabProfil] Bouton Enregistrer cliqué");
+    setSaving(true);
+    try {
+      const payload = {
+        userId: sophrologue.user_id, // ← auth user_id (WHERE user_id = ?)
+        prenom: form.prenom.trim(),
+        nom: form.nom.trim(),
+        phone: form.telephone,
+        bio: form.bio,
+        specialties: form.specialites
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        rpps: form.numero_rpps,
+        teleconsultationUrl: form.lien_teleconsultation,
+        address: form.adresse,
+        city: form.ville,
+        postalCode: form.code_postal,
+      };
+
+      console.log("[TabProfil] Payload envoyé :", payload);
+
+      const res = await fetch("/api/sophrologue/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      console.log("[TabProfil] Réponse API :", res.status, json);
+
+      if (!res.ok) {
+        showToast(json.error ?? "Erreur lors de la sauvegarde.", false);
+        return;
+      }
+
+      onSaved({
+        ...sophrologue,
+        ...form,
+        specialites: form.specialites.split(",").map((s) => s.trim()).filter(Boolean),
+      });
+      showToast("Profil mis à jour avec succès.");
+    } catch (err) {
+      console.error("[TabProfil] Erreur fetch :", err);
+      showToast("Erreur réseau lors de la sauvegarde.", false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = (
+    label: string,
+    key: keyof typeof form,
+    opts?: { type?: string; placeholder?: string },
+  ) => (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-slate-600">{label}</label>
+      <Input
+        type={opts?.type ?? "text"}
+        placeholder={opts?.placeholder}
+        value={form[key]}
+        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+      />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {field("Prénom", "prenom", { placeholder: "Marie" })}
+        {field("Nom", "nom", { placeholder: "Dupont" })}
+        {field("Email", "email", { type: "email", placeholder: "marie@exemple.fr" })}
+        {field("Téléphone", "telephone", { type: "tel", placeholder: "06 12 34 56 78" })}
+        {field("Adresse cabinet", "adresse", { placeholder: "12 rue de la Paix" })}
+        {field("Ville", "ville", { placeholder: "Paris" })}
+        {field("Code postal", "code_postal", { placeholder: "75001" })}
+        {field("N° RPPS", "numero_rpps", { placeholder: "10 chiffres" })}
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-slate-600">Bio / Présentation</label>
+        <textarea
+          rows={4}
+          placeholder="Décrivez votre approche, votre parcours…"
+          value={form.bio}
+          onChange={(e) => setForm({ ...form, bio: e.target.value })}
+          className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-slate-600">
+          Spécialités{" "}
+          <span className="font-normal text-slate-400">(séparées par des virgules)</span>
+        </label>
+        <Input
+          placeholder="Stress, Sommeil, Préparation mentale"
+          value={form.specialites}
+          onChange={(e) => setForm({ ...form, specialites: e.target.value })}
+        />
+      </div>
+
+      {field("Lien téléconsultation", "lien_teleconsultation", {
+        type: "url",
+        placeholder: "https://whereby.com/mon-espace",
+      })}
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Enregistrer le profil
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal créer / modifier un type de séance ────────────────────────────────
+
+function ModalSeance({
+  sophrologueId,
+  editing,      // undefined = création, TypeSeance = modification
+  onClose,
+  onCreated,
+  onUpdated,
+}: {
+  sophrologueId: string;
+  editing?: TypeSeance;
+  onClose: () => void;
+  onCreated: (t: TypeSeance) => void;
+  onUpdated: (t: TypeSeance) => void;
+}) {
+  const isEdit = !!editing;
+  const [form, setForm] = useState({
+    nom: editing?.nom ?? "",
+    duree: editing?.duree_minutes ?? 60,
+    tarif: editing ? String(editing.tarif) : "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nom.trim() || !form.tarif) {
+      setError("Nom et tarif sont obligatoires.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      if (isEdit && editing) {
+        // ── Modification ──────────────────────────────────────────────
+        const res = await fetch("/api/types-seances/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editing.id,
+            nom: form.nom.trim(),
+            duree_minutes: form.duree,
+            tarif: parseFloat(form.tarif),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error ?? "Erreur."); return; }
+        onUpdated({ ...editing, nom: form.nom.trim(), duree_minutes: form.duree, tarif: parseFloat(form.tarif) });
+      } else {
+        // ── Création ──────────────────────────────────────────────────
+        const res = await fetch("/api/types-seances/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sophrologue_id: sophrologueId,
+            nom: form.nom.trim(),
+            duree_minutes: form.duree,
+            tarif: parseFloat(form.tarif),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error ?? "Erreur."); return; }
+        onCreated(json.type_seance);
+      }
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h3 className="text-base font-semibold text-[#1E3A5F]">
+            {isEdit ? "Modifier le type de séance" : "Nouveau type de séance"}
+          </h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-600">
+              Nom <span className="text-red-500">*</span>
+            </label>
+            <Input
+              placeholder="Séance individuelle, Découverte…"
+              value={form.nom}
+              onChange={(e) => setForm({ ...form, nom: e.target.value })}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-600">Durée</label>
+            <select
+              value={form.duree}
+              onChange={(e) => setForm({ ...form, duree: Number(e.target.value) })}
+              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+            >
+              {DUREES.map((d) => (
+                <option key={d} value={d}>{d} minutes</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-600">
+              Tarif (€) <span className="text-red-500">*</span>
+            </label>
+            <Input
+              type="number"
+              min="0"
+              step="0.50"
+              placeholder="60"
+              value={form.tarif}
+              onChange={(e) => setForm({ ...form, tarif: e.target.value })}
+            />
+          </div>
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+          )}
+          <div className="flex justify-end gap-3 pt-1">
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isEdit ? (
+                "Enregistrer"
+              ) : (
+                "Ajouter"
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Onglet 2 : Types de séances ─────────────────────────────────────────────
+
+function TabSeances({
+  sophrologueId,
+  showToast,
+}: {
+  sophrologueId: string;
+  showToast: (msg: string, ok?: boolean) => void;
+}) {
+  const [types, setTypes] = useState<TypeSeance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  // undefined = modal fermé, null = création, TypeSeance = édition
+  const [editingType, setEditingType] = useState<TypeSeance | null | undefined>(undefined);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  useEffect(() => {
+    supabase
+      .from("types_seances")
+      .select("id, nom, duree_minutes, tarif, actif")
+      .eq("sophrologue_id", sophrologueId)
+      .order("nom")
+      .returns<TypeSeance[]>()
+      .then(({ data }) => {
+        setTypes(data ?? []);
+        setLoading(false);
+      });
+  }, [sophrologueId, supabase]);
+
+  const handleToggle = async (t: TypeSeance) => {
+    const res = await fetch("/api/types-seances/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: t.id, actif: !t.actif }),
+    });
+    if (res.ok) {
+      setTypes((prev) => prev.map((x) => (x.id === t.id ? { ...x, actif: !x.actif } : x)));
+    } else {
+      showToast("Impossible de modifier le statut.", false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Supprimer ce type de séance ?")) return;
+    const res = await fetch("/api/types-seances/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      setTypes((prev) => prev.filter((x) => x.id !== id));
+      showToast("Type de séance supprimé.");
+    } else {
+      const json = await res.json();
+      showToast(json.error ?? "Erreur lors de la suppression.", false);
+    }
+  };
+
+  const openCreate = () => { setEditingType(null); setShowModal(true); };
+  const openEdit = (t: TypeSeance) => { setEditingType(t); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setEditingType(undefined); };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-[#2E75B6]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          {types.length} type{types.length !== 1 ? "s" : ""} de séance
+        </p>
+        <Button onClick={openCreate} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Ajouter un type de séance
+        </Button>
+      </div>
+
+      {types.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-500">
+          Aucun type de séance configuré.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="hidden grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 sm:grid">
+            {["Nom", "Durée", "Tarif", "Statut", "Actions"].map((h) => (
+              <span key={h} className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {h}
+              </span>
+            ))}
+          </div>
+          <div className="divide-y divide-slate-100">
+            {types.map((t) => (
+              <div
+                key={t.id}
+                className="grid grid-cols-1 items-center gap-2 px-5 py-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] sm:gap-4"
+              >
+                <span className="font-medium text-slate-900">{t.nom}</span>
+                <span className="text-sm text-slate-600">{t.duree_minutes} min</span>
+                <span className="text-sm font-medium text-slate-900">{t.tarif.toFixed(2)} €</span>
+                <button
+                  onClick={() => handleToggle(t)}
+                  className={`flex items-center gap-1.5 text-sm font-medium ${
+                    t.actif ? "text-[#27AE60]" : "text-slate-400"
+                  }`}
+                >
+                  {t.actif ? (
+                    <ToggleRight className="h-5 w-5" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5" />
+                  )}
+                  {t.actif ? "Actif" : "Inactif"}
+                </button>
+                {/* Edit + Delete */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEdit(t)}
+                    className="text-slate-400 hover:text-[#2E75B6]"
+                    title="Modifier"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(t.id)}
+                    className="text-slate-400 hover:text-red-500"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showModal && (
+        <ModalSeance
+          sophrologueId={sophrologueId}
+          editing={editingType ?? undefined}
+          onClose={closeModal}
+          onCreated={(t) => {
+            setTypes((prev) => [...prev, t]);
+            showToast("Type de séance ajouté.");
+          }}
+          onUpdated={(t) => {
+            setTypes((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+            showToast("Type de séance mis à jour.");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Onglet 3 : Disponibilités ────────────────────────────────────────────────
+
+const DISPO_DEFAULT: Dispo[] = JOURS.map((_, i) => ({
+  jour_semaine: i,
+  heure_debut: "09:00",
+  heure_fin: "18:00",
+  actif: i < 5, // Lun-Ven actifs par défaut
+}));
+
+function TabDisponibilites({
+  sophrologueId,
+  showToast,
+}: {
+  sophrologueId: string;
+  showToast: (msg: string, ok?: boolean) => void;
+}) {
+  const [dispos, setDispos] = useState<Dispo[]>(DISPO_DEFAULT);
+  const [delai, setDelai] = useState(24);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: dispoData } = await supabase
+        .from("disponibilites")
+        .select("jour_semaine, heure_debut, heure_fin, actif")
+        .eq("sophrologue_id", sophrologueId)
+        .returns<Dispo[]>();
+
+      if (dispoData && dispoData.length > 0) {
+        setDispos(
+          JOURS.map((_, i) => {
+            const existing = dispoData.find((d) => d.jour_semaine === i);
+            return (
+              existing ?? {
+                jour_semaine: i,
+                heure_debut: "09:00",
+                heure_fin: "18:00",
+                actif: false,
+              }
+            );
+          }),
+        );
+      }
+
+      const { data: params } = await supabase
+        .from("parametres_cabinet")
+        .select("delai_min_reservation_heures")
+        .eq("sophrologue_id", sophrologueId)
+        .maybeSingle<ParamsCabinet>();
+
+      if (params) setDelai(params.delai_min_reservation_heures);
+      setLoading(false);
+    };
+    load();
+  }, [sophrologueId, supabase]);
+
+  const updateDispo = (i: number, patch: Partial<Dispo>) => {
+    setDispos((prev) => prev.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/sophrologue/disponibilites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sophrologue_id: sophrologueId, dispos, delai }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        showToast(j.error ?? "Erreur lors de la sauvegarde.", false);
+        return;
+      }
+      showToast("Disponibilités enregistrées.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-[#2E75B6]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Jours + heures */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700">Jours et horaires</h3>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {dispos.map((d, i) => (
+            <div
+              key={i}
+              className={`flex flex-wrap items-center gap-4 border-b border-slate-100 px-5 py-3 last:border-0 ${
+                !d.actif ? "opacity-50" : ""
+              }`}
+            >
+              {/* Toggle jour */}
+              <label className="flex w-28 cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={d.actif}
+                  onChange={(e) => updateDispo(i, { actif: e.target.checked })}
+                  className="h-4 w-4 rounded accent-[#2E75B6]"
+                />
+                <span className="text-sm font-medium text-slate-800">{JOURS[i]}</span>
+              </label>
+
+              {/* Heures */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={d.heure_debut}
+                  disabled={!d.actif}
+                  onChange={(e) => updateDispo(i, { heure_debut: e.target.value })}
+                  className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+                />
+                <span className="text-xs text-slate-400">à</span>
+                <input
+                  type="time"
+                  value={d.heure_fin}
+                  disabled={!d.actif}
+                  onChange={(e) => updateDispo(i, { heure_fin: e.target.value })}
+                  className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+                />
+              </div>
+
+              {d.actif && (
+                <span className="ml-auto flex items-center gap-1 text-xs text-[#27AE60]">
+                  <Check className="h-3.5 w-3.5" /> Disponible
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Délai minimum */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-slate-700">
+          Délai minimum avant réservation
+        </h3>
+        <select
+          value={delai}
+          onChange={(e) => setDelai(Number(e.target.value))}
+          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+        >
+          {DELAIS.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-500">
+          Les patients ne pourront pas réserver moins de {DELAIS.find((d) => d.value === delai)?.label.toLowerCase()} avant la séance.
+        </p>
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Enregistrer les disponibilités
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
+
+export default function ParametresPage() {
+  const [tab, setTab] = useState<Tab>("profil");
+  const [sophrologue, setSophrologue] = useState<Sophrologue | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast, show: showToast } = useToast();
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const { data } = await supabase
+        .from("sophrologues")
+        .select("id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, code_postal")
+        .eq("user_id", user.id)
+        .maybeSingle<Sophrologue>();
+
+      if (!cancelled) {
+        setSophrologue(data ?? null);
+        setLoading(false);
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+  }, [supabase]);
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-[#2E75B6]" />
+      </main>
+    );
+  }
+
+  if (!sophrologue) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <p className="text-sm text-slate-500">Profil sophrologue introuvable.</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-10">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#1E3A5F]">Paramètres</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Gérez votre profil, vos types de séances et vos disponibilités.
+          </p>
+        </div>
+
+        <TabBar active={tab} onChange={setTab} />
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          {tab === "profil" && (
+            <TabProfil
+              sophrologue={sophrologue}
+              onSaved={setSophrologue}
+              showToast={showToast}
+            />
+          )}
+          {tab === "seances" && (
+            <TabSeances sophrologueId={sophrologue.id} showToast={showToast} />
+          )}
+          {tab === "disponibilites" && (
+            <TabDisponibilites sophrologueId={sophrologue.id} showToast={showToast} />
+          )}
+        </div>
+      </div>
+
+      <Toast toast={toast} />
+    </main>
+  );
+}

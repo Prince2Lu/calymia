@@ -11,7 +11,9 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const {
-      userId,
+      userId,   // auth.users UUID — used in WHERE user_id = userId
+      prenom,
+      nom,
       bio,
       specialties,
       rpps,
@@ -22,6 +24,8 @@ export async function POST(request: Request) {
       phone,
     } = body as {
       userId?: string;
+      prenom?: string;
+      nom?: string;
       bio?: string;
       specialties?: string[];
       rpps?: string;
@@ -32,50 +36,66 @@ export async function POST(request: Request) {
       phone?: string;
     };
 
+    console.log("[sophrologue/update] userId reçu :", userId);
+    console.log("[sophrologue/update] payload complet :", {
+      prenom, nom, bio, specialties, rpps,
+      teleconsultationUrl, address, city, postalCode, phone,
+    });
+
     if (!userId) {
+      console.error("[sophrologue/update] userId manquant dans le body");
       return NextResponse.json(
         { error: "Utilisateur non identifié pour la mise à jour." },
         { status: 400 },
       );
     }
 
-    console.log("Update called for userId:", userId);
+    const updatePayload = {
+      ...(prenom !== undefined && { prenom }),
+      ...(nom !== undefined && { nom }),
+      ...(bio !== undefined && { bio }),
+      ...(specialties !== undefined && { specialites: specialties }),
+      ...(rpps !== undefined && { numero_rpps: rpps }),
+      ...(teleconsultationUrl !== undefined && { lien_teleconsultation: teleconsultationUrl }),
+      ...(address !== undefined && { adresse: address }),
+      ...(city !== undefined && { ville: city }),
+      ...(postalCode !== undefined && { code_postal: postalCode }),
+      ...(phone !== undefined && { telephone: phone }),
+    };
 
-    const { error } = await supabase
+    console.log("[sophrologue/update] Colonnes mises à jour :", updatePayload);
+
+    const { data, error } = await supabase
       .from("sophrologues")
-      .update({
-        bio,
-        specialites: specialties,
-        numero_rpps: rpps,
-        lien_teleconsultation: teleconsultationUrl,
-        adresse: address,
-        ville: city,
-        code_postal: postalCode,
-        telephone: phone,
-      })
-      .eq("user_id", userId);
+      .update(updatePayload)
+      .eq("user_id", userId)
+      .select("id, user_id, prenom, nom");
+
+    console.log("[sophrologue/update] Réponse Supabase — data :", data, "| error :", error);
 
     if (error) {
-      console.error("Supabase update error:", error);
+      console.error("[sophrologue/update] Erreur Supabase :", error);
       return NextResponse.json(
-        {
-          error:
-            "Erreur lors de la mise à jour de votre profil. Merci de réessayer.",
-        },
+        { error: "Erreur lors de la mise à jour de votre profil. Merci de réessayer." },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ success: true });
+    if (!data || data.length === 0) {
+      console.warn("[sophrologue/update] Aucune ligne mise à jour — user_id introuvable :", userId);
+      return NextResponse.json(
+        { error: "Profil introuvable pour cet utilisateur." },
+        { status: 404 },
+      );
+    }
+
+    console.log("[sophrologue/update] Succès — ligne mise à jour :", data[0]);
+    return NextResponse.json({ success: true, sophrologue: data[0] });
   } catch (error) {
-    console.error("Sophrologue update - unexpected exception:", error);
+    console.error("[sophrologue/update] Exception inattendue :", error);
     return NextResponse.json(
-      {
-        error:
-          "Une erreur inattendue est survenue lors de la mise à jour de votre profil.",
-      },
+      { error: "Une erreur inattendue est survenue lors de la mise à jour de votre profil." },
       { status: 500 },
     );
   }
 }
-
