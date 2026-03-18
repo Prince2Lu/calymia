@@ -252,7 +252,7 @@ function SignUpForm() {
 
       <Button
         type="submit"
-        className="w-full bg-[#1E3A5F] hover:bg-[#2E75B6]"
+        className="w-full"
         disabled={loading}
       >
         Créer mon compte Calymia

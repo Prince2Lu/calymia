@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PaymentForm } from "@/components/booking/PaymentForm";
 
@@ -363,7 +363,7 @@ export default function ReserverPage() {
     <main className="min-h-screen bg-white">
       <div className="mx-auto max-w-5xl px-4 py-10">
         <div className="mb-6 space-y-2">
-          <Badge>Réservation Calymia</Badge>
+          <Image src="/logo.webp" alt="Calymia" width={120} height={48} style={{ height: "auto" }} />
           <h1 className="text-3xl font-semibold text-[#1E3A5F]">
             Prendre rendez-vous
           </h1>
@@ -377,7 +377,7 @@ export default function ReserverPage() {
         </div>
 
         <div className="mb-6">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+          <div className="flex items-center justify-between text-xs font-medium">
             {["Créneau", "Infos client", "Paiement", "Confirmation"].map((t, i) => {
               const n = (i + 1) as Step;
               const active = n === step;
@@ -385,24 +385,30 @@ export default function ReserverPage() {
               return (
                 <div key={t} className="flex flex-1 items-center">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                      done
-                        ? "bg-[#27AE60] text-white"
-                        : active
-                          ? "bg-[#2E75B6] text-white"
-                          : "bg-slate-200 text-slate-700"
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                      done || active
+                        ? "border-[#426F59] bg-[#426F59] text-white"
+                        : "border-[#C5D9CC] bg-[#E8F0EC] text-[#426F59]"
                     }`}
                   >
                     {n}
                   </div>
-                  <span className="ml-2 hidden text-slate-700 sm:inline">
+                  <span
+                    className={`ml-2 hidden sm:inline ${
+                      active
+                        ? "font-semibold text-[#426F59]"
+                        : done
+                          ? "text-[#426F59]"
+                          : "text-[#9CA3AF]"
+                    }`}
+                  >
                     {t}
                   </span>
                   {n < 4 ? (
-                    <div className="ml-2 hidden h-0.5 flex-1 rounded bg-slate-200 sm:block">
+                    <div className="ml-2 hidden h-0.5 flex-1 rounded bg-[#C5D9CC] sm:block">
                       <div
-                        className={`h-0.5 rounded ${
-                          step > n ? "bg-[#27AE60]" : "bg-transparent"
+                        className={`h-0.5 rounded transition-all ${
+                          step > n ? "w-full bg-[#426F59]" : "w-0"
                         }`}
                       />
                     </div>
@@ -411,9 +417,9 @@ export default function ReserverPage() {
               );
             })}
           </div>
-          <div className="mt-3 h-1 w-full rounded-full bg-slate-200">
+          <div className="mt-3 h-1 w-full rounded-full bg-[#C5D9CC]">
             <div
-              className="h-1 rounded-full bg-[#2E75B6] transition-all"
+              className="h-1 rounded-full bg-[#426F59] transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -648,7 +654,7 @@ export default function ReserverPage() {
 
                 <Button
                   type="button"
-                  className="w-full bg-[#1E3A5F] hover:bg-[#2E75B6]"
+                  className="w-full"
                   onClick={createPaymentIntent}
                   disabled={loading}
                 >
@@ -749,7 +755,6 @@ export default function ReserverPage() {
               <Button
                 type="button"
                 onClick={goNext}
-                className="bg-[#1E3A5F] hover:bg-[#2E75B6]"
                 disabled={loading}
               >
                 Continuer

@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-
 type SophrologueRow = {
   id: string | number;
   slug: string;
@@ -198,7 +197,7 @@ export default async function SophrologueProfilPage({
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Badge>Calymia</Badge>
+                <Image src="/logo.webp" alt="Calymia" width={120} height={48} style={{ height: "auto" }} />
                 <h1 className="text-3xl font-semibold tracking-tight text-[#1E3A5F] sm:text-4xl">
                   {fullName || "Sophrologue"}
                 </h1>
@@ -230,7 +229,7 @@ export default async function SophrologueProfilPage({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a
                   href={`/sophrologues/${deptSlug}/${villeSlug}/${data.slug}/reserver`}
-                  className="inline-flex items-center justify-center rounded-md font-medium bg-[#27AE60] text-white hover:bg-green-700 h-10 px-6 py-2 text-sm"
+                  className="btn-primary inline-flex items-center justify-center rounded-md font-medium transition-all duration-150 bg-[#426F59] text-white hover:bg-[#355849] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 h-10 px-6 py-2 text-sm"
                 >
                   Prendre rendez-vous
                 </a>

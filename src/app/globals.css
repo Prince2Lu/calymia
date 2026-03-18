@@ -12,7 +12,12 @@ body {
     "Segoe UI", sans-serif;
 }
 
-a {
+a:not([class*="bg-"]):not(.btn-primary) {
   color: #2e75b6;
+}
+
+a.btn-primary {
+  color: white !important;
+  text-decoration: none;
 }
 
