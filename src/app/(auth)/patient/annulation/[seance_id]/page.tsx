@@ -284,10 +284,10 @@ export default function AnnulationPage() {
                 Retour à mon espace
               </Button>
               <Button
-                onClick={() => router.push("/")}
+                onClick={() => router.push("/patient")}
                 className="flex-1 bg-[#1E3A5F] hover:bg-[#2E75B6]"
               >
-                Retour à l'accueil
+                Retour à mon espace
               </Button>
             </div>
           </Card>

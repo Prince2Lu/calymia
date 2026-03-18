@@ -217,10 +217,7 @@ export async function POST(request: NextRequest) {
     // ── 6) Marquer la séance comme annulée ────────────────────────────────────
     const { error: updateError } = await supabaseAdmin
       .from("seances")
-      .update({
-        statut: "annulee",
-        ...(annule_par ? { annule_par } : {}),
-      })
+      .update({ statut: "annulee" })
       .eq("id", seance_id);
 
     if (updateError) {
