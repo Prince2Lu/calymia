@@ -169,7 +169,12 @@ export default function ReserverPage() {
 
   const goBack = () => {
     setError(null);
-    setStep((s) => (s > 1 ? ((s - 1) as Step) : s));
+    if (step === 1) {
+      // Retour vers la page vitrine du sophrologue
+      router.push(`/sophrologues/${params.dept}/${params.ville}/${params.slug}`);
+      return;
+    }
+    setStep((s) => (s - 1) as Step);
   };
 
   const goNext = () => {
@@ -595,7 +600,7 @@ export default function ReserverPage() {
               type="button"
               variant="outline"
               onClick={goBack}
-              disabled={step === 1 || loading}
+              disabled={loading}
             >
               Retour
             </Button>

@@ -117,12 +117,22 @@ export async function generateMetadata({
   };
 }
 
+/** Transforme "Sarreguemines" → "sarreguemines", gère les accents */
+function slugifyVille(ville: string) {
+  return ville
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export default async function SophrologueProfilPage({
   params,
 }: {
   params: Promise<{ dept: string; ville: string; slug: string }>;
 }) {
-  const { dept, ville, slug } = await params;
+  const { slug } = await params;
   const { data } = await fetchSophrologueBySlug(slug);
 
   if (!data) notFound();
@@ -130,8 +140,13 @@ export default async function SophrologueProfilPage({
   const prenom = data.prenom ?? "";
   const nom = data.nom ?? "";
   const fullName = `${prenom} ${nom}`.trim();
-  const city = data.ville ?? "";
+  const city = data.ville ?? "";          // toujours depuis la base de données
   const specialites = normalizeSpecialites(data.specialites);
+
+  // Construit le segment URL de la ville et du département depuis la BDD
+  // (pas depuis les params URL qui peuvent être obsolètes)
+  const villeSlug = city ? slugifyVille(city) : "ville";
+  const deptSlug = data.departement ?? "fr";
 
   const description = `Prenez RDV avec ${fullName}, sophrologue à ${city}. Spécialités : ${specialites
     .map(specialtyLabel)
@@ -142,9 +157,7 @@ export default async function SophrologueProfilPage({
     "@type": "MedicalBusiness",
     name: fullName,
     description,
-    url: `https://calymia.fr/sophrologues/${data.departement ?? ""}/${(
-      data.ville ?? ""
-    ).toLowerCase()}/${data.slug}`,
+    url: `https://calymia.fr/sophrologues/${deptSlug}/${villeSlug}/${data.slug}`,
     image: data.photo_url || undefined,
     telephone: data.telephone || undefined,
     address: {
@@ -216,7 +229,7 @@ export default async function SophrologueProfilPage({
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a
-                  href={`/sophrologues/${dept}/${ville}/${slug}/reserver`}
+                  href={`/sophrologues/${deptSlug}/${villeSlug}/${data.slug}/reserver`}
                   className="inline-flex items-center justify-center rounded-md font-medium bg-[#27AE60] text-white hover:bg-green-700 h-10 px-6 py-2 text-sm"
                 >
                   Prendre rendez-vous

@@ -315,6 +315,7 @@ export default function PatientSpacePage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [notPatient, setNotPatient] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [upcomingSeances, setUpcomingSeances] = useState<Seance[]>([]);
   const [pastSeances, setPastSeances] = useState<Seance[]>([]);
 
@@ -326,25 +327,56 @@ export default function PatientSpacePage() {
   useEffect(() => {
     let cancelled = false;
 
+    // Timeout de sécurité : 8 secondes max
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        console.error("[patient/page] Timeout — chargement trop long");
+        setLoadError("Le chargement a pris trop de temps. Vérifiez votre connexion.");
+        setLoading(false);
+      }
+    }, 8000);
+
     const load = async () => {
+      console.log("[patient/page] Début chargement");
+
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (!user || cancelled) return;
+      console.log("[patient/page] Auth user:", user?.id ?? "non connecté", authError ?? "");
+
+      if (!user || cancelled) {
+        clearTimeout(timeout);
+        if (!cancelled) {
+          setLoadError("Vous devez être connecté pour accéder à cette page.");
+          setLoading(false);
+        }
+        return;
+      }
 
       // Cherche une fiche patient liée au user_id
-      const { data: patientData } = await supabase
+      const { data: patientData, error: patientError } = await supabase
         .from("patients")
         .select("id, prenom, nom, email, telephone, user_id")
         .eq("user_id", user.id)
         .maybeSingle<Patient>();
 
-      if (cancelled) return;
+      console.log("[patient/page] Fiche patient:", patientData?.id ?? "introuvable", patientError ?? "");
+
+      if (cancelled) { clearTimeout(timeout); return; }
+
+      if (patientError) {
+        setLoadError(`Erreur lors du chargement du profil : ${patientError.message}`);
+        setLoading(false);
+        clearTimeout(timeout);
+        return;
+      }
 
       if (!patientData) {
         setNotPatient(true);
         setLoading(false);
+        clearTimeout(timeout);
         return;
       }
 
@@ -377,16 +409,28 @@ export default function PatientSpacePage() {
         .order("debut_at", { ascending: false })
         .returns<Seance[]>();
 
+      console.log("[patient/page] Séances à venir:", upcoming?.length ?? 0, "| passées:", past?.length ?? 0);
+
       if (!cancelled) {
         setUpcomingSeances(upcoming ?? []);
         setPastSeances(past ?? []);
         setLoading(false);
+        clearTimeout(timeout);
       }
     };
 
-    load();
+    load().catch((err) => {
+      console.error("[patient/page] Erreur inattendue dans load():", err);
+      if (!cancelled) {
+        setLoadError("Une erreur inattendue est survenue.");
+        setLoading(false);
+        clearTimeout(timeout);
+      }
+    });
+
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, [supabase]);
 
@@ -399,7 +443,32 @@ export default function PatientSpacePage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-[#2E75B6]" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[#2E75B6]" />
+          <p className="text-sm text-slate-500">Chargement de votre espace…</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
+            <AlertCircle className="h-7 w-7 text-red-400" />
+          </div>
+          <h1 className="mb-2 text-lg font-semibold text-[#1E3A5F]">
+            Erreur de chargement
+          </h1>
+          <p className="mb-4 text-sm text-slate-500">{loadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-sm font-medium text-[#2E75B6] hover:underline"
+          >
+            Réessayer
+          </button>
+        </div>
       </main>
     );
   }

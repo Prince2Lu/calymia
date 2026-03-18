@@ -52,15 +52,35 @@ function SignInForm() {
       return;
     }
 
-    const role =
-      (data.user.user_metadata as { role?: string } | null | undefined)
-        ?.role ?? "sophrologue";
+    // Détecte le rôle réel en interrogeant la base de données
+    const userId = data.user.id;
 
-    if (role === "patient") {
-      router.push("/patient");
-    } else {
+    // 1) Sophrologue ?
+    const { data: sophrologue } = await supabase
+      .from("sophrologues")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle<{ id: string }>();
+
+    if (sophrologue) {
       router.push("/dashboard");
+      return;
     }
+
+    // 2) Patient ?
+    const { data: patient } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle<{ id: string }>();
+
+    if (patient) {
+      router.push("/patient");
+      return;
+    }
+
+    // 3) Aucun profil trouvé
+    router.push("/");
   };
 
   return (
