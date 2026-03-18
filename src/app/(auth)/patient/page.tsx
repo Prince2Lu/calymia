@@ -17,6 +17,7 @@ import {
   X,
   AlertCircle,
   CalendarDays,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -305,6 +306,141 @@ function InfoSection({ patient }: { patient: Patient }) {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+// ─── Composant : changement de mot de passe ───────────────────────────────────
+
+function ChangePasswordSection() {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    setSaving(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setSaving(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setSuccess(true);
+    setPassword("");
+    setConfirm("");
+    setTimeout(() => {
+      setSuccess(false);
+      setOpen(false);
+    }, 3000);
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
+    setPassword("");
+    setConfirm("");
+    setError(null);
+    setSuccess(false);
+  };
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F0F7F4]">
+            <KeyRound className="h-4 w-4 text-[#426F59]" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">
+              Mot de passe
+            </h2>
+            <p className="text-xs text-slate-400">Modifier votre mot de passe de connexion</p>
+          </div>
+        </div>
+        {!open && (
+          <button
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 text-sm text-[#426F59] hover:underline"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Modifier
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-800">
+              Nouveau mot de passe
+            </label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 8 caractères"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-800">
+              Confirmer le mot de passe
+            </label>
+            <Input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Répétez le mot de passe"
+            />
+          </div>
+
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="rounded-lg bg-[#F0F7F4] px-3 py-2 text-sm font-medium text-[#426F59]">
+              ✓ Mot de passe mis à jour avec succès.
+            </p>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <Button type="submit" disabled={saving} size="sm">
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Mettre à jour"
+              )}
+            </Button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={saving}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }
@@ -701,6 +837,9 @@ export default function PatientSpacePage() {
             </p>
           </section>
         )}
+
+        {/* ── Section 5 : Mot de passe ──────────────────────────────────── */}
+        <ChangePasswordSection />
       </div>
     </main>
   );
