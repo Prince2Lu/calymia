@@ -25,6 +25,24 @@ type PatientInfo = {
   consent: boolean;
 };
 
+// jour_semaine : 0=Lundi … 6=Dimanche (convention BDD)
+type DispoRow = {
+  jour_semaine: number;
+  heure_debut: string; // "09:00"
+  heure_fin: string;   // "18:00"
+};
+
+type AvailabilityData = {
+  // JS getDay() → DispoRow | null
+  dispoByJsDay: Map<number, DispoRow>;
+  // ensemble des heures déjà réservées : "YYYY-MM-DDThh:00"
+  bookedKeys: Set<string>;
+  // délai minimum en heures avant réservation
+  delaiMinHeures: number;
+};
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
 function pad2(n: number) {
   return n.toString().padStart(2, "0");
 }
@@ -54,11 +72,6 @@ function addDays(d: Date, days: number) {
   return x;
 }
 
-function isWeekend(d: Date) {
-  const day = d.getDay(); // 0 Sun ... 6 Sat
-  return day === 0 || day === 6;
-}
-
 function isSameDay(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -67,14 +80,38 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
-function buildHourlySlots(day: Date) {
-  // Lun-Ven 9:00 à 18:00, créneaux 60 minutes, dernier départ 17:00
+/** Convertit jour_semaine BDD (0=Lun … 6=Dim) → JS getDay() (0=Dim, 1=Lun … 6=Sam) */
+function dbJourToJsDay(dbJour: number): number {
+  return (dbJour + 1) % 7;
+}
+
+/** Clé unique pour un créneau réservé : "YYYY-MM-DDThh" */
+function bookedKey(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}`;
+}
+
+/** Génère les créneaux horaires disponibles pour un jour donné */
+function buildSlotsFromDispo(
+  day: Date,
+  dispo: DispoRow,
+  bookedKeys: Set<string>,
+  delaiMinHeures: number,
+): Date[] {
   const slots: Date[] = [];
-  const base = new Date(day);
-  base.setHours(9, 0, 0, 0);
-  for (let h = 9; h <= 17; h += 1) {
+  const [startH] = dispo.heure_debut.split(":").map(Number);
+  const [endH] = dispo.heure_fin.split(":").map(Number);
+  // Dernier départ = endH - 1 (séance de 60 min)
+  const lastSlotH = endH - 1;
+  const now = new Date();
+  const cutoff = new Date(now.getTime() + delaiMinHeures * 60 * 60 * 1000);
+
+  for (let h = startH; h <= lastSlotH; h++) {
     const slot = new Date(day);
     slot.setHours(h, 0, 0, 0);
+    // Exclure les créneaux trop proches ou passés
+    if (slot <= cutoff) continue;
+    // Exclure les créneaux déjà réservés
+    if (bookedKeys.has(bookedKey(slot))) continue;
     slots.push(slot);
   }
   return slots;
@@ -106,6 +143,9 @@ export default function ReserverPage() {
   const [sophrologue, setSophrologue] = useState<SophrologueLite | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [seanceId, setSeanceId] = useState<string | number | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityData | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [noAvailability, setNoAvailability] = useState(false);
 
   const supabase = useMemo(
     () =>
@@ -121,18 +161,83 @@ export default function ReserverPage() {
     const run = async () => {
       const slug = params.slug;
       if (!slug) return;
-      const { data } = await supabase
+
+      // 1) Sophrologue de base
+      const { data: sophroData } = await supabase
         .from("sophrologues")
         .select("id, prenom, nom")
         .eq("slug", slug)
         .eq("actif", true)
         .maybeSingle<SophrologueLite>();
-      if (!cancelled) setSophrologue(data ?? null);
+
+      if (!sophroData || cancelled) return;
+      setSophrologue(sophroData);
+
+      const sid = sophroData.id;
+      const horizon = addDays(new Date(), 28).toISOString();
+
+      // 2) Disponibilités actives
+      const { data: dispos } = await supabase
+        .from("disponibilites")
+        .select("jour_semaine, heure_debut, heure_fin")
+        .eq("sophrologue_id", sid)
+        .eq("actif", true)
+        .returns<DispoRow[]>();
+
+      // 3) Séances déjà réservées dans les 4 prochaines semaines
+      const { data: seances } = await supabase
+        .from("seances")
+        .select("debut_at")
+        .eq("sophrologue_id", sid)
+        .in("statut", ["confirmee", "en_attente"])
+        .gt("debut_at", new Date().toISOString())
+        .lt("debut_at", horizon)
+        .returns<{ debut_at: string }[]>();
+
+      // 4) Paramètres cabinet (délai minimum)
+      const { data: params_cabinet } = await supabase
+        .from("parametres_cabinet")
+        .select("delai_min_reservation_heures")
+        .eq("sophrologue_id", sid)
+        .maybeSingle<{ delai_min_reservation_heures: number }>();
+
+      if (cancelled) return;
+
+      // Construire la map JS-day → DispoRow
+      const dispoByJsDay = new Map<number, DispoRow>();
+      for (const d of dispos ?? []) {
+        dispoByJsDay.set(dbJourToJsDay(d.jour_semaine), d);
+      }
+
+      // Construire l'ensemble des créneaux déjà pris
+      const bookedKeys = new Set<string>();
+      for (const s of seances ?? []) {
+        bookedKeys.add(bookedKey(new Date(s.debut_at)));
+      }
+
+      const delaiMinHeures = params_cabinet?.delai_min_reservation_heures ?? 24;
+
+      const avail: AvailabilityData = { dispoByJsDay, bookedKeys, delaiMinHeures };
+      setAvailability(avail);
+      setNoAvailability(dispoByJsDay.size === 0);
+      setAvailabilityLoading(false);
+
+      // Sélectionner automatiquement le premier jour disponible
+      const today = startOfDay(new Date());
+      for (let i = 0; i < 28; i++) {
+        const d = addDays(today, i);
+        const dispo = avail.dispoByJsDay.get(d.getDay());
+        if (dispo) {
+          const slots = buildSlotsFromDispo(d, dispo, bookedKeys, delaiMinHeures);
+          if (slots.length > 0) {
+            if (!cancelled) setSelectedDay(d);
+            break;
+          }
+        }
+      }
     };
     run();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [params.slug, supabase]);
 
   const sophrologueName = useMemo(() => {
@@ -155,15 +260,17 @@ export default function ReserverPage() {
     return out;
   }, [days]);
 
-  const availableDaysSet = useMemo(() => {
-    // Dispo par défaut : lun-ven
-    return new Set<number>([1, 2, 3, 4, 5]);
-  }, []);
-
   const slotsForSelectedDay = useMemo(() => {
-    if (!availableDaysSet.has(selectedDay.getDay())) return [];
-    return buildHourlySlots(selectedDay);
-  }, [availableDaysSet, selectedDay]);
+    if (!availability) return [];
+    const dispo = availability.dispoByJsDay.get(selectedDay.getDay());
+    if (!dispo) return [];
+    return buildSlotsFromDispo(
+      selectedDay,
+      dispo,
+      availability.bookedKeys,
+      availability.delaiMinHeures,
+    );
+  }, [availability, selectedDay]);
 
   const progress = (step / 4) * 100;
 
@@ -329,98 +436,132 @@ export default function ReserverPage() {
 
           <div className="mt-6 space-y-6">
             {step === 1 ? (
-              <section className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
-                <div className="space-y-3">
-                  <h2 className="text-sm font-semibold text-slate-800">
-                    Calendrier (4 semaines)
-                  </h2>
-                  <div className="space-y-3">
-                    {weeks.map((week, wi) => (
-                      <div
-                        key={`w-${wi}`}
-                        className="grid grid-cols-7 gap-2"
-                      >
-                        {week.map((d) => {
-                          const isAvailable = availableDaysSet.has(d.getDay());
-                          const isSelected = isSameDay(d, selectedDay);
-                          const isDisabled = !isAvailable || isWeekend(d);
-                          return (
-                            <button
-                              key={d.toISOString()}
-                              type="button"
-                              onClick={() => {
-                                if (isDisabled) return;
-                                setSelectedDay(startOfDay(d));
-                                setSelectedSlot(null);
-                              }}
-                              className={`rounded-lg border px-2 py-2 text-xs transition-colors ${
-                                isSelected
-                                  ? "border-[#2E75B6] bg-[#2E75B6]/10 text-[#1E3A5F]"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              } ${isDisabled ? "opacity-40 cursor-not-allowed" : ""}`}
-                              aria-disabled={isDisabled}
-                            >
-                              <div className="font-semibold">
-                                {d.toLocaleDateString("fr-FR", {
-                                  weekday: "short",
-                                })}
-                              </div>
-                              <div className="text-sm font-semibold">
-                                {d.getDate()}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
+              <section className="space-y-4">
+                {availabilityLoading ? (
+                  <div className="flex items-center gap-3 py-8 text-sm text-slate-500">
+                    <svg className="h-5 w-5 animate-spin text-[#2E75B6]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Chargement des disponibilités…
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Disponibilités par défaut : lundi à vendredi, 9h–18h.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h2 className="text-sm font-semibold text-slate-800">
-                    Créneaux du {formatDateFR(selectedDay)}
-                  </h2>
-                  {slotsForSelectedDay.length === 0 ? (
-                    <p className="text-sm text-slate-600">
-                      Aucun créneau disponible ce jour-là.
+                ) : noAvailability ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
+                    <p className="text-sm font-medium text-amber-800">
+                      Aucune disponibilité configurée
                     </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {slotsForSelectedDay.map((slot) => {
-                        const selected =
-                          selectedSlot?.getTime() === slot.getTime();
-                        return (
-                          <button
-                            key={slot.toISOString()}
-                            type="button"
-                            onClick={() => setSelectedSlot(slot)}
-                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                              selected
-                                ? "border-[#27AE60] bg-[#27AE60]/15 text-[#1E3A5F]"
-                                : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
-                            }`}
-                          >
-                            {formatTime(slot)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {selectedSlot ? (
-                    <div className="rounded-xl border border-[#27AE60]/30 bg-[#27AE60]/5 p-3">
-                      <p className="text-sm text-slate-800">
-                        <span className="font-semibold text-[#1E3A5F]">
-                          Créneau sélectionné
-                        </span>{" "}
-                        : {formatDateFR(selectedSlot)} à {formatTime(selectedSlot)}
+                    <p className="mt-1 text-xs text-amber-700">
+                      Ce sophrologue n'a pas encore renseigné ses créneaux. Contactez-le directement.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
+                    {/* ── Calendrier ──────────────────────────────────── */}
+                    <div className="space-y-3">
+                      <h2 className="text-sm font-semibold text-slate-800">
+                        Calendrier (4 semaines)
+                      </h2>
+                      <div className="space-y-3">
+                        {weeks.map((week, wi) => (
+                          <div key={`w-${wi}`} className="grid grid-cols-7 gap-1.5">
+                            {week.map((d) => {
+                              const dispo = availability?.dispoByJsDay.get(d.getDay());
+                              const hasSlots =
+                                availability != null &&
+                                dispo != null &&
+                                buildSlotsFromDispo(
+                                  d,
+                                  dispo,
+                                  availability.bookedKeys,
+                                  availability.delaiMinHeures,
+                                ).length > 0;
+                              const isSelected = isSameDay(d, selectedDay);
+                              const isDisabled = !hasSlots;
+                              return (
+                                <button
+                                  key={d.toISOString()}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isDisabled) return;
+                                    setSelectedDay(startOfDay(d));
+                                    setSelectedSlot(null);
+                                  }}
+                                  className={`rounded-lg border px-1 py-2 text-xs transition-colors ${
+                                    isSelected
+                                      ? "border-[#2E75B6] bg-[#2E75B6]/10 text-[#1E3A5F] font-semibold"
+                                      : hasSlots
+                                        ? "border-slate-200 bg-white text-slate-700 hover:border-[#2E75B6]/40 hover:bg-slate-50"
+                                        : "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed"
+                                  }`}
+                                  aria-disabled={isDisabled}
+                                  title={
+                                    isDisabled
+                                      ? "Aucun créneau disponible"
+                                      : `${dispo!.heure_debut} – ${dispo!.heure_fin}`
+                                  }
+                                >
+                                  <div className="font-medium">
+                                    {d.toLocaleDateString("fr-FR", { weekday: "short" })}
+                                  </div>
+                                  <div className="text-sm font-semibold">{d.getDate()}</div>
+                                  {hasSlots && !isSelected && (
+                                    <div className="mx-auto mt-1 h-1 w-1 rounded-full bg-[#27AE60]" />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        ● Créneau disponible · Jours grisés = aucun créneau libre
                       </p>
                     </div>
-                  ) : null}
-                </div>
+
+                    {/* ── Créneaux du jour sélectionné ────────────────── */}
+                    <div className="space-y-3">
+                      <h2 className="text-sm font-semibold text-slate-800">
+                        Créneaux du {formatDateFR(selectedDay)}
+                      </h2>
+                      {slotsForSelectedDay.length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                          Aucun créneau disponible ce jour-là. Choisissez une autre date.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {slotsForSelectedDay.map((slot) => {
+                            const selected = selectedSlot?.getTime() === slot.getTime();
+                            return (
+                              <button
+                                key={slot.toISOString()}
+                                type="button"
+                                onClick={() => setSelectedSlot(slot)}
+                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                                  selected
+                                    ? "border-[#27AE60] bg-[#27AE60]/15 text-[#1E3A5F]"
+                                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
+                                }`}
+                              >
+                                {formatTime(slot)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {selectedSlot && (
+                        <div className="rounded-xl border border-[#27AE60]/30 bg-[#27AE60]/5 p-3">
+                          <p className="text-sm text-slate-800">
+                            <span className="font-semibold text-[#1E3A5F]">
+                              Créneau sélectionné
+                            </span>{" "}
+                            : {formatDateFR(selectedSlot)} à {formatTime(selectedSlot)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </section>
             ) : null}
 
