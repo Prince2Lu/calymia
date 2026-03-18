@@ -147,6 +147,21 @@ export default function ReserverPage() {
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [noAvailability, setNoAvailability] = useState(false);
 
+  // ── Account detection & inline login (step 2) ──────────────────────────────
+  type EmailStatus = "idle" | "checking" | "exists" | "new";
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // ── Account creation (step 4) ───────────────────────────────────────────────
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountPasswordConfirm, setAccountPasswordConfirm] = useState("");
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [accountDone, setAccountDone] = useState(false);
+
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -357,6 +372,99 @@ export default function ReserverPage() {
     setSeanceId(data.seance_id);
     setLoading(false);
     setStep(3);
+  };
+
+  // ── Email blur: check if account exists ────────────────────────────────────
+  const handleEmailBlur = async () => {
+    const email = patient.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (isLoggedIn) return;
+    setEmailStatus("checking");
+    setLoginError(null);
+    try {
+      const res = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = (await res.json()) as { exists: boolean };
+      setEmailStatus(data.exists ? "exists" : "new");
+    } catch {
+      setEmailStatus("idle");
+    }
+  };
+
+  // ── Inline login ───────────────────────────────────────────────────────────
+  const handleInlineLogin = async () => {
+    setLoginError(null);
+    setLoginLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: patient.email.trim(),
+      password: loginPassword,
+    });
+    if (error || !data.user) {
+      setLoginError("Mot de passe incorrect. Vérifiez et réessayez.");
+      setLoginLoading(false);
+      return;
+    }
+    // Pre-fill form if patient data available (requires RLS read on own record)
+    const { data: patientData } = await supabase
+      .from("patients")
+      .select("prenom, nom, telephone")
+      .eq("email", patient.email.trim())
+      .maybeSingle<{ prenom: string | null; nom: string | null; telephone: string | null }>();
+    if (patientData) {
+      setPatient((p) => ({
+        ...p,
+        prenom: patientData.prenom || p.prenom,
+        nom: patientData.nom || p.nom,
+        telephone: patientData.telephone || p.telephone,
+      }));
+    }
+    setIsLoggedIn(true);
+    setLoginLoading(false);
+  };
+
+  // ── Account creation after payment ────────────────────────────────────────
+  const handleCreateAccount = async () => {
+    setAccountError(null);
+    if (!accountPassword) {
+      setAccountError("Choisissez un mot de passe.");
+      return;
+    }
+    if (accountPassword.length < 8) {
+      setAccountError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+    if (accountPassword !== accountPasswordConfirm) {
+      setAccountError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    setAccountLoading(true);
+    const res = await fetch("/api/auth/create-client-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: patient.email.trim(),
+        password: accountPassword,
+        patient_email: patient.email.trim(),
+      }),
+    });
+    const data = (await res.json()) as { success?: boolean; error?: string };
+    if (data.error === "exists") {
+      setAccountError(
+        "Un compte existe déjà pour cet email. Connectez-vous depuis la page de connexion.",
+      );
+      setAccountLoading(false);
+      return;
+    }
+    if (!data.success) {
+      setAccountError("Une erreur est survenue. Merci de réessayer.");
+      setAccountLoading(false);
+      return;
+    }
+    setAccountDone(true);
+    setAccountLoading(false);
   };
 
   return (
@@ -605,10 +713,15 @@ export default function ReserverPage() {
                     <Input
                       type="email"
                       value={patient.email}
-                      onChange={(e) =>
-                        setPatient((p) => ({ ...p, email: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        setPatient((p) => ({ ...p, email: e.target.value }));
+                        if (emailStatus !== "idle") setEmailStatus("idle");
+                      }}
+                      onBlur={handleEmailBlur}
                     />
+                    {emailStatus === "checking" && (
+                      <p className="text-xs text-slate-400">Vérification…</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-slate-800">
@@ -622,6 +735,50 @@ export default function ReserverPage() {
                     />
                   </div>
                 </div>
+
+                {/* ── Inline login si compte détecté ───────────────────── */}
+                {emailStatus === "exists" && !isLoggedIn && (
+                  <div className="rounded-xl border border-[#426F59]/30 bg-[#F0F7F4] p-4 space-y-3">
+                    <p className="text-sm font-semibold text-[#426F59]">
+                      ✓ Vous avez déjà un espace client Calymia
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      Connectez-vous pour retrouver votre historique de réservations.
+                    </p>
+                    <Input
+                      type="password"
+                      placeholder="Mot de passe"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleInlineLogin()}
+                    />
+                    {loginError && (
+                      <p className="text-xs text-red-600">{loginError}</p>
+                    )}
+                    <div className="flex items-center gap-4">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleInlineLogin}
+                        disabled={loginLoading || !loginPassword}
+                      >
+                        {loginLoading ? "Connexion…" : "Me connecter et continuer"}
+                      </Button>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-500 underline hover:text-slate-700"
+                        onClick={() => setEmailStatus("new")}
+                      >
+                        Continuer sans connexion
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {emailStatus === "exists" && isLoggedIn && (
+                  <p className="text-xs font-medium text-[#426F59]">
+                    ✓ Connecté — vos informations ont été pré-remplies
+                  </p>
+                )}
 
                 <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
                   <input
@@ -728,6 +885,91 @@ export default function ReserverPage() {
                       : "—"}
                   </p>
                 </div>
+
+                {/* ── Création de compte post-paiement ─────────────── */}
+                {!isLoggedIn && !accountDone && (
+                  <div className="rounded-xl border border-[#426F59]/25 bg-[#F0F7F4] p-5 space-y-4">
+                    <div>
+                      <p className="font-semibold text-[#426F59]">
+                        Suivez vos rendez-vous en ligne
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Créez votre espace client pour gérer vos réservations et télécharger vos factures.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">
+                          Email
+                        </label>
+                        <Input
+                          value={patient.email}
+                          readOnly
+                          className="bg-slate-100 text-slate-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">
+                          Mot de passe <span className="text-slate-400">(min. 8 caractères)</span>
+                        </label>
+                        <Input
+                          type="password"
+                          placeholder="Choisissez un mot de passe"
+                          value={accountPassword}
+                          onChange={(e) => setAccountPassword(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-700">
+                          Confirmer le mot de passe
+                        </label>
+                        <Input
+                          type="password"
+                          placeholder="Répétez le mot de passe"
+                          value={accountPasswordConfirm}
+                          onChange={(e) =>
+                            setAccountPasswordConfirm(e.target.value)
+                          }
+                        />
+                      </div>
+                      {accountError && (
+                        <p className="text-sm text-red-600">{accountError}</p>
+                      )}
+                      <Button
+                        type="button"
+                        className="w-full"
+                        onClick={handleCreateAccount}
+                        disabled={accountLoading}
+                      >
+                        {accountLoading
+                          ? "Création en cours…"
+                          : "Créer mon espace client"}
+                      </Button>
+                      <button
+                        type="button"
+                        className="block w-full text-center text-xs text-slate-400 underline hover:text-slate-600"
+                        onClick={() => setAccountDone(true)}
+                      >
+                        Non merci
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!isLoggedIn && accountDone && (
+                  <div className="rounded-xl border border-[#426F59]/30 bg-[#F0F7F4] p-4">
+                    <p className="text-sm font-semibold text-[#426F59]">
+                      ✓ Votre espace client a été créé !
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Connectez-vous sur{" "}
+                      <a href="/connexion" className="underline">
+                        calymia.com/connexion
+                      </a>{" "}
+                      pour accéder à votre espace.
+                    </p>
+                  </div>
+                )}
 
                 <Button
                   type="button"
