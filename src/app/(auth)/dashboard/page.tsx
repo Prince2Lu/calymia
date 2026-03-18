@@ -12,7 +12,6 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -260,7 +259,6 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-5xl space-y-8 px-4 py-10">
         {/* Titre */}
         <div className="space-y-1">
-          <Badge>Calymia</Badge>
           <h1 className="text-3xl font-semibold text-[#1E3A5F]">
             Tableau de bord
           </h1>
@@ -304,7 +302,7 @@ export default function DashboardPage() {
                 />
                 <KpiCard
                   icon={<Users className="h-5 w-5 text-amber-600" />}
-                  title="Nouveaux patients"
+                  title="Nouveaux clients"
                   value={String(kpi.nouveauxPatients)}
                   sub="inscrits ce mois"
                   accent="bg-amber-50"
@@ -327,7 +325,7 @@ export default function DashboardPage() {
                   seancesAujourdhui.map((s) => {
                     const nomPatient =
                       `${s.patient?.prenom ?? ""} ${s.patient?.nom ?? ""}`.trim() ||
-                      "Patient inconnu";
+                      "Client inconnu";
                     return (
                       <div
                         key={s.id}
@@ -376,7 +374,7 @@ export default function DashboardPage() {
                   prochainsRdv.map((s) => {
                     const nomPatient =
                       `${s.patient?.prenom ?? ""} ${s.patient?.nom ?? ""}`.trim() ||
-                      "Patient inconnu";
+                      "Client inconnu";
                     return (
                       <div
                         key={s.id}

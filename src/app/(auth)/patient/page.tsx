@@ -355,14 +355,16 @@ export default function PatientSpacePage() {
         return;
       }
 
-      // Cherche une fiche patient liée au user_id
-      const { data: patientData, error: patientError } = await supabase
+      console.log("[patient/page] Auth user email:", user.email);
+
+      // 1) Cherche d'abord par user_id
+      let { data: patientData, error: patientError } = await supabase
         .from("patients")
         .select("id, prenom, nom, email, telephone, user_id")
         .eq("user_id", user.id)
         .maybeSingle<Patient>();
 
-      console.log("[patient/page] Fiche patient:", patientData?.id ?? "introuvable", patientError ?? "");
+      console.log("[patient/page] Recherche par user_id:", patientData?.id ?? "introuvable", patientError ?? "");
 
       if (cancelled) { clearTimeout(timeout); return; }
 
@@ -373,12 +375,57 @@ export default function PatientSpacePage() {
         return;
       }
 
+      // 2) Si introuvable, cherche par email (réservation faite sans compte)
+      if (!patientData && user.email) {
+        console.log("[patient/page] Pas de fiche via user_id — recherche par email:", user.email);
+
+        const { data: byEmail, error: emailError } = await supabase
+          .from("patients")
+          .select("id, prenom, nom, email, telephone, user_id")
+          .eq("email", user.email)
+          .limit(1)
+          .maybeSingle<Patient>();
+
+        console.log("[patient/page] Fiche trouvée par email:", byEmail ?? null, emailError ?? "");
+
+        if (cancelled) { clearTimeout(timeout); return; }
+
+        if (emailError) {
+          setLoadError(`Erreur lors du chargement du profil : ${emailError.message}`);
+          setLoading(false);
+          clearTimeout(timeout);
+          return;
+        }
+
+        if (byEmail) {
+          patientData = byEmail;
+
+          // 3) Lier le user_id si absent (réservation anonyme → compte lié)
+          if (!byEmail.user_id) {
+            console.log("[patient/page] Liaison user_id sur la fiche client:", byEmail.id);
+            await fetch("/api/patients/update-info", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                patient_id: byEmail.id,
+                user_id: user.id,
+              }),
+            });
+          }
+        } else {
+          console.log("[patient/page] Aucune fiche trouvée pour email:", user.email, "— vérifiez que l'email de la réservation correspond exactement.");
+        }
+      }
+
       if (!patientData) {
+        console.log("[patient/page] Aucune fiche client trouvée pour cet utilisateur");
         setNotPatient(true);
         setLoading(false);
         clearTimeout(timeout);
         return;
       }
+
+      console.log("[patient/page] Fiche client chargée:", patientData.id);
 
       setPatient(patientData);
       const now = new Date().toISOString();
@@ -481,10 +528,10 @@ export default function PatientSpacePage() {
             <AlertCircle className="h-7 w-7 text-slate-400" />
           </div>
           <h1 className="mb-2 text-xl font-semibold text-[#1E3A5F]">
-            Espace réservé aux patients
+            Espace réservé aux clients
           </h1>
           <p className="text-sm text-slate-500">
-            Votre compte n'est pas associé à un dossier patient. Si vous êtes
+            Votre compte n'est pas associé à un dossier client. Si vous êtes
             sophrologue, accédez à votre{" "}
             <a href="/dashboard" className="text-[#2E75B6] hover:underline">
               tableau de bord

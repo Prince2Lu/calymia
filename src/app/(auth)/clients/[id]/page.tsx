@@ -220,7 +220,7 @@ export default function FichePatientPage() {
   if (!patient) return null;
 
   const nomComplet =
-    `${patient.prenom ?? ""} ${patient.nom ?? ""}`.trim() || "Patient inconnu";
+    `${patient.prenom ?? ""} ${patient.nom ?? ""}`.trim() || "Client inconnu";
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -231,7 +231,7 @@ export default function FichePatientPage() {
           className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#1E3A5F]"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour aux patients
+          Retour aux clients
         </button>
 
         {/* ── Hero patient ─────────────────────────────────────────────── */}
@@ -244,7 +244,7 @@ export default function FichePatientPage() {
               {nomComplet}
             </h1>
             <p className="text-sm text-slate-500">
-              Patient depuis le {formatDate(patient.created_at)}
+              Client depuis le {formatDate(patient.created_at)}
             </p>
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function FichePatientPage() {
 
               {seances.length === 0 ? (
                 <p className="text-sm text-slate-400">
-                  Aucune séance enregistrée pour ce patient.
+                  Aucune séance enregistrée pour ce client.
                 </p>
               ) : (
                 <div className="divide-y divide-slate-100">

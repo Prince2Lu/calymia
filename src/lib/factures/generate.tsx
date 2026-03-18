@@ -234,7 +234,7 @@ function FactureDocument({ data }: { data: FactureData }) {
             ) : null}
           </View>
           <View style={styles.sectionBox}>
-            <Text style={styles.sectionTitle}>Patient</Text>
+            <Text style={styles.sectionTitle}>Client</Text>
             <Text style={styles.sectionLine}>
               {data.patientPrenom} {data.patientNom}
             </Text>

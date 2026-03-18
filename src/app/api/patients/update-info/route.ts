@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { patient_id, prenom, nom, email, telephone } = await request.json();
+    const { patient_id, prenom, nom, email, telephone, user_id } = await request.json();
 
     if (!patient_id) {
       return NextResponse.json(
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     if (nom !== undefined) payload.nom = nom?.trim() || null;
     if (email !== undefined) payload.email = email?.trim().toLowerCase() || null;
     if (telephone !== undefined) payload.telephone = telephone?.trim() || null;
+    if (user_id !== undefined) payload.user_id = user_id || null;
 
     if (Object.keys(payload).length === 0) {
       return NextResponse.json(

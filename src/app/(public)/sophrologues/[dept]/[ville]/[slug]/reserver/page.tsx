@@ -309,7 +309,7 @@ export default function ReserverPage() {
       !patient.email.trim() ||
       !patient.telephone.trim()
     ) {
-      setError("Merci de renseigner toutes les informations patient.");
+      setError("Merci de renseigner toutes les informations client.");
       return;
     }
     if (!patient.consent) {
@@ -378,7 +378,7 @@ export default function ReserverPage() {
 
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs font-medium text-slate-600">
-            {["Créneau", "Infos patient", "Paiement", "Confirmation"].map((t, i) => {
+            {["Créneau", "Infos client", "Paiement", "Confirmation"].map((t, i) => {
               const n = (i + 1) as Step;
               const active = n === step;
               const done = n < step;
@@ -422,7 +422,7 @@ export default function ReserverPage() {
         <Card>
           <CardTitle>
             {step === 1 && "Étape 1 — Choix du créneau"}
-            {step === 2 && "Étape 2 — Informations patient"}
+            {step === 2 && "Étape 2 — Informations client"}
             {step === 3 && "Étape 3 — Paiement"}
             {step === 4 && "Étape 4 — Confirmation"}
           </CardTitle>

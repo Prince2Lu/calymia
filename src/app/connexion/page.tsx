@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -52,35 +53,27 @@ function SignInForm() {
       return;
     }
 
-    // Détecte le rôle réel en interrogeant la base de données
-    const userId = data.user.id;
+    console.log("Login successful, user:", data.user?.id, data.user?.email);
 
-    // 1) Sophrologue ?
-    const { data: sophrologue } = await supabase
-      .from("sophrologues")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle<{ id: string }>();
+    const res = await fetch("/api/auth/check-role", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: data.user.id,
+        email: data.user.email ?? "",
+      }),
+    });
 
-    if (sophrologue) {
+    const { role } = await res.json() as { role: string };
+    console.log("Role detected:", role);
+
+    if (role === "sophrologue") {
       router.push("/dashboard");
-      return;
-    }
-
-    // 2) Patient ?
-    const { data: patient } = await supabase
-      .from("patients")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle<{ id: string }>();
-
-    if (patient) {
+    } else if (role === "patient") {
       router.push("/patient");
-      return;
+    } else {
+      router.push("/");
     }
-
-    // 3) Aucun profil trouvé
-    router.push("/");
   };
 
   return (
@@ -141,13 +134,23 @@ export default function ConnexionPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="mx-4 w-full max-w-md">
+        <div className="mb-8 flex justify-center">
+          <Image
+            src="/logo.webp"
+            alt="Calymia"
+            width={200}
+            height={80}
+            priority
+            className="object-contain"
+          />
+        </div>
         <Card>
           <CardTitle>Connexion</CardTitle>
           <CardDescription>
-            Accédez à votre espace Calymia pour gérer vos patients et séances.
+            Accédez à votre espace Calymia pour gérer vos clients et séances.
           </CardDescription>
           <div className="mt-2">
-            <Badge>Pour sophrologues et patients</Badge>
+            <Badge>Pour sophrologues et clients</Badge>
           </div>
           <div className="mt-6">
             <SignInForm />

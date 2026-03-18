@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -264,10 +265,20 @@ export default function InscriptionPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="mx-4 w-full max-w-xl">
+        <div className="mb-8 flex justify-center">
+          <Image
+            src="/logo.webp"
+            alt="Calymia"
+            width={200}
+            height={80}
+            priority
+            className="object-contain"
+          />
+        </div>
         <Card>
           <CardTitle>Créer votre compte Calymia</CardTitle>
           <CardDescription>
-            Plateforme dédiée aux sophrologues pour gérer vos patients,
+            Plateforme dédiée aux sophrologues pour gérer vos clients,
             séances et activité.
           </CardDescription>
           <div className="mt-2">

@@ -49,25 +49,53 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1) Créer le patient
-    const { data: patient, error: patientError } = await supabase
-      .from("patients")
-      .insert({
-        sophrologue_id,
-        prenom: patient_prenom,
-        nom: patient_nom,
-        email: patient_email,
-        telephone: patient_telephone,
-      })
-      .select("id")
-      .single<{ id: string | number }>();
+    // 1) Récupérer ou créer le client (évite les doublons par email)
+    let patient: { id: string | number } | null = null;
 
-    if (patientError || !patient) {
-      console.error("Create PI - patient insert error:", patientError);
-      return NextResponse.json(
-        { error: "Impossible de créer le patient. Merci de réessayer." },
-        { status: 500 },
-      );
+    const { data: existing } = await supabase
+      .from("patients")
+      .select("id, user_id")
+      .eq("sophrologue_id", sophrologue_id)
+      .eq("email", patient_email)
+      .maybeSingle<{ id: string | number; user_id: string | null }>();
+
+    if (existing) {
+      // Client déjà connu — mettre à jour les infos de contact
+      await supabase
+        .from("patients")
+        .update({
+          prenom: patient_prenom,
+          nom: patient_nom,
+          telephone: patient_telephone,
+        })
+        .eq("id", existing.id);
+
+      patient = { id: existing.id };
+      console.log("Create PI - client existant réutilisé:", patient.id);
+    } else {
+      // Nouveau client
+      const { data: created, error: patientError } = await supabase
+        .from("patients")
+        .insert({
+          sophrologue_id,
+          prenom: patient_prenom,
+          nom: patient_nom,
+          email: patient_email,
+          telephone: patient_telephone,
+        })
+        .select("id")
+        .single<{ id: string | number }>();
+
+      if (patientError || !created) {
+        console.error("Create PI - patient insert error:", patientError);
+        return NextResponse.json(
+          { error: "Impossible de créer le client. Merci de réessayer." },
+          { status: 500 },
+        );
+      }
+
+      patient = created;
+      console.log("Create PI - nouveau client créé:", patient.id);
     }
 
     // 2) Récupérer le type_seance_id (NOT NULL en base — obligatoire)

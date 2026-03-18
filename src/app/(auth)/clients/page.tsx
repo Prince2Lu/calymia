@@ -108,7 +108,7 @@ function NouveauPatientModal({ onClose, sophrologueId, onCreated }: ModalProps) 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h2 className="text-lg font-semibold text-[#1E3A5F]">
-            Nouveau patient
+            Nouveau client
           </h2>
           <button
             onClick={onClose}
@@ -185,7 +185,7 @@ function NouveauPatientModal({ onClose, sophrologueId, onCreated }: ModalProps) 
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Ajouter le patient"
+                "Ajouter le client"
               )}
             </Button>
           </div>
@@ -314,12 +314,12 @@ export default function ClientsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-[#1E3A5F]">
-              Mes patients
+              Mes clients
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               {loading
                 ? "Chargement…"
-                : `${patients.length} patient${patients.length !== 1 ? "s" : ""} au total${isEssentiel ? ` / ${LIMITE_ESSENTIEL} (plan Essentiel)` : ""}`}
+                : `${patients.length} client${patients.length !== 1 ? "s" : ""} au total${isEssentiel ? ` / ${LIMITE_ESSENTIEL} (plan Essentiel)` : ""}`}
             </p>
           </div>
           {!limitReached ? (
@@ -328,7 +328,7 @@ export default function ClientsPage() {
               className="flex items-center gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              Nouveau patient
+              Nouveau client
             </Button>
           ) : (
             <a
@@ -347,10 +347,10 @@ export default function ClientsPage() {
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
             <div>
               <p className="text-sm font-semibold text-amber-800">
-                Limite de {LIMITE_ESSENTIEL} patients atteinte
+                Limite de {LIMITE_ESSENTIEL} clients atteinte
               </p>
               <p className="mt-0.5 text-sm text-amber-700">
-                Votre plan Essentiel est limité à {LIMITE_ESSENTIEL} patients actifs. Passez au plan{" "}
+                Votre plan Essentiel est limité à {LIMITE_ESSENTIEL} clients actifs. Passez au plan{" "}
                 <a href="/parametres" className="font-medium underline">
                   Professionnel
                 </a>{" "}
@@ -393,8 +393,8 @@ export default function ClientsPage() {
             <Users className="h-10 w-10 text-slate-300" />
             <p className="text-sm text-slate-500">
               {search
-                ? "Aucun patient ne correspond à votre recherche."
-                : "Aucun patient pour l'instant. Ajoutez votre premier patient !"}
+                ? "Aucun client ne correspond à votre recherche."
+                : "Aucun client pour l'instant. Ajoutez votre premier client !"}
             </p>
           </div>
         ) : (

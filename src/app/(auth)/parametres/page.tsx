@@ -730,7 +730,7 @@ function TabDisponibilites({
           ))}
         </select>
         <p className="text-xs text-slate-500">
-          Les patients ne pourront pas réserver moins de {DELAIS.find((d) => d.value === delai)?.label.toLowerCase()} avant la séance.
+          Les clients ne pourront pas réserver moins de {DELAIS.find((d) => d.value === delai)?.label.toLowerCase()} avant la séance.
         </p>
       </div>
 

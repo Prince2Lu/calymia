@@ -127,7 +127,7 @@ function SeanceDrawer({ seance, onClose, onMarkDone, onCancel }: DrawerProps) {
   const st = statutStyle(seance.statut);
 
   const nomPatient =
-    `${seance.patient?.prenom ?? ""} ${seance.patient?.nom ?? ""}`.trim() || "Patient inconnu";
+    `${seance.patient?.prenom ?? ""} ${seance.patient?.nom ?? ""}`.trim() || "Client inconnu";
 
   const montant = Array.isArray(seance.paiement)
     ? (seance.paiement[0]?.montant_total ?? null)
@@ -183,7 +183,7 @@ function SeanceDrawer({ seance, onClose, onMarkDone, onCancel }: DrawerProps) {
 
           {/* Patient */}
           <section className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Patient</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Client</p>
             <p className="text-lg font-semibold text-[#1E3A5F]">{nomPatient}</p>
             {email && (
               <a href={`mailto:${email}`} className="flex items-center gap-2 text-sm text-[#2E75B6] hover:underline">
@@ -511,7 +511,7 @@ export default function SeancesPage() {
                           const st = statutStyle(s.statut);
                           const nomPatient =
                             `${s.patient?.prenom ?? ""} ${s.patient?.nom ?? ""}`.trim() ||
-                            "Patient";
+                            "Client";
                           const typeNom = Array.isArray(s.type_seance)
                             ? (s.type_seance[0]?.nom ?? "Séance")
                             : (s.type_seance?.nom ?? "Séance");
