@@ -16,6 +16,7 @@ import {
   Check,
   X,
   AlertCircle,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -523,21 +524,33 @@ export default function PatientSpacePage() {
   if (notPatient) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
-            <AlertCircle className="h-7 w-7 text-slate-400" />
+        <div className="max-w-md text-center space-y-5">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F0F7F4]">
+            <CalendarDays className="h-8 w-8 text-[#426F59]" />
           </div>
-          <h1 className="mb-2 text-xl font-semibold text-[#1E3A5F]">
-            Espace réservé aux clients
-          </h1>
-          <p className="text-sm text-slate-500">
-            Votre compte n'est pas associé à un dossier client. Si vous êtes
-            sophrologue, accédez à votre{" "}
-            <a href="/dashboard" className="text-[#2E75B6] hover:underline">
-              tableau de bord
+          <div>
+            <h1 className="text-xl font-semibold text-[#1E3A5F]">
+              Bienvenue sur votre espace client
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Vous n'avez pas encore de réservation. Trouvez un sophrologue
+              près de chez vous et réservez votre première séance.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <a
+              href="/"
+              className="btn-primary inline-flex items-center justify-center gap-2 rounded-lg bg-[#426F59] px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-[#355849] hover:shadow-md"
+            >
+              Trouver un sophrologue
             </a>
-            .
-          </p>
+            <p className="text-xs text-slate-400">
+              Vous êtes sophrologue ?{" "}
+              <a href="/dashboard" className="underline">
+                Accédez à votre tableau de bord
+              </a>
+            </p>
+          </div>
         </div>
       </main>
     );

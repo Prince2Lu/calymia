@@ -55,24 +55,30 @@ function SignInForm() {
 
     console.log("Login successful, user:", data.user?.id, data.user?.email);
 
-    const res = await fetch("/api/auth/check-role", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: data.user.id,
-        email: data.user.email ?? "",
-      }),
-    });
+    try {
+      const response = await fetch("/api/auth/check-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: data.user.id,
+          email: data.user.email ?? "",
+        }),
+      });
 
-    const { role } = await res.json() as { role: string };
-    console.log("Role detected:", role);
+      console.log("check-role HTTP status:", response.status);
+      const result = (await response.json()) as { role?: string; error?: string };
+      console.log("check-role result:", result);
 
-    if (role === "sophrologue") {
-      router.push("/dashboard");
-    } else if (role === "patient") {
+      if (result.role === "sophrologue") {
+        router.push("/dashboard");
+      } else {
+        // patient, unknown, or any error → client space
+        router.push("/patient");
+      }
+    } catch (err) {
+      console.error("check-role fetch failed:", err);
+      // Safe fallback: send to patient space
       router.push("/patient");
-    } else {
-      router.push("/");
     }
   };
 
