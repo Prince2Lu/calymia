@@ -32,11 +32,13 @@ type DispoRow = {
   heure_fin: string;   // "18:00"
 };
 
+type BookedInterval = { debut: Date; fin: Date };
+
 type AvailabilityData = {
   // JS getDay() → DispoRow | null
   dispoByJsDay: Map<number, DispoRow>;
-  // ensemble des heures déjà réservées : "YYYY-MM-DDThh:00"
-  bookedKeys: Set<string>;
+  // séances déjà réservées sous forme d'intervalles (dates locales)
+  bookedIntervals: BookedInterval[];
   // délai minimum en heures avant réservation
   delaiMinHeures: number;
 };
@@ -85,16 +87,21 @@ function dbJourToJsDay(dbJour: number): number {
   return (dbJour + 1) % 7;
 }
 
-/** Clé unique pour un créneau réservé : "YYYY-MM-DDThh" */
-function bookedKey(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}`;
+const SLOT_DURATION_MS = 60 * 60 * 1000; // 60 minutes
+
+/** Vérifie si un créneau chevauchement avec une séance existante */
+function isSlotBooked(slotStart: Date, bookedIntervals: BookedInterval[]): boolean {
+  const slotEnd = new Date(slotStart.getTime() + SLOT_DURATION_MS);
+  return bookedIntervals.some(
+    ({ debut, fin }) => debut < slotEnd && fin > slotStart,
+  );
 }
 
 /** Génère les créneaux horaires disponibles pour un jour donné */
 function buildSlotsFromDispo(
   day: Date,
   dispo: DispoRow,
-  bookedKeys: Set<string>,
+  bookedIntervals: BookedInterval[],
   delaiMinHeures: number,
 ): Date[] {
   const slots: Date[] = [];
@@ -110,8 +117,11 @@ function buildSlotsFromDispo(
     slot.setHours(h, 0, 0, 0);
     // Exclure les créneaux trop proches ou passés
     if (slot <= cutoff) continue;
-    // Exclure les créneaux déjà réservés
-    if (bookedKeys.has(bookedKey(slot))) continue;
+    // Exclure les créneaux qui chevauchent une séance existante
+    if (isSlotBooked(slot, bookedIntervals)) {
+      console.log(`[reserver] Créneau exclu (déjà réservé) : ${slot.toLocaleString("fr-FR")}`);
+      continue;
+    }
     slots.push(slot);
   }
   return slots;
@@ -202,12 +212,14 @@ export default function ReserverPage() {
       // 3) Séances déjà réservées dans les 4 prochaines semaines
       const { data: seances } = await supabase
         .from("seances")
-        .select("debut_at")
+        .select("debut_at, fin_at")
         .eq("sophrologue_id", sid)
         .in("statut", ["confirmee", "en_attente"])
         .gt("debut_at", new Date().toISOString())
         .lt("debut_at", horizon)
-        .returns<{ debut_at: string }[]>();
+        .returns<{ debut_at: string; fin_at: string }[]>();
+
+      console.log(`[reserver] Séances réservées récupérées : ${seances?.length ?? 0}`, seances);
 
       // 4) Paramètres cabinet (délai minimum)
       const { data: params_cabinet } = await supabase
@@ -224,15 +236,15 @@ export default function ReserverPage() {
         dispoByJsDay.set(dbJourToJsDay(d.jour_semaine), d);
       }
 
-      // Construire l'ensemble des créneaux déjà pris
-      const bookedKeys = new Set<string>();
-      for (const s of seances ?? []) {
-        bookedKeys.add(bookedKey(new Date(s.debut_at)));
-      }
+      // Construire les intervalles de séances réservées
+      const bookedIntervals: BookedInterval[] = (seances ?? []).map((s) => ({
+        debut: new Date(s.debut_at),
+        fin: new Date(s.fin_at),
+      }));
 
       const delaiMinHeures = params_cabinet?.delai_min_reservation_heures ?? 24;
 
-      const avail: AvailabilityData = { dispoByJsDay, bookedKeys, delaiMinHeures };
+      const avail: AvailabilityData = { dispoByJsDay, bookedIntervals, delaiMinHeures };
       setAvailability(avail);
       setNoAvailability(dispoByJsDay.size === 0);
       setAvailabilityLoading(false);
@@ -243,7 +255,7 @@ export default function ReserverPage() {
         const d = addDays(today, i);
         const dispo = avail.dispoByJsDay.get(d.getDay());
         if (dispo) {
-          const slots = buildSlotsFromDispo(d, dispo, bookedKeys, delaiMinHeures);
+          const slots = buildSlotsFromDispo(d, dispo, avail.bookedIntervals, delaiMinHeures);
           if (slots.length > 0) {
             if (!cancelled) setSelectedDay(d);
             break;
@@ -282,7 +294,7 @@ export default function ReserverPage() {
     return buildSlotsFromDispo(
       selectedDay,
       dispo,
-      availability.bookedKeys,
+      availability.bookedIntervals,
       availability.delaiMinHeures,
     );
   }, [availability, selectedDay]);
@@ -586,7 +598,7 @@ export default function ReserverPage() {
                                 buildSlotsFromDispo(
                                   d,
                                   dispo,
-                                  availability.bookedKeys,
+                                  availability.bookedIntervals,
                                   availability.delaiMinHeures,
                                 ).length > 0;
                               const isSelected = isSameDay(d, selectedDay);
