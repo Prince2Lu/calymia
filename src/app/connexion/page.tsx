@@ -144,8 +144,8 @@ export default function ConnexionPage() {
           <Image
             src="/logo.webp"
             alt="Calymia"
-            width={200}
-            height={80}
+            width={260}
+            height={104}
             priority
             className="object-contain"
           />
