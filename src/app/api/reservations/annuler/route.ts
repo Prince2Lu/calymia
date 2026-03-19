@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
 
     const { seance_id, annule_par } = body;
 
+    console.log(`[annuler] Starting cancellation — seance_id: ${seance_id}, annule_par: ${annule_par ?? "non précisé"}`);
+
     if (!seance_id) {
       return NextResponse.json(
         { error: "seance_id est requis." },
@@ -102,12 +104,18 @@ export async function POST(request: NextRequest) {
       .eq("id", seance_id)
       .maybeSingle<SeanceRow>();
 
+    if (seanceReadError) {
+      console.error("[annuler] Erreur lecture séance:", seanceReadError);
+    }
+
     if (seanceReadError || !seance) {
       return NextResponse.json(
         { error: "Séance introuvable." },
         { status: 404 },
       );
     }
+
+    console.log(`[annuler] Séance trouvée — statut: ${seance.statut}, debut_at: ${seance.debut_at}`);
 
     if (seance.statut === "annulee") {
       return NextResponse.json(
@@ -172,7 +180,14 @@ export async function POST(request: NextRequest) {
     const isSophrologueCancel = annule_par === "sophrologue";
     const ratio = isSophrologueCancel ? 1.0 : calcRefundRatio(seance.debut_at);
 
+    console.log(`[annuler] Ratio de remboursement: ${ratio * 100}% (isSophrologueCancel: ${isSophrologueCancel})`);
+
     // ── 4) Récupérer le paiement ──────────────────────────────────────────────
+    // Fetches ONLY the successful payment tied to this exact seance_id.
+    // Using .eq('statut','reussi') prevents accidentally picking up an already-
+    // refunded row when multiple paiements rows exist for the same seance.
+    console.log(`[annuler] Fetching payment for seance_id: ${seance_id}`);
+
     const { data: paiement, error: paiementReadError } = await supabaseAdmin
       .from("paiements")
       .select("id, montant_total, stripe_payment_intent_id, statut")
@@ -184,41 +199,64 @@ export async function POST(request: NextRequest) {
       console.error("[annuler] Erreur lecture paiement:", paiementReadError);
     }
 
+    console.log("[annuler] Payment found:", paiement ?? null);
+
     let montantRembourse = 0;
 
     // ── 5) Remboursement Stripe si applicable ─────────────────────────────────
-    if (ratio > 0 && paiement?.stripe_payment_intent_id) {
+    // Guard: only refund if ratio > 0, payment exists, has a PI, and isn't already refunded
+    const canRefund =
+      ratio > 0 &&
+      paiement != null &&
+      paiement.stripe_payment_intent_id != null &&
+      paiement.statut !== "rembourse";
+
+    console.log(`[annuler] Peut rembourser: ${canRefund} — raisons: ratio=${ratio}, paiement=${!!paiement}, pi=${paiement?.stripe_payment_intent_id ?? "null"}, statut=${paiement?.statut ?? "null"}`);
+
+    if (canRefund && paiement) {
       montantRembourse =
         Math.round(paiement.montant_total * ratio * 100) / 100;
       const amountCents = Math.round(montantRembourse * 100);
 
+      console.log(`[annuler] Initiating Stripe refund — payment_intent: ${paiement.stripe_payment_intent_id}, amount_cents: ${amountCents}`);
+
       try {
-        await stripe.refunds.create({
-          payment_intent: paiement.stripe_payment_intent_id,
+        const refund = await stripe.refunds.create({
+          payment_intent: paiement.stripe_payment_intent_id!,
           amount: amountCents,
         });
 
-        await supabaseAdmin
+        console.log(`[annuler] Stripe refund created: ${refund.id}, status: ${refund.status}`);
+
+        const { error: paiementUpdateError } = await supabaseAdmin
           .from("paiements")
           .update({ statut: "rembourse" })
           .eq("id", paiement.id);
 
-        console.log(
-          `[annuler] Remboursement Stripe ${montantRembourse} € (${ratio * 100}%) — séance ${seance_id} — par ${annule_par ?? "inconnu"}`,
-        );
+        if (paiementUpdateError) {
+          console.error("[annuler] Erreur mise à jour paiement:", paiementUpdateError);
+        } else {
+          console.log(`[annuler] Paiement ${paiement.id} marqué 'rembourse'`);
+        }
       } catch (stripeErr) {
-        console.error("[annuler] Erreur remboursement Stripe:", stripeErr);
+        console.error("[annuler] STRIPE ERROR — full error object:", stripeErr);
+        console.error("[annuler] STRIPE ERROR — message:", (stripeErr as Error)?.message);
         return NextResponse.json(
           {
-            error:
-              "Le remboursement Stripe a échoué. La séance n'a pas été annulée.",
+            error: `Le remboursement Stripe a échoué : ${(stripeErr as Error)?.message ?? "erreur inconnue"}. La séance n'a pas été annulée.`,
           },
           { status: 500 },
         );
       }
+    } else if (ratio === 0) {
+      console.log(`[annuler] Aucun remboursement — politique d'annulation tardive`);
+    } else if (!paiement) {
+      console.log(`[annuler] Aucun paiement trouvé pour cette séance — pas de remboursement Stripe`);
     }
 
     // ── 6) Marquer la séance comme annulée ────────────────────────────────────
+    console.log(`[annuler] Updating seance ${seance_id} to 'annulee'`);
+
     const { error: updateError } = await supabaseAdmin
       .from("seances")
       .update({ statut: "annulee" })
@@ -231,6 +269,8 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+
+    console.log(`[annuler] Séance ${seance_id} successfully marked 'annulee'`);
 
     // ── 7) Log dans la table communications (best-effort) ────────────────────
     try {
