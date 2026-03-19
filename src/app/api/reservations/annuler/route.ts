@@ -165,8 +165,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 3) Calculer le taux de remboursement ──────────────────────────────────
-    const ratio = calcRefundRatio(seance.debut_at);
+    // ── 3) Déterminer le taux de remboursement selon l'auteur ─────────────────
+    //   • Sophrologue → remboursement 100 % systématique (le sophrologue annule,
+    //                   c'est de sa responsabilité)
+    //   • Patient     → politique basée sur le délai avant la séance
+    const isSophrologueCancel = annule_par === "sophrologue";
+    const ratio = isSophrologueCancel ? 1.0 : calcRefundRatio(seance.debut_at);
 
     // ── 4) Récupérer le paiement ──────────────────────────────────────────────
     const { data: paiement, error: paiementReadError } = await supabaseAdmin
@@ -200,7 +204,7 @@ export async function POST(request: NextRequest) {
           .eq("id", paiement.id);
 
         console.log(
-          `[annuler] Remboursement Stripe ${montantRembourse} € — séance ${seance_id} — par ${annule_par ?? "inconnu"}`,
+          `[annuler] Remboursement Stripe ${montantRembourse} € (${ratio * 100}%) — séance ${seance_id} — par ${annule_par ?? "inconnu"}`,
         );
       } catch (stripeErr) {
         console.error("[annuler] Erreur remboursement Stripe:", stripeErr);
@@ -228,8 +232,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── 7) Log dans la table communications (best-effort) ────────────────────
+    try {
+      await supabaseAdmin.from("communications").insert({
+        seance_id,
+        type: "annulation",
+        contenu: isSophrologueCancel
+          ? `Séance annulée par le sophrologue. Remboursement intégral de ${montantRembourse.toFixed(2)} € initié.`
+          : `Séance annulée par le client. Remboursement de ${montantRembourse.toFixed(2)} € (${ratio * 100}%) initié.`,
+        created_at: new Date().toISOString(),
+      });
+    } catch {
+      // Table optionnelle — on ne bloque pas si elle n'existe pas
+    }
+
     console.log(
-      `[annuler] Séance ${seance_id} annulée par ${annule_par ?? "inconnu"} — remboursement ${montantRembourse} €`,
+      `[annuler] Séance ${seance_id} annulée par ${annule_par ?? "inconnu"} — remboursement ${montantRembourse} € (${ratio * 100}%)`,
     );
 
     return NextResponse.json({
