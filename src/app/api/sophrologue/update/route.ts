@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       city,
       postalCode,
       phone,
+      onboarding_completed,
     } = body as {
       userId?: string;
       prenom?: string;
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       city?: string;
       postalCode?: string;
       phone?: string;
+      onboarding_completed?: boolean;
     };
 
     console.log("[sophrologue/update] userId reçu :", userId);
@@ -61,6 +63,7 @@ export async function POST(request: Request) {
       ...(city !== undefined && { ville: city }),
       ...(postalCode !== undefined && { code_postal: postalCode }),
       ...(phone !== undefined && { telephone: phone }),
+      ...(onboarding_completed !== undefined && { onboarding_completed }),
     };
 
     console.log("[sophrologue/update] Colonnes mises à jour :", updatePayload);

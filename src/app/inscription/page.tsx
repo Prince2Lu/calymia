@@ -83,7 +83,7 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/onboarding");
   };
 
   return (

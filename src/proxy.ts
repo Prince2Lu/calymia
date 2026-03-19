@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PROTECTED_PATHS = ["/dashboard", "/patient", "/clients", "/seances", "/parametres"];
+const PROTECTED_PATHS = ["/dashboard", "/onboarding", "/patient", "/clients", "/seances", "/parametres"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -47,6 +47,30 @@ export async function proxy(request: NextRequest) {
     redirectUrl.pathname = "/connexion";
     redirectUrl.searchParams.set("redirectedFrom", pathname);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // ── Onboarding guard ────────────────────────────────────────────────────────
+  // If a sophrologue hasn't completed onboarding, redirect them to the wizard.
+  // We only check on /dashboard* paths (not /dashboard/onboarding itself, not
+  // patient-only routes like /patient, /seances, /clients, /parametres).
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isOnboardingPage = pathname.startsWith("/onboarding");
+
+  if (isDashboard && !isOnboardingPage) {
+    const { data: sophrologue } = await supabase
+      .from("sophrologues")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle<{ onboarding_completed: boolean | null }>();
+
+    // If the user IS a sophrologue and hasn't finished onboarding → redirect.
+    // Treat both false AND null as "not completed" (existing accounts have null).
+    if (sophrologue && sophrologue.onboarding_completed !== true) {
+      const onboardingUrl = request.nextUrl.clone();
+      onboardingUrl.pathname = "/onboarding";
+      onboardingUrl.search = "";
+      return NextResponse.redirect(onboardingUrl);
+    }
   }
 
   return supabaseResponse;

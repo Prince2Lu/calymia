@@ -45,12 +45,8 @@ type TypeSeance = {
   actif: boolean;
 };
 
-type Dispo = {
-  jour_semaine: number; // 0=Lun … 6=Dim
-  heure_debut: string;  // "09:00"
-  heure_fin: string;    // "18:00"
-  actif: boolean;
-};
+type DispoSlot = { heure_debut: string; heure_fin: string };
+type DispoByDay = Record<number, { actif: boolean; slots: DispoSlot[] }>;
 
 type ParamsCabinet = {
   delai_min_reservation_heures: number;
@@ -571,12 +567,16 @@ function TabSeances({
 
 // ─── Onglet 3 : Disponibilités ────────────────────────────────────────────────
 
-const DISPO_DEFAULT: Dispo[] = JOURS.map((_, i) => ({
-  jour_semaine: i,
-  heure_debut: "09:00",
-  heure_fin: "18:00",
-  actif: i < 5, // Lun-Ven actifs par défaut
-}));
+function getDefaultDispoByDay(): DispoByDay {
+  const out: DispoByDay = {};
+  for (let i = 0; i < 7; i++) {
+    out[i] = {
+      actif: i < 5,
+      slots: [{ heure_debut: "09:00", heure_fin: "18:00" }],
+    };
+  }
+  return out;
+}
 
 function TabDisponibilites({
   sophrologueId,
@@ -585,7 +585,7 @@ function TabDisponibilites({
   sophrologueId: string;
   showToast: (msg: string, ok?: boolean) => void;
 }) {
-  const [dispos, setDispos] = useState<Dispo[]>(DISPO_DEFAULT);
+  const [disposByDay, setDisposByDay] = useState<DispoByDay>(getDefaultDispoByDay());
   const [delai, setDelai] = useState(24);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -601,22 +601,20 @@ function TabDisponibilites({
         .from("disponibilites")
         .select("jour_semaine, heure_debut, heure_fin, actif")
         .eq("sophrologue_id", sophrologueId)
-        .returns<Dispo[]>();
+        .returns<{ jour_semaine: number; heure_debut: string; heure_fin: string; actif: boolean }[]>();
 
+      const byDay: DispoByDay = getDefaultDispoByDay();
       if (dispoData && dispoData.length > 0) {
-        setDispos(
-          JOURS.map((_, i) => {
-            const existing = dispoData.find((d) => d.jour_semaine === i);
-            return (
-              existing ?? {
-                jour_semaine: i,
-                heure_debut: "09:00",
-                heure_fin: "18:00",
-                actif: false,
-              }
-            );
-          }),
-        );
+        for (let i = 0; i < 7; i++) {
+          const rows = dispoData.filter((d) => d.jour_semaine === i);
+          if (rows.length > 0) {
+            byDay[i] = {
+              actif: rows[0].actif,
+              slots: rows.map((r) => ({ heure_debut: r.heure_debut, heure_fin: r.heure_fin })),
+            };
+          }
+        }
+        setDisposByDay(byDay);
       }
 
       const { data: params } = await supabase
@@ -631,11 +629,60 @@ function TabDisponibilites({
     load();
   }, [sophrologueId, supabase]);
 
-  const updateDispo = (i: number, patch: Partial<Dispo>) => {
-    setDispos((prev) => prev.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
+  const updateDayActif = (i: number, actif: boolean) => {
+    setDisposByDay((prev) => ({
+      ...prev,
+      [i]: { ...prev[i], actif },
+    }));
+  };
+
+  const addSlot = (i: number) => {
+    setDisposByDay((prev) => ({
+      ...prev,
+      [i]: {
+        ...prev[i],
+        slots: [...prev[i].slots, { heure_debut: "14:00", heure_fin: "18:00" }],
+      },
+    }));
+  };
+
+  const updateSlot = (i: number, slotIdx: number, field: "heure_debut" | "heure_fin", value: string) => {
+    setDisposByDay((prev) => ({
+      ...prev,
+      [i]: {
+        ...prev[i],
+        slots: prev[i].slots.map((s, idx) =>
+          idx === slotIdx ? { ...s, [field]: value } : s,
+        ),
+      },
+    }));
+  };
+
+  const removeSlot = (i: number, slotIdx: number) => {
+    setDisposByDay((prev) => {
+      const slots = prev[i].slots.filter((_, idx) => idx !== slotIdx);
+      return {
+        ...prev,
+        [i]: {
+          ...prev[i],
+          slots: slots.length === 0 ? [{ heure_debut: "09:00", heure_fin: "18:00" }] : slots,
+        },
+      };
+    });
   };
 
   const handleSave = async () => {
+    const dispos = Object.entries(disposByDay)
+      .filter(([, d]) => d.actif)
+      .flatMap(([jourStr, d]) =>
+        d.slots.map((s) => ({
+          jour_semaine: Number(jourStr),
+          heure_debut: s.heure_debut,
+          heure_fin: s.heure_fin,
+          actif: true,
+        })),
+      );
+
     setSaving(true);
     try {
       const res = await fetch("/api/sophrologue/disponibilites", {
@@ -668,50 +715,73 @@ function TabDisponibilites({
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-700">Jours et horaires</h3>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {dispos.map((d, i) => (
-            <div
-              key={i}
-              className={`flex flex-wrap items-center gap-4 border-b border-slate-100 px-5 py-3 last:border-0 ${
-                !d.actif ? "opacity-50" : ""
-              }`}
-            >
-              {/* Toggle jour */}
-              <label className="flex w-28 cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={d.actif}
-                  onChange={(e) => updateDispo(i, { actif: e.target.checked })}
-                  className="h-4 w-4 rounded accent-[#2E75B6]"
-                />
-                <span className="text-sm font-medium text-slate-800">{JOURS[i]}</span>
-              </label>
+          {JOURS.map((label, i) => {
+            const d = disposByDay[i] ?? { actif: false, slots: [{ heure_debut: "09:00", heure_fin: "18:00" }] };
+            return (
+              <div
+                key={i}
+                className={`flex flex-wrap items-start gap-4 border-b border-slate-100 px-5 py-3 last:border-0 ${
+                  !d.actif ? "opacity-50" : ""
+                }`}
+              >
+                {/* Toggle jour */}
+                <label className="flex w-28 cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={d.actif}
+                    onChange={(e) => updateDayActif(i, e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#426F59]"
+                  />
+                  <span className="text-sm font-medium text-slate-800">{label}</span>
+                </label>
 
-              {/* Heures */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="time"
-                  value={d.heure_debut}
-                  disabled={!d.actif}
-                  onChange={(e) => updateDispo(i, { heure_debut: e.target.value })}
-                  className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
-                />
-                <span className="text-xs text-slate-400">à</span>
-                <input
-                  type="time"
-                  value={d.heure_fin}
-                  disabled={!d.actif}
-                  onChange={(e) => updateDispo(i, { heure_fin: e.target.value })}
-                  className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
-                />
+                {/* Plages horaires */}
+                <div className="flex-1 space-y-2">
+                  {d.actif && d.slots.map((slot, slotIdx) => (
+                    <div key={slotIdx} className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={slot.heure_debut}
+                        onChange={(e) => updateSlot(i, slotIdx, "heure_debut", e.target.value)}
+                        className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#426F59]/30"
+                      />
+                      <span className="text-xs text-slate-400">à</span>
+                      <input
+                        type="time"
+                        value={slot.heure_fin}
+                        onChange={(e) => updateSlot(i, slotIdx, "heure_fin", e.target.value)}
+                        className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#426F59]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSlot(i, slotIdx)}
+                        disabled={d.slots.length <= 1}
+                        className="text-slate-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Supprimer la plage"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {d.actif && (
+                    <button
+                      type="button"
+                      onClick={() => addSlot(i)}
+                      className="text-xs font-medium text-[#426F59] hover:underline"
+                    >
+                      + Ajouter une plage
+                    </button>
+                  )}
+                </div>
+
+                {d.actif && (
+                  <span className="ml-auto flex items-center gap-1 text-xs text-[#426F59]">
+                    <Check className="h-3.5 w-3.5" /> Disponible
+                  </span>
+                )}
               </div>
-
-              {d.actif && (
-                <span className="ml-auto flex items-center gap-1 text-xs text-[#27AE60]">
-                  <Check className="h-3.5 w-3.5" /> Disponible
-                </span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

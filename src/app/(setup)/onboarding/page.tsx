@@ -40,13 +40,12 @@ type OnboardingState = {
   city: string;
   postalCode: string;
   phone: string;
-  // Étape 3
+  // Étape 3 — chaque jour peut avoir plusieurs plages horaires
   availability: Record<
     DayKey,
     {
       enabled: boolean;
-      start: string;
-      end: string;
+      slots: { start: string; end: string }[];
     }
   >;
   sessionTypes: SessionType[];
@@ -63,12 +62,12 @@ const INITIAL_STATE: OnboardingState = {
   postalCode: "",
   phone: "",
   availability: {
-    lundi: { enabled: false, start: "09:00", end: "18:00" },
-    mardi: { enabled: false, start: "09:00", end: "18:00" },
-    mercredi: { enabled: false, start: "09:00", end: "18:00" },
-    jeudi: { enabled: false, start: "09:00", end: "18:00" },
-    vendredi: { enabled: false, start: "09:00", end: "18:00" },
-    samedi: { enabled: false, start: "09:00", end: "13:00" },
+    lundi: { enabled: false, slots: [{ start: "09:00", end: "18:00" }] },
+    mardi: { enabled: false, slots: [{ start: "09:00", end: "18:00" }] },
+    mercredi: { enabled: false, slots: [{ start: "09:00", end: "18:00" }] },
+    jeudi: { enabled: false, slots: [{ start: "09:00", end: "18:00" }] },
+    vendredi: { enabled: false, slots: [{ start: "09:00", end: "18:00" }] },
+    samedi: { enabled: false, slots: [{ start: "09:00", end: "13:00" }] },
   },
   sessionTypes: [],
   minBookingDelay: "24",
@@ -95,6 +94,16 @@ const DAYS: { key: DayKey; label: string }[] = [
   { key: "vendredi", label: "Vendredi" },
   { key: "samedi", label: "Samedi" },
 ];
+
+// Maps the French day key to the DB jour_semaine value (1=lundi … 6=samedi)
+const DAY_TO_JOUR: Record<DayKey, number> = {
+  lundi: 1,
+  mardi: 2,
+  mercredi: 3,
+  jeudi: 4,
+  vendredi: 5,
+  samedi: 6,
+};
 
 const STEP_TITLES = [
   "Profil public",
@@ -130,21 +139,64 @@ export default function OnboardingPage() {
     });
   };
 
-  const updateAvailability = (
-    day: DayKey,
-    field: "enabled" | "start" | "end",
-    value: boolean | string,
-  ) => {
+  const updateDayEnabled = (day: DayKey, enabled: boolean) => {
     setState((prev) => ({
       ...prev,
       availability: {
         ...prev.availability,
         [day]: {
           ...prev.availability[day],
-          [field]: value,
+          enabled,
+          slots: enabled && prev.availability[day].slots.length === 0
+            ? [{ start: "09:00", end: "18:00" }]
+            : prev.availability[day].slots,
         },
       },
     }));
+  };
+
+  const addSlot = (day: DayKey) => {
+    setState((prev) => ({
+      ...prev,
+      availability: {
+        ...prev.availability,
+        [day]: {
+          ...prev.availability[day],
+          slots: [...prev.availability[day].slots, { start: "14:00", end: "18:00" }],
+        },
+      },
+    }));
+  };
+
+  const updateSlot = (day: DayKey, slotIdx: number, field: "start" | "end", value: string) => {
+    setState((prev) => ({
+      ...prev,
+      availability: {
+        ...prev.availability,
+        [day]: {
+          ...prev.availability[day],
+          slots: prev.availability[day].slots.map((s, i) =>
+            i === slotIdx ? { ...s, [field]: value } : s,
+          ),
+        },
+      },
+    }));
+  };
+
+  const removeSlot = (day: DayKey, slotIdx: number) => {
+    setState((prev) => {
+      const slots = prev.availability[day].slots.filter((_, i) => i !== slotIdx);
+      return {
+        ...prev,
+        availability: {
+          ...prev.availability,
+          [day]: {
+            ...prev.availability[day],
+            slots: slots.length === 0 ? [{ start: "09:00", end: "18:00" }] : slots,
+          },
+        },
+      };
+    });
   };
 
   const addSessionType = () => {
@@ -186,24 +238,37 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
 
+    // ── 1) Auth user ───────────────────────────────────────────────────────
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      setError(
-        "Impossible de récupérer votre compte. Merci de vous reconnecter.",
-      );
+      setError("Impossible de récupérer votre compte. Merci de vous reconnecter.");
       setLoading(false);
       return;
     }
 
-    const response = await fetch("/api/sophrologue/update", {
+    // ── 2) Fetch the sophrologue row to get its PK (needed for related tables)
+    const { data: sophrologueRow, error: sophrologueError } = await supabase
+      .from("sophrologues")
+      .select("id")
+      .eq("user_id", user.id)
+      .single<{ id: string }>();
+
+    if (sophrologueError || !sophrologueRow) {
+      setError("Profil sophrologue introuvable. Merci de vous reconnecter.");
+      setLoading(false);
+      return;
+    }
+
+    const sophrologueId = sophrologueRow.id;
+
+    // ── 3) Save profile (bio, address, specialties, etc.) ─────────────────
+    const profileRes = await fetch("/api/sophrologue/update", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: user.id,
         bio: state.bio,
@@ -214,24 +279,95 @@ export default function OnboardingPage() {
         city: state.city,
         postalCode: state.postalCode,
         phone: state.phone,
-        availability: state.availability,
-        sessionTypes: state.sessionTypes,
-        minBookingDelay: state.minBookingDelay,
       }),
     });
 
-    if (!response.ok) {
-      const data = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(
-        data?.error ??
-          "Une erreur est survenue lors de la sauvegarde de votre profil. Merci de réessayer.",
-      );
+    if (!profileRes.ok) {
+      const d = (await profileRes.json().catch(() => null)) as { error?: string } | null;
+      setError(d?.error ?? "Erreur lors de la sauvegarde du profil. Merci de réessayer.");
       setLoading(false);
       return;
     }
 
+    // ── 4) Save availability (disponibilites + parametres_cabinet) ─────────
+    const dispos = (Object.entries(state.availability) as [DayKey, { enabled: boolean; slots: { start: string; end: string }[] }][])
+      .filter(([, cfg]) => cfg.enabled)
+      .flatMap(([day, cfg]) =>
+        cfg.slots.map((slot) => ({
+          jour_semaine: DAY_TO_JOUR[day],
+          heure_debut: slot.start,
+          heure_fin: slot.end,
+          actif: true,
+        })),
+      );
+
+    console.log(`[onboarding] Saving disponibilites: ${dispos.length} days`, dispos);
+
+    const dispoRes = await fetch("/api/sophrologue/disponibilites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sophrologue_id: sophrologueId,
+        dispos,
+        delai: Number(state.minBookingDelay),
+      }),
+    });
+
+    if (!dispoRes.ok) {
+      const d = (await dispoRes.json().catch(() => null)) as { error?: string } | null;
+      setError(d?.error ?? "Erreur lors de la sauvegarde des disponibilités. Merci de réessayer.");
+      setLoading(false);
+      return;
+    }
+
+    // ── 5) Save session types (types_seances) ──────────────────────────────
+    const validSessionTypes = state.sessionTypes.filter(
+      (s) => s.name.trim() !== "" && s.price !== "",
+    );
+
+    console.log(`[onboarding] Saving types_seances: ${validSessionTypes.length} types`, validSessionTypes);
+
+    if (validSessionTypes.length > 0) {
+      const results = await Promise.all(
+        validSessionTypes.map((s) =>
+          fetch("/api/types-seances/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sophrologue_id: sophrologueId,
+              nom: s.name.trim(),
+              duree_minutes: Number(s.duration),
+              tarif: Number(s.price),
+            }),
+          }),
+        ),
+      );
+
+      const failed = results.find((r) => !r.ok);
+      if (failed) {
+        const d = (await failed.json().catch(() => null)) as { error?: string } | null;
+        setError(d?.error ?? "Erreur lors de la sauvegarde des types de séances. Merci de réessayer.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    // ── 6) Mark onboarding as completed (direct client — bypasses RLS via
+    //       the anon key; RLS must allow sophrologues to update their own row)
+    const { error: flagError } = await supabase
+      .from("sophrologues")
+      .update({ onboarding_completed: true })
+      .eq("user_id", user.id);
+
+    if (flagError) {
+      console.error("[onboarding] Failed to set onboarding_completed:", flagError);
+      // Non-blocking: we still redirect — the middleware guard will loop the
+      // user back here on next visit, but we don't want to block the UX now.
+    } else {
+      console.log("[onboarding] onboarding_completed set to true");
+    }
+
+    // ── 7) All good — go to dashboard ─────────────────────────────────────
     router.push("/dashboard");
   };
 
@@ -242,7 +378,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-4xl px-4">
         <div className="mb-6 space-y-2">
           <Badge>Onboarding Calymia</Badge>
-          <h1 className="text-3xl font-semibold text-[#1E3A5F]">
+          <h1 className="text-3xl font-semibold text-[#426F59]">
             Configurez votre espace en quelques étapes
           </h1>
           <p className="text-sm text-slate-600">
@@ -262,9 +398,9 @@ export default function OnboardingPage() {
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-white ${
                       isDone
-                        ? "bg-[#27AE60]"
+                        ? "bg-[#426F59]"
                         : isActive
-                          ? "bg-[#2E75B6]"
+                          ? "bg-[#426F59]"
                           : "bg-slate-200 text-slate-700"
                     }`}
                   >
@@ -277,7 +413,7 @@ export default function OnboardingPage() {
                     <div className="ml-2 hidden h-0.5 flex-1 rounded bg-slate-200 sm:block">
                       <div
                         className={`h-0.5 rounded ${
-                          step > stepNumber ? "bg-[#27AE60]" : "bg-transparent"
+                          step > stepNumber ? "bg-[#426F59]" : "bg-transparent"
                         }`}
                       />
                     </div>
@@ -288,7 +424,7 @@ export default function OnboardingPage() {
           </div>
           <div className="mt-3 h-1 w-full rounded-full bg-slate-200">
             <div
-              className="h-1 rounded-full bg-[#2E75B6] transition-all"
+              className="h-1 rounded-full bg-[#426F59] transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -317,7 +453,7 @@ export default function OnboardingPage() {
                   <input
                     type="file"
                     accept="image/*"
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[#2E75B6] file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#1E3A5F]"
+                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[#426F59] file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#355447]"
                   />
                   <p className="text-xs text-slate-500">
                     Formats recommandés : JPG ou PNG, minimum 400x400px.
@@ -329,7 +465,7 @@ export default function OnboardingPage() {
                     Bio
                   </label>
                   <textarea
-                    className="min-h-[120px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A5F] focus-visible:ring-offset-2"
+                    className="min-h-[120px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#426F59] focus-visible:ring-offset-2"
                     value={state.bio}
                     onChange={(e) =>
                       setState((prev) => ({ ...prev, bio: e.target.value }))
@@ -352,8 +488,8 @@ export default function OnboardingPage() {
                           onClick={() => toggleSpecialty(option.value)}
                           className={`rounded-full border px-3 py-1 text-xs font-medium ${
                             active
-                              ? "border-[#2E75B6] bg-[#2E75B6] text-white"
-                              : "border-slate-200 bg-white text-slate-700 hover:border-[#2E75B6]"
+                              ? "border-[#426F59] bg-[#426F59] text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-[#426F59]"
                           }`}
                         >
                           {option.label}
@@ -467,13 +603,10 @@ export default function OnboardingPage() {
                           <label className="flex items-center gap-2">
                             <input
                               type="checkbox"
+                              className="accent-[#426F59]"
                               checked={config.enabled}
                               onChange={(e) =>
-                                updateAvailability(
-                                  day.key,
-                                  "enabled",
-                                  e.target.checked,
-                                )
+                                updateDayEnabled(day.key, e.target.checked)
                               }
                             />
                             <span className="font-medium text-slate-800">
@@ -481,32 +614,47 @@ export default function OnboardingPage() {
                             </span>
                           </label>
                           {config.enabled && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <Input
-                                type="time"
-                                value={config.start}
-                                onChange={(e) =>
-                                  updateAvailability(
-                                    day.key,
-                                    "start",
-                                    e.target.value,
-                                  )
-                                }
-                                className="h-8"
-                              />
-                              <span className="text-slate-500">à</span>
-                              <Input
-                                type="time"
-                                value={config.end}
-                                onChange={(e) =>
-                                  updateAvailability(
-                                    day.key,
-                                    "end",
-                                    e.target.value,
-                                  )
-                                }
-                                className="h-8"
-                              />
+                            <div className="mt-2 space-y-2">
+                              {config.slots.map((slot, slotIdx) => (
+                                <div
+                                  key={slotIdx}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Input
+                                    type="time"
+                                    value={slot.start}
+                                    onChange={(e) =>
+                                      updateSlot(day.key, slotIdx, "start", e.target.value)
+                                    }
+                                    className="h-8"
+                                  />
+                                  <span className="text-slate-500">à</span>
+                                  <Input
+                                    type="time"
+                                    value={slot.end}
+                                    onChange={(e) =>
+                                      updateSlot(day.key, slotIdx, "end", e.target.value)
+                                    }
+                                    className="h-8"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSlot(day.key, slotIdx)}
+                                    disabled={config.slots.length <= 1}
+                                    className="text-slate-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="Supprimer la plage"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addSlot(day.key)}
+                                className="text-xs font-medium text-[#426F59] hover:underline"
+                              >
+                                + Ajouter une plage
+                              </button>
                             </div>
                           )}
                         </div>
@@ -524,7 +672,7 @@ export default function OnboardingPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="border-[#2E75B6] text-[#2E75B6]"
+                      className="border-[#426F59] text-[#426F59]"
                       onClick={addSessionType}
                     >
                       Ajouter une séance
@@ -629,7 +777,7 @@ export default function OnboardingPage() {
             {step === 4 && (
               <section className="space-y-4 text-sm text-slate-800">
                 <div>
-                  <h2 className="text-sm font-semibold text-[#1E3A5F]">
+                  <h2 className="text-sm font-semibold text-[#426F59]">
                     Profil public
                   </h2>
                   <p className="mt-1 whitespace-pre-line text-slate-700">
@@ -654,7 +802,7 @@ export default function OnboardingPage() {
                 </div>
 
                 <div>
-                  <h2 className="text-sm font-semibold text-[#1E3A5F]">
+                  <h2 className="text-sm font-semibold text-[#426F59]">
                     Cabinet
                   </h2>
                   <p className="mt-1 text-xs text-slate-700">
@@ -672,7 +820,7 @@ export default function OnboardingPage() {
                 </div>
 
                 <div>
-                  <h2 className="text-sm font-semibold text-[#1E3A5F]">
+                  <h2 className="text-sm font-semibold text-[#426F59]">
                     Disponibilités
                   </h2>
                   <ul className="mt-1 space-y-1 text-xs text-slate-700">
@@ -681,7 +829,8 @@ export default function OnboardingPage() {
                       if (!config.enabled) return null;
                       return (
                         <li key={day.key}>
-                          {day.label} : {config.start} – {config.end}
+                          {day.label} :{" "}
+                          {config.slots.map((s, i) => `${s.start} – ${s.end}`).join(", ")}
                         </li>
                       );
                     })}
@@ -695,7 +844,7 @@ export default function OnboardingPage() {
                 </div>
 
                 <div>
-                  <h2 className="text-sm font-semibold text-[#1E3A5F]">
+                  <h2 className="text-sm font-semibold text-[#426F59]">
                     Types de séances
                   </h2>
                   {state.sessionTypes.length === 0 ? (
@@ -735,7 +884,7 @@ export default function OnboardingPage() {
             {step < 4 ? (
               <Button
                 type="button"
-                className="bg-[#1E3A5F] hover:bg-[#2E75B6]"
+                className="bg-[#426F59] hover:bg-[#355447]"
                 onClick={goNext}
                 disabled={loading}
               >
@@ -744,7 +893,7 @@ export default function OnboardingPage() {
             ) : (
               <Button
                 type="button"
-                className="bg-[#27AE60] hover:bg-emerald-600"
+                className="bg-[#426F59] hover:bg-[#355447]"
                 onClick={handleFinish}
                 disabled={loading}
               >

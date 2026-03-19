@@ -35,8 +35,8 @@ type DispoRow = {
 type BookedInterval = { debut: Date; fin: Date };
 
 type AvailabilityData = {
-  // JS getDay() → DispoRow | null
-  dispoByJsDay: Map<number, DispoRow>;
+  // JS getDay() → DispoRow[] (multiple slots per day, e.g. 09-12 and 14-18)
+  dispoByJsDay: Map<number, DispoRow[]>;
   // séances déjà réservées sous forme d'intervalles (dates locales)
   bookedIntervals: BookedInterval[];
   // délai minimum en heures avant réservation
@@ -97,34 +97,44 @@ function isSlotBooked(slotStart: Date, bookedIntervals: BookedInterval[]): boole
   );
 }
 
-/** Génère les créneaux horaires disponibles pour un jour donné */
+/** Génère les créneaux horaires disponibles pour un jour donné.
+ *  Accepte plusieurs plages (ex: 09-12 et 14-18) et fusionne les créneaux. */
 function buildSlotsFromDispo(
   day: Date,
-  dispo: DispoRow,
+  dispos: DispoRow[],
   bookedIntervals: BookedInterval[],
   delaiMinHeures: number,
 ): Date[] {
-  const slots: Date[] = [];
-  const [startH] = dispo.heure_debut.split(":").map(Number);
-  const [endH] = dispo.heure_fin.split(":").map(Number);
-  // Dernier départ = endH - 1 (séance de 60 min)
-  const lastSlotH = endH - 1;
+  const allSlots: Date[] = [];
   const now = new Date();
   const cutoff = new Date(now.getTime() + delaiMinHeures * 60 * 60 * 1000);
 
-  for (let h = startH; h <= lastSlotH; h++) {
-    const slot = new Date(day);
-    slot.setHours(h, 0, 0, 0);
-    // Exclure les créneaux trop proches ou passés
-    if (slot <= cutoff) continue;
-    // Exclure les créneaux qui chevauchent une séance existante
-    if (isSlotBooked(slot, bookedIntervals)) {
-      console.log(`[reserver] Créneau exclu (déjà réservé) : ${slot.toLocaleString("fr-FR")}`);
-      continue;
+  for (const dispo of dispos) {
+    const [startH] = dispo.heure_debut.split(":").map(Number);
+    const [endH] = dispo.heure_fin.split(":").map(Number);
+    const lastSlotH = endH - 1;
+
+    for (let h = startH; h <= lastSlotH; h++) {
+      const slot = new Date(day);
+      slot.setHours(h, 0, 0, 0);
+      if (slot <= cutoff) continue;
+      if (isSlotBooked(slot, bookedIntervals)) {
+        console.log(`[reserver] Créneau exclu (déjà réservé) : ${slot.toLocaleString("fr-FR")}`);
+        continue;
+      }
+      allSlots.push(slot);
     }
-    slots.push(slot);
   }
-  return slots;
+
+  const seen = new Set<number>();
+  return allSlots
+    .filter((s) => {
+      const k = s.getTime();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .sort((a, b) => a.getTime() - b.getTime());
 }
 
 export default function ReserverPage() {
@@ -237,10 +247,13 @@ export default function ReserverPage() {
 
       if (cancelled) return;
 
-      // Construire la map JS-day → DispoRow
-      const dispoByJsDay = new Map<number, DispoRow>();
+      // Construire la map JS-day → DispoRow[] (plusieurs plages par jour)
+      const dispoByJsDay = new Map<number, DispoRow[]>();
       for (const d of dispos ?? []) {
-        dispoByJsDay.set(dbJourToJsDay(d.jour_semaine), d);
+        const jsDay = dbJourToJsDay(d.jour_semaine);
+        const arr = dispoByJsDay.get(jsDay) ?? [];
+        arr.push(d);
+        dispoByJsDay.set(jsDay, arr);
       }
 
       // Construire les intervalles de séances réservées
@@ -260,9 +273,9 @@ export default function ReserverPage() {
       const today = startOfDay(new Date());
       for (let i = 0; i < 28; i++) {
         const d = addDays(today, i);
-        const dispo = avail.dispoByJsDay.get(d.getDay());
-        if (dispo) {
-          const slots = buildSlotsFromDispo(d, dispo, avail.bookedIntervals, delaiMinHeures);
+        const dayDispos = avail.dispoByJsDay.get(d.getDay());
+        if (dayDispos && dayDispos.length > 0) {
+          const slots = buildSlotsFromDispo(d, dayDispos, avail.bookedIntervals, delaiMinHeures);
           if (slots.length > 0) {
             if (!cancelled) setSelectedDay(d);
             break;
@@ -296,11 +309,11 @@ export default function ReserverPage() {
 
   const slotsForSelectedDay = useMemo(() => {
     if (!availability) return [];
-    const dispo = availability.dispoByJsDay.get(selectedDay.getDay());
-    if (!dispo) return [];
+    const dayDispos = availability.dispoByJsDay.get(selectedDay.getDay());
+    if (!dayDispos || dayDispos.length === 0) return [];
     return buildSlotsFromDispo(
       selectedDay,
-      dispo,
+      dayDispos,
       availability.bookedIntervals,
       availability.delaiMinHeures,
     );
@@ -655,18 +668,24 @@ export default function ReserverPage() {
                         {weeks.map((week, wi) => (
                           <div key={`w-${wi}`} className="grid grid-cols-7 gap-1.5">
                             {week.map((d) => {
-                              const dispo = availability?.dispoByJsDay.get(d.getDay());
+                              const dayDispos = availability?.dispoByJsDay.get(d.getDay());
                               const hasSlots =
                                 availability != null &&
-                                dispo != null &&
+                                dayDispos != null &&
+                                dayDispos.length > 0 &&
                                 buildSlotsFromDispo(
                                   d,
-                                  dispo,
+                                  dayDispos,
                                   availability.bookedIntervals,
                                   availability.delaiMinHeures,
                                 ).length > 0;
                               const isSelected = isSameDay(d, selectedDay);
                               const isDisabled = !hasSlots;
+                              const titleText = isDisabled
+                                ? "Aucun créneau disponible"
+                                : dayDispos!
+                                    .map((dp) => `${dp.heure_debut} – ${dp.heure_fin}`)
+                                    .join(", ");
                               return (
                                 <button
                                   key={d.toISOString()}
@@ -684,11 +703,7 @@ export default function ReserverPage() {
                                         : "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed"
                                   }`}
                                   aria-disabled={isDisabled}
-                                  title={
-                                    isDisabled
-                                      ? "Aucun créneau disponible"
-                                      : `${dispo!.heure_debut} – ${dispo!.heure_fin}`
-                                  }
+                                  title={titleText}
                                 >
                                   <div className="font-medium">
                                     {d.toLocaleDateString("fr-FR", { weekday: "short" })}
