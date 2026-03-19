@@ -12,8 +12,10 @@ const supabase = createClient(
 );
 
 type Payload = {
+  // Existing blocked seance (from bloquer-creneau)
+  seance_id: string | number;
   sophrologue_id: string | number;
-  montant: number;
+  montant?: number;
   debut_at: string;
   patient_prenom: string;
   patient_nom: string;
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Partial<Payload>;
 
     const {
+      seance_id,
       sophrologue_id,
       montant,
       debut_at,
@@ -36,6 +39,7 @@ export async function POST(request: Request) {
     } = body;
 
     if (
+      seance_id == null ||
       sophrologue_id == null ||
       !debut_at ||
       !patient_prenom ||
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1) Récupérer ou créer le client (évite les doublons par email)
+    // ── 1) Récupérer ou créer le client (évite les doublons par email) ────────
     let patient: { id: string | number } | null = null;
 
     const { data: existing } = await supabase
@@ -60,20 +64,13 @@ export async function POST(request: Request) {
       .maybeSingle<{ id: string | number; user_id: string | null }>();
 
     if (existing) {
-      // Client déjà connu — mettre à jour les infos de contact
       await supabase
         .from("patients")
-        .update({
-          prenom: patient_prenom,
-          nom: patient_nom,
-          telephone: patient_telephone,
-        })
+        .update({ prenom: patient_prenom, nom: patient_nom, telephone: patient_telephone })
         .eq("id", existing.id);
-
       patient = { id: existing.id };
       console.log("Create PI - client existant réutilisé:", patient.id);
     } else {
-      // Nouveau client
       const { data: created, error: patientError } = await supabase
         .from("patients")
         .insert({
@@ -93,78 +90,38 @@ export async function POST(request: Request) {
           { status: 500 },
         );
       }
-
       patient = created;
       console.log("Create PI - nouveau client créé:", patient.id);
     }
 
-    // 2) Récupérer le type_seance_id (NOT NULL en base — obligatoire)
-    //    Essai 1 : type actif du sophrologue
-    let { data: typeSeance } = await supabase
-      .from("types_seances")
-      .select("id")
-      .eq("sophrologue_id", sophrologue_id)
-      .eq("actif", true)
-      .limit(1)
-      .maybeSingle<{ id: string | number }>();
-
-    // Essai 2 : n'importe quel type du sophrologue (même inactif)
-    if (typeSeance == null) {
-      const { data: fallback } = await supabase
-        .from("types_seances")
-        .select("id")
-        .eq("sophrologue_id", sophrologue_id)
-        .limit(1)
-        .maybeSingle<{ id: string | number }>();
-      typeSeance = fallback;
-    }
-
-    if (typeSeance == null) {
-      return NextResponse.json(
-        {
-          error:
-            "Aucun type de séance configuré. Merci de créer au moins une séance dans vos paramètres avant de recevoir des réservations.",
-        },
-        { status: 400 },
-      );
-    }
-
-    // 3) Calculer fin_at = debut_at + 60 min
-    const debutDate = new Date(debut_at);
-    const finDate = new Date(debutDate.getTime() + 60 * 60 * 1000);
-
-    const seancePayload: Record<string, unknown> = {
-      sophrologue_id,
-      patient_id: patient.id,
-      type_seance_id: typeSeance.id,
-      debut_at,
-      fin_at: finDate.toISOString(),
-      statut: "en_attente",
-      origine: "en_ligne",
-    };
-
-    const { data: seance, error: seanceError } = await supabase
+    // ── 2) Attach patient to the blocked seance, clear expire_at ─────────────
+    const { error: seanceError } = await supabase
       .from("seances")
-      .insert(seancePayload)
-      .select("id")
-      .single<{ id: string | number }>();
+      .update({
+        patient_id: patient.id,
+        expire_at: null, // remove hold — slot is now a real pending booking
+      })
+      .eq("id", seance_id)
+      .eq("statut", "en_attente"); // safety: don't touch confirmed seances
 
-    if (seanceError || !seance) {
-      console.error("Create PI - seance insert error:", seanceError);
+    if (seanceError) {
+      console.error("Create PI - seance update error:", seanceError);
       return NextResponse.json(
-        { error: "Impossible de créer la séance. Merci de réessayer." },
+        { error: "Impossible de lier la séance. Merci de réessayer." },
         { status: 500 },
       );
     }
 
-    // 4) Créer le PaymentIntent Stripe
+    console.log("Create PI - séance liée au client:", seance_id, "→ patient:", patient.id);
+
+    // ── 3) Créer le PaymentIntent Stripe ─────────────────────────────────────
     const amountCents = Math.round((montant ?? 60) * 100);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "eur",
       metadata: {
-        seance_id: String(seance.id),
+        seance_id: String(seance_id),
         sophrologue_id: String(sophrologue_id),
         patient_id: String(patient.id),
       },
@@ -180,7 +137,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
-      seance_id: seance.id,
+      seance_id,
     });
   } catch (error) {
     console.error("Create PI - unexpected error:", error);

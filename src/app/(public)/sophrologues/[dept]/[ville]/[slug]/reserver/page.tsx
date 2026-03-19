@@ -153,6 +153,10 @@ export default function ReserverPage() {
   const [sophrologue, setSophrologue] = useState<SophrologueLite | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [seanceId, setSeanceId] = useState<string | number | null>(null);
+  // Temporary block held while patient fills their info (step 2)
+  const [blockedSeanceId, setBlockedSeanceId] = useState<string | number | null>(null);
+  // Slots confirmed taken by a concurrent booking (show as unavailable)
+  const [blockedSlots, setBlockedSlots] = useState<number[]>([]); // slot.getTime() values
   const [availability, setAvailability] = useState<AvailabilityData | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [noAvailability, setNoAvailability] = useState(false);
@@ -210,13 +214,16 @@ export default function ReserverPage() {
         .returns<DispoRow[]>();
 
       // 3) Séances déjà réservées dans les 4 prochaines semaines
+      // Exclude temporary blocks that have already expired
+      const nowIso = new Date().toISOString();
       const { data: seances } = await supabase
         .from("seances")
         .select("debut_at, fin_at")
         .eq("sophrologue_id", sid)
         .in("statut", ["confirmee", "en_attente"])
-        .gt("debut_at", new Date().toISOString())
+        .gt("debut_at", nowIso)
         .lt("debut_at", horizon)
+        .or(`expire_at.is.null,expire_at.gt.${nowIso}`)
         .returns<{ debut_at: string; fin_at: string }[]>();
 
       console.log(`[reserver] Séances réservées récupérées : ${seances?.length ?? 0}`, seances);
@@ -301,23 +308,75 @@ export default function ReserverPage() {
 
   const progress = (step / 4) * 100;
 
+  const releaseBlock = async (id: string | number) => {
+    try {
+      await fetch("/api/reservations/liberer-creneau", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seance_id: id }),
+      });
+      console.log("[reserver] Créneau libéré:", id);
+    } catch {
+      // Non-blocking — block will expire on its own after 15 min
+    }
+    setBlockedSeanceId(null);
+  };
+
   const goBack = () => {
     setError(null);
     if (step === 1) {
-      // Retour vers la page vitrine du sophrologue
       router.push(`/sophrologues/${params.dept}/${params.ville}/${params.slug}`);
       return;
+    }
+    // Release the temporary block when going back to slot selection
+    if (step === 2 && blockedSeanceId != null) {
+      void releaseBlock(blockedSeanceId);
     }
     setStep((s) => (s - 1) as Step);
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     setError(null);
     if (step === 1) {
       if (!selectedSlot) {
         setError("Merci de sélectionner un créneau.");
         return;
       }
+      if (!sophrologue?.id) {
+        setError("Impossible d'identifier le sophrologue. Merci de réessayer.");
+        return;
+      }
+
+      setLoading(true);
+      const finAt = new Date(selectedSlot.getTime() + 60 * 60 * 1000);
+      const res = await fetch("/api/reservations/bloquer-creneau", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sophrologue_id: sophrologue.id,
+          debut_at: selectedSlot.toISOString(),
+          fin_at: finAt.toISOString(),
+        }),
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | { seance_id?: string | number; error?: string }
+        | null;
+
+      setLoading(false);
+
+      if (!res.ok || !data?.seance_id) {
+        if (res.status === 409) {
+          // Mark slot as taken so it renders disabled immediately
+          setBlockedSlots((prev) => [...prev, selectedSlot.getTime()]);
+          setSelectedSlot(null);
+        }
+        setError(data?.error ?? "Impossible de réserver ce créneau. Merci de réessayer.");
+        return;
+      }
+
+      console.log("[reserver] Créneau bloqué:", data.seance_id);
+      setBlockedSeanceId(data.seance_id);
       setStep(2);
       return;
     }
@@ -348,11 +407,16 @@ export default function ReserverPage() {
       return;
     }
 
+    if (blockedSeanceId == null) {
+      setError("Le créneau n'est plus réservé. Veuillez recommencer.");
+      return;
+    }
+
     setLoading(true);
     const montant = 60; // placeholder (types de séances à venir)
     const payload = {
+      seance_id: blockedSeanceId,
       sophrologue_id: sophrologue.id,
-      type_seance_nom: "Séance 60 min",
       montant,
       debut_at: selectedSlot.toISOString(),
       patient_prenom: patient.prenom,
@@ -657,18 +721,27 @@ export default function ReserverPage() {
                         <div className="grid grid-cols-2 gap-2">
                           {slotsForSelectedDay.map((slot) => {
                             const selected = selectedSlot?.getTime() === slot.getTime();
+                            const isBlocked = blockedSlots.includes(slot.getTime());
                             return (
                               <button
                                 key={slot.toISOString()}
                                 type="button"
-                                onClick={() => setSelectedSlot(slot)}
-                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                                  selected
-                                    ? "border-[#27AE60] bg-[#27AE60]/15 text-[#1E3A5F]"
-                                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
+                                disabled={isBlocked}
+                                onClick={() => !isBlocked && setSelectedSlot(slot)}
+                                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors flex flex-col items-center gap-0.5 ${
+                                  isBlocked
+                                    ? "opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400"
+                                    : selected
+                                      ? "border-[#27AE60] bg-[#27AE60]/15 text-[#1E3A5F]"
+                                      : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                                 }`}
                               >
-                                {formatTime(slot)}
+                                <span>{formatTime(slot)}</span>
+                                {isBlocked && (
+                                  <span className="text-xs font-normal text-gray-400">
+                                    Indisponible
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
