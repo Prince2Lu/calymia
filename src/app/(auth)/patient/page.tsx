@@ -310,6 +310,18 @@ function InfoSection({ patient }: { patient: Patient }) {
   );
 }
 
+// ─── Traduction des erreurs Supabase ──────────────────────────────────────────
+
+function translateError(message: string): string {
+  if (message.includes("New password should be different"))
+    return "Le nouveau mot de passe doit être différent de l'ancien.";
+  if (message.includes("Password should be at least"))
+    return "Le mot de passe doit contenir au moins 8 caractères.";
+  if (message.includes("Auth session missing"))
+    return "Session expirée. Veuillez vous reconnecter.";
+  return "Une erreur est survenue. Veuillez réessayer.";
+}
+
 // ─── Composant : changement de mot de passe ───────────────────────────────────
 
 function ChangePasswordSection() {
@@ -340,7 +352,7 @@ function ChangePasswordSection() {
     const { error: updateError } = await supabase.auth.updateUser({ password });
     setSaving(false);
     if (updateError) {
-      setError(updateError.message);
+      setError(translateError(updateError.message));
       return;
     }
     setSuccess(true);
