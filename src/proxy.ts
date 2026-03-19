@@ -1,7 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 
 const PROTECTED_PATHS = ["/dashboard", "/onboarding", "/patient", "/clients", "/seances", "/parametres"];
+
+const AUTH_CACHE_TTL_MS = 30_000; // 30 seconds
+
+const authCache = new Map<
+  string,
+  { user: User | null; cachedAt: number }
+>();
+
+function getSessionCacheKey(request: NextRequest): string {
+  const authCookie = request.cookies
+    .getAll()
+    .find((c) => c.name.includes("auth-token") && !c.name.includes("code-verifier"));
+  return (authCookie?.value ?? "").slice(0, 20);
+}
+
+function pruneExpiredCache() {
+  const now = Date.now();
+  for (const [key, entry] of authCache.entries()) {
+    if (now - entry.cachedAt > AUTH_CACHE_TTL_MS) authCache.delete(key);
+  }
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -36,11 +58,21 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // IMPORTANT : ne jamais appeler supabase.auth.getSession() ici — toujours getUser()
-  // getUser() valide le JWT côté serveur Supabase ; getSession() lit seulement le cookie.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // ── Auth check (with 30s in-memory cache to avoid Supabase rate limits) ───
+  const cacheKey = getSessionCacheKey(request);
+  const cached = authCache.get(cacheKey);
+  const now = Date.now();
+
+  let user: User | null;
+
+  if (cached && now - cached.cachedAt < AUTH_CACHE_TTL_MS) {
+    user = cached.user;
+  } else {
+    const { data: { user: u } } = await supabase.auth.getUser();
+    user = u ?? null;
+    authCache.set(cacheKey, { user, cachedAt: now });
+    pruneExpiredCache();
+  }
 
   if (!user) {
     const redirectUrl = request.nextUrl.clone();

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { generateAndStoreFacture } from '@/lib/factures/generate'
+import {
+  confirmationReservation,
+  confirmationReservationSophrologue,
+} from '@/lib/emails/templates'
+import { sendEmail } from '@/lib/emails/send'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -9,6 +14,22 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+function formatDateFR(iso: string): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso))
+}
+
+function formatTimeFR(iso: string): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -72,17 +93,78 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('Paiement inserted successfully')
 
+      let factureUrl: string | null = null
+
       // Génération automatique de la facture PDF (appel direct, sans HTTP)
       try {
         console.log('[Webhook] Démarrage génération facture pour séance:', seance_id)
         const result = await generateAndStoreFacture(seance_id)
         if (result.success) {
-          console.log('[Webhook] Facture générée avec succès:', result.facture_url)
+          factureUrl = result.facture_url
+          console.log('[Webhook] Facture générée avec succès:', factureUrl)
         } else {
           console.error('[Webhook] Échec génération facture:', result.error)
         }
       } catch (factureErr) {
         console.error('[Webhook] Erreur inattendue lors de la génération de facture:', factureErr)
+      }
+
+      // Emails de confirmation (patient + sophrologue)
+      try {
+        const { data: seance } = await supabase
+          .from('seances')
+          .select('debut_at, fin_at, type_seance_id, patient_id, sophrologue_id')
+          .eq('id', seance_id)
+          .single()
+
+        if (seance) {
+          const [{ data: patient }, { data: sophrologue }, { data: typeSeance }] = await Promise.all([
+            supabase.from('patients').select('prenom, nom, email').eq('id', seance.patient_id).single(),
+            supabase.from('sophrologues').select('prenom, nom, email').eq('id', seance.sophrologue_id).single(),
+            supabase.from('types_seances').select('nom').eq('id', seance.type_seance_id).single(),
+          ])
+
+          const dateSeance = formatDateFR(seance.debut_at)
+          const heureSeance = formatTimeFR(seance.debut_at)
+          const montant = montant_total
+
+          if (patient?.email) {
+            const html = confirmationReservation({
+              prenom_client: patient.prenom ?? '',
+              prenom_sophrologue: sophrologue?.prenom ?? '',
+              nom_sophrologue: sophrologue?.nom ?? '',
+              date_seance: dateSeance,
+              heure_seance: heureSeance,
+              type_seance: typeSeance?.nom ?? 'Séance',
+              montant,
+              facture_url: factureUrl,
+            })
+            await sendEmail({
+              to: patient.email,
+              subject: 'Confirmation de votre réservation Calymia',
+              html,
+            })
+          }
+
+          if (sophrologue?.email) {
+            const html = confirmationReservationSophrologue({
+              prenom_sophrologue: sophrologue.prenom ?? '',
+              prenom_client: patient?.prenom ?? '',
+              nom_client: patient?.nom ?? '',
+              date_seance: dateSeance,
+              heure_seance: heureSeance,
+              type_seance: typeSeance?.nom ?? 'Séance',
+              montant,
+            })
+            await sendEmail({
+              to: sophrologue.email,
+              subject: 'Nouvelle réservation confirmée',
+              html,
+            })
+          }
+        }
+      } catch (emailErr) {
+        console.error('[Webhook] Erreur envoi emails confirmation:', emailErr)
       }
     }
   }

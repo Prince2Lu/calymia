@@ -3,6 +3,8 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { annulationClient, annulationSophrologue } from "@/lib/emails/templates";
+import { sendEmail } from "@/lib/emails/send";
 
 // ─── Clients Supabase ─────────────────────────────────────────────────────────
 
@@ -289,6 +291,51 @@ export async function POST(request: NextRequest) {
     console.log(
       `[annuler] Séance ${seance_id} annulée par ${annule_par ?? "inconnu"} — remboursement ${montantRembourse} € (${ratio * 100}%)`,
     );
+
+    // ── 8) Emails d'annulation (patient + sophrologue) ─────────────────────────
+    try {
+      const dateSeance = new Intl.DateTimeFormat("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(new Date(seance.debut_at));
+
+      const [{ data: patient }, { data: sophrologue }] = await Promise.all([
+        supabaseAdmin.from("patients").select("prenom, nom, email").eq("id", seance.patient_id).single(),
+        supabaseAdmin.from("sophrologues").select("prenom, nom, email").eq("id", seance.sophrologue_id).single(),
+      ]);
+
+      if (patient?.email) {
+        const html = annulationClient({
+          prenom_client: patient.prenom ?? "",
+          prenom_sophrologue: sophrologue?.prenom ?? "",
+          date_seance: dateSeance,
+          montant_rembourse: montantRembourse,
+        });
+        await sendEmail({
+          to: patient.email,
+          subject: "Annulation de votre séance Calymia",
+          html,
+        });
+      }
+
+      if (sophrologue?.email) {
+        const html = annulationSophrologue({
+          prenom_sophrologue: sophrologue.prenom ?? "",
+          prenom_client: patient?.prenom ?? "",
+          nom_client: patient?.nom ?? "",
+          date_seance: dateSeance,
+        });
+        await sendEmail({
+          to: sophrologue.email,
+          subject: "Séance annulée",
+          html,
+        });
+      }
+    } catch (emailErr) {
+      console.error("[annuler] Erreur envoi emails annulation:", emailErr);
+    }
 
     return NextResponse.json({
       success: true,

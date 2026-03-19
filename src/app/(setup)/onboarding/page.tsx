@@ -365,6 +365,17 @@ export default function OnboardingPage() {
       // user back here on next visit, but we don't want to block the UX now.
     } else {
       console.log("[onboarding] onboarding_completed set to true");
+
+      // ── 6b) Envoi email de bienvenue (non bloquant) ─────────────────────
+      try {
+        await fetch("/api/emails/welcome-sophrologue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sophrologue_id: sophrologueId }),
+        });
+      } catch {
+        // Ignoré — l'email ne doit pas bloquer la redirection
+      }
     }
 
     // ── 7) All good — go to dashboard ─────────────────────────────────────
