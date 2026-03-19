@@ -122,6 +122,8 @@ export default function OnboardingPage() {
   const [photoPreviewLocal, setPhotoPreviewLocal] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [sophrologueId, setSophrologueId] = useState<string | null>(null);
+  const [prenom, setPrenom] = useState("");
+  const [nom, setNom] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -149,10 +151,14 @@ export default function OnboardingPage() {
       if (!user || cancelled) return;
       const { data } = await supabase
         .from("sophrologues")
-        .select("id")
+        .select("id, prenom, nom")
         .eq("user_id", user.id)
-        .maybeSingle<{ id: string }>();
-      if (!cancelled && data?.id) setSophrologueId(data.id);
+        .maybeSingle<{ id: string; prenom: string | null; nom: string | null }>();
+      if (!cancelled && data?.id) {
+        setSophrologueId(data.id);
+        setPrenom(data.prenom ?? "");
+        setNom(data.nom ?? "");
+      }
     })();
     return () => {
       cancelled = true;
@@ -350,9 +356,9 @@ export default function OnboardingPage() {
     // ── 2) Fetch the sophrologue row to get its PK (needed for related tables)
     const { data: sophrologueRow, error: sophrologueError } = await supabase
       .from("sophrologues")
-      .select("id")
+      .select("id, prenom, nom")
       .eq("user_id", user.id)
-      .single<{ id: string }>();
+      .single<{ id: string; prenom: string | null; nom: string | null }>();
 
     if (sophrologueError || !sophrologueRow) {
       setError("Profil sophrologue introuvable. Merci de vous reconnecter.");
@@ -361,6 +367,8 @@ export default function OnboardingPage() {
     }
 
     const sophrologueId = sophrologueRow.id;
+    const prenomPayload = prenom || sophrologueRow.prenom || "";
+    const nomPayload = nom || sophrologueRow.nom || "";
 
     // ── 3) Save profile (bio, address, specialties, etc.) ─────────────────
     const profileRes = await fetch("/api/sophrologue/update", {
@@ -368,6 +376,8 @@ export default function OnboardingPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: user.id,
+        prenom: prenomPayload,
+        nom: nomPayload,
         bio: state.bio,
         specialties: state.specialties,
         rpps: state.rpps,
@@ -555,6 +565,37 @@ export default function OnboardingPage() {
           <div className="mt-6 space-y-6">
             {step === 1 && (
               <section className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-800">
+                      Prénom
+                    </label>
+                    <Input
+                      value={prenom}
+                      readOnly
+                      disabled
+                      className="cursor-default bg-slate-50 text-slate-700"
+                      title="Renseigné à l’inscription — modifiable dans Paramètres après l’onboarding"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-800">
+                      Nom
+                    </label>
+                    <Input
+                      value={nom}
+                      readOnly
+                      disabled
+                      className="cursor-default bg-slate-50 text-slate-700"
+                      title="Renseigné à l’inscription — modifiable dans Paramètres après l’onboarding"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Ces informations proviennent de votre inscription. Vous pourrez les modifier
+                  dans les paramètres.
+                </p>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-800">
                     Photo de profil
