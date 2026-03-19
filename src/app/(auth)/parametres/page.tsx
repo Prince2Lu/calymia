@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { uploadAvatarWithSession } from "@/lib/supabase/upload-avatar-client";
 import {
   Loader2,
   Save,
@@ -35,6 +36,7 @@ type Sophrologue = {
   adresse: string | null;
   ville: string | null;
   code_postal: string | null;
+  photo_url: string | null;
 };
 
 type TypeSeance = {
@@ -128,6 +130,13 @@ function TabProfil({
   onSaved: (s: Sophrologue) => void;
   showToast: (msg: string, ok?: boolean) => void;
 }) {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   const [form, setForm] = useState({
     prenom: sophrologue.prenom ?? "",
     nom: sophrologue.nom ?? "",
@@ -142,6 +151,43 @@ function TabProfil({
     code_postal: sophrologue.code_postal ?? "",
   });
   const [saving, setSaving] = useState(false);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const result = await uploadAvatarWithSession(supabase, sophrologue.id, file);
+      if ("error" in result) {
+        showToast(result.error, false);
+        return;
+      }
+
+      const res = await fetch("/api/sophrologue/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: sophrologue.user_id,
+          photo_url: result.publicUrl,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+
+      if (!res.ok) {
+        showToast(json.error ?? "Impossible d’enregistrer la photo.", false);
+        return;
+      }
+
+      onSaved({ ...sophrologue, photo_url: result.publicUrl });
+      showToast("Photo de profil mise à jour.");
+    } catch (err) {
+      console.error("[TabProfil] avatar upload:", err);
+      showToast("Erreur lors de l’envoi de la photo.", false);
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const handleSave = async () => {
     console.log("[TabProfil] Bouton Enregistrer cliqué");
@@ -212,6 +258,65 @@ function TabProfil({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-4 border-b border-slate-100 pb-6">
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={handleAvatarChange}
+          disabled={avatarUploading}
+        />
+        <button
+          type="button"
+          onClick={() => avatarInputRef.current?.click()}
+          disabled={avatarUploading}
+          className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-slate-200 bg-slate-100 ring-offset-2 transition hover:ring-2 hover:ring-[#2E75B6]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E75B6] disabled:opacity-60"
+          title="Changer la photo de profil"
+        >
+          {sophrologue.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={sophrologue.photo_url}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-xs font-medium text-slate-400">
+              Photo
+            </span>
+          )}
+          {avatarUploading && (
+            <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <Loader2 className="h-6 w-6 animate-spin text-white" />
+            </span>
+          )}
+        </button>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-slate-800">Photo de profil</p>
+          <p className="text-xs text-slate-500">
+            Visible sur votre page publique. JPG, PNG ou WebP — max. 5 Mo.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-1"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
+          >
+            {avatarUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Envoi…
+              </>
+            ) : (
+              "Changer la photo"
+            )}
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         {field("Prénom", "prenom", { placeholder: "Marie" })}
         {field("Nom", "nom", { placeholder: "Dupont" })}
@@ -835,7 +940,7 @@ export default function ParametresPage() {
 
       const { data } = await supabase
         .from("sophrologues")
-        .select("id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, code_postal")
+        .select("id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, code_postal, photo_url")
         .eq("user_id", user.id)
         .maybeSingle<Sophrologue>();
 

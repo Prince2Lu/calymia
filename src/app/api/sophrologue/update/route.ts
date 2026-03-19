@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       city,
       postalCode,
       phone,
+      photo_url,
       onboarding_completed,
     } = body as {
       userId?: string;
@@ -35,13 +36,14 @@ export async function POST(request: Request) {
       city?: string;
       postalCode?: string;
       phone?: string;
+      photo_url?: string | null;
       onboarding_completed?: boolean;
     };
 
     console.log("[sophrologue/update] userId reçu :", userId);
     console.log("[sophrologue/update] payload complet :", {
       prenom, nom, bio, specialties, rpps,
-      teleconsultationUrl, address, city, postalCode, phone,
+      teleconsultationUrl, address, city, postalCode, phone, photo_url,
     });
 
     if (!userId) {
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
       ...(city !== undefined && { ville: city }),
       ...(postalCode !== undefined && { code_postal: postalCode }),
       ...(phone !== undefined && { telephone: phone }),
+      ...(photo_url !== undefined && { photo_url }),
       ...(onboarding_completed !== undefined && { onboarding_completed }),
     };
 
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
       .from("sophrologues")
       .update(updatePayload)
       .eq("user_id", userId)
-      .select("id, user_id, prenom, nom");
+      .select("id, user_id, prenom, nom, photo_url");
 
     console.log("[sophrologue/update] Réponse Supabase — data :", data, "| error :", error);
 

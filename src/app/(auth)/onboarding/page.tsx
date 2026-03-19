@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { uploadAvatarWithSession } from "@/lib/supabase/upload-avatar-client";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,8 @@ type SessionType = {
 
 type OnboardingState = {
   // Étape 1
+  /** Public URL after upload to Storage (`avatars` bucket) */
+  photoUrl: string | null;
   bio: string;
   specialties: Specialty[];
   rpps?: string;
@@ -53,6 +56,7 @@ type OnboardingState = {
 };
 
 const INITIAL_STATE: OnboardingState = {
+  photoUrl: null,
   bio: "",
   specialties: [],
   rpps: "",
@@ -115,14 +119,45 @@ const STEP_TITLES = [
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [state, setState] = useState<OnboardingState>(INITIAL_STATE);
+  const [photoPreviewLocal, setPhotoPreviewLocal] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [sophrologueId, setSophrologueId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewLocal) {
+        URL.revokeObjectURL(photoPreviewLocal);
+      }
+    };
+  }, [photoPreviewLocal]);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const { data } = await supabase
+        .from("sophrologues")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle<{ id: string }>();
+      if (!cancelled && data?.id) setSophrologueId(data.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   const goNext = () => setStep((s) => Math.min(4, s + 1));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
@@ -234,6 +269,68 @@ export default function OnboardingPage() {
     }));
   };
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    if (photoPreviewLocal) {
+      URL.revokeObjectURL(photoPreviewLocal);
+    }
+    const localUrl = URL.createObjectURL(file);
+    setPhotoPreviewLocal(localUrl);
+    setPhotoUploading(true);
+
+    try {
+      let sid = sophrologueId;
+      if (!sid) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          URL.revokeObjectURL(localUrl);
+          setPhotoPreviewLocal(null);
+          setError("Session expirée. Reconnectez-vous pour ajouter une photo.");
+          return;
+        }
+        const { data: row } = await supabase
+          .from("sophrologues")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle<{ id: string }>();
+        if (!row?.id) {
+          URL.revokeObjectURL(localUrl);
+          setPhotoPreviewLocal(null);
+          setError("Profil introuvable. Réessayez dans un instant.");
+          return;
+        }
+        sid = row.id;
+        setSophrologueId(sid);
+      }
+
+      const result = await uploadAvatarWithSession(supabase, sid, file);
+      if ("error" in result) {
+        URL.revokeObjectURL(localUrl);
+        setPhotoPreviewLocal(null);
+        setState((prev) => ({ ...prev, photoUrl: null }));
+        setError(result.error);
+        return;
+      }
+
+      setState((prev) => ({ ...prev, photoUrl: result.publicUrl }));
+      URL.revokeObjectURL(localUrl);
+      setPhotoPreviewLocal(null);
+    } catch {
+      URL.revokeObjectURL(localUrl);
+      setPhotoPreviewLocal(null);
+      setState((prev) => ({ ...prev, photoUrl: null }));
+      setError("Échec de l’envoi de la photo. Vérifiez votre connexion.");
+    } finally {
+      setPhotoUploading(false);
+      e.target.value = "";
+    }
+  };
+
   const handleFinish = async () => {
     setLoading(true);
     setError(null);
@@ -279,6 +376,7 @@ export default function OnboardingPage() {
         city: state.city,
         postalCode: state.postalCode,
         phone: state.phone,
+        ...(state.photoUrl ? { photo_url: state.photoUrl } : {}),
       }),
     });
 
@@ -457,17 +555,59 @@ export default function OnboardingPage() {
           <div className="mt-6 space-y-6">
             {step === 1 && (
               <section className="space-y-4">
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-800">
                     Photo de profil
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[#426F59] file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#355447]"
-                  />
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div
+                      className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-slate-200 bg-slate-100 text-xs text-slate-400"
+                      aria-hidden
+                    >
+                      {photoPreviewLocal || state.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={photoPreviewLocal ?? state.photoUrl ?? ""}
+                          alt="Aperçu de votre photo de profil"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="px-2 text-center leading-tight">
+                          Aperçu
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handlePhotoChange}
+                        disabled={photoUploading}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-fit border-[#426F59] text-[#426F59]"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={photoUploading}
+                      >
+                        {photoUploading
+                          ? "Envoi en cours…"
+                          : state.photoUrl || photoPreviewLocal
+                            ? "Changer la photo"
+                            : "Choisir une photo"}
+                      </Button>
+                      {photoUploading && (
+                        <p className="text-xs text-slate-500">
+                          Téléversement vers Calymia…
+                        </p>
+                      )}
+                    </div>
+                  </div>
                   <p className="text-xs text-slate-500">
-                    Formats recommandés : JPG ou PNG, minimum 400x400px.
+                    Formats recommandés : JPG ou PNG, minimum 400x400px (max. 5 Mo).
                   </p>
                 </div>
 
@@ -791,6 +931,17 @@ export default function OnboardingPage() {
                   <h2 className="text-sm font-semibold text-[#426F59]">
                     Profil public
                   </h2>
+                  {state.photoUrl && (
+                    <div className="mb-3 flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={state.photoUrl}
+                        alt=""
+                        className="h-14 w-14 rounded-full border border-slate-200 object-cover"
+                      />
+                      <span className="text-xs text-slate-600">Photo de profil</span>
+                    </div>
+                  )}
                   <p className="mt-1 whitespace-pre-line text-slate-700">
                     {state.bio || "Aucune bio renseignée pour le moment."}
                   </p>
