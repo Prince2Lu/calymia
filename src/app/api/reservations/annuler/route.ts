@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       seance_id?: string;
-      annule_par?: string;
+      annule_par?: "sophrologue" | "client";
     };
 
     const { seance_id, annule_par } = body;
@@ -294,6 +294,13 @@ export async function POST(request: NextRequest) {
 
     // ── 8) Emails d'annulation (patient + sophrologue) ─────────────────────────
     try {
+      const typeVersClient = isSophrologueCancel
+        ? "annulation_par_sophrologue_vers_client"
+        : "annulation_par_client_vers_client";
+      const typeVersPraticien = isSophrologueCancel
+        ? "annulation_par_sophrologue_vers_praticien"
+        : "annulation_par_client_vers_praticien";
+
       const dateSeance = new Intl.DateTimeFormat("fr-FR", {
         weekday: "long",
         day: "numeric",
@@ -321,7 +328,7 @@ export async function POST(request: NextRequest) {
             sophrologue_id: seance.sophrologue_id,
             patient_id: seance.patient_id,
             seance_id: seance.id,
-            type: "annulation_client",
+            type: typeVersClient,
             destinataire_nom:
               [patient.prenom, patient.nom].filter(Boolean).join(" ").trim() ||
               null,
@@ -344,7 +351,7 @@ export async function POST(request: NextRequest) {
             sophrologue_id: seance.sophrologue_id,
             patient_id: seance.patient_id,
             seance_id: seance.id,
-            type: "annulation_praticien",
+            type: typeVersPraticien,
             destinataire_nom:
               [sophrologue.prenom, sophrologue.nom]
                 .filter(Boolean)

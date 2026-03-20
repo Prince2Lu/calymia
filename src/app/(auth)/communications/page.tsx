@@ -23,6 +23,10 @@ function labelType(type: string) {
   const map: Record<string, string> = {
     confirmation_reservation: "Confirmation (client)",
     confirmation_reservation_praticien: "Confirmation (praticien)",
+    annulation_par_sophrologue_vers_client: "Annulation sophro → client",
+    annulation_par_sophrologue_vers_praticien: "Annulation sophro → praticien",
+    annulation_par_client_vers_client: "Annulation client → client",
+    annulation_par_client_vers_praticien: "Annulation client → praticien",
     annulation_client: "Annulation (client)",
     annulation_praticien: "Annulation (praticien)",
     bienvenue_sophrologue: "Bienvenue praticien",
@@ -36,6 +40,22 @@ function labelType(type: string) {
 function badgeTypeClass(type: string) {
   if (type.startsWith("confirmation"))
     return "bg-[#426F59]/15 text-[#426F59] ring-1 ring-[#426F59]/25";
+  // Annulations vers le client : rouge
+  if (
+    type === "annulation_par_sophrologue_vers_client" ||
+    type === "annulation_par_client_vers_client" ||
+    type === "annulation_client"
+  ) {
+    return "bg-red-50 text-red-700 ring-1 ring-red-200";
+  }
+  // Annulations vers le praticien : orange
+  if (
+    type === "annulation_par_sophrologue_vers_praticien" ||
+    type === "annulation_par_client_vers_praticien" ||
+    type === "annulation_praticien"
+  ) {
+    return "bg-orange-50 text-orange-800 ring-1 ring-orange-200";
+  }
   if (type.startsWith("annulation"))
     return "bg-red-50 text-red-700 ring-1 ring-red-200";
   if (type.includes("rappel"))
