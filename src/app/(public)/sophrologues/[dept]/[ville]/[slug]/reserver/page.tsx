@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { createBrowserClient } from "@supabase/ssr";
@@ -554,7 +555,52 @@ export default function ReserverPage() {
     }
     setAccountDone(true);
     setAccountLoading(false);
+
+    try {
+      await fetch("/api/emails/welcome-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: patient.email.trim(),
+          prenom: patient.prenom.trim() || "Client",
+        }),
+      });
+    } catch {
+      /* non bloquant */
+    }
   };
+
+  /** Si l’email n’a pas été vérifié à l’étape 2 (pas de blur), re-vérifier à l’étape 4 */
+  useEffect(() => {
+    if (step !== 4 || isLoggedIn) return;
+    const email = patient.email.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (emailStatus !== "idle") return;
+
+    let cancelled = false;
+    setEmailStatus("checking");
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/check-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = (await res.json()) as { exists?: boolean };
+        if (cancelled) return;
+        if (!res.ok) {
+          setEmailStatus("new");
+          return;
+        }
+        setEmailStatus(data.exists ? "exists" : "new");
+      } catch {
+        if (!cancelled) setEmailStatus("new");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, patient.email, isLoggedIn, emailStatus]);
 
   return (
     <main className="min-h-screen bg-white">
@@ -986,8 +1032,36 @@ export default function ReserverPage() {
                   </p>
                 </div>
 
-                {/* ── Création de compte post-paiement ─────────────── */}
-                {!isLoggedIn && !accountDone && (
+                {/* ── Compte existant (check-email → emailStatus === "exists") ── */}
+                {!isLoggedIn && emailStatus === "exists" && (
+                  <div className="rounded-xl border border-[#2E75B6]/25 bg-[#EBF4FB] p-5 space-y-4">
+                    <p className="font-semibold text-[#1E3A5F]">
+                      Vous avez déjà un espace client Calymia.
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Connectez-vous avec votre email et votre mot de passe pour retrouver vos
+                      rendez-vous et vos documents.
+                    </p>
+                    <Link
+                      href="/connexion"
+                      className="inline-flex h-10 w-full items-center justify-center rounded-md bg-[#426F59] text-sm font-medium text-white transition hover:bg-[#355849] sm:w-auto sm:px-8"
+                    >
+                      Accéder à mon espace client
+                    </Link>
+                  </div>
+                )}
+
+                {/* ── Vérification email à l’étape 4 (si pas de blur étape 2) ── */}
+                {!isLoggedIn && emailStatus === "checking" && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    Vérification de votre compte…
+                  </div>
+                )}
+
+                {/* ── Création de compte post-paiement (nouveaux clients) ───────── */}
+                {!isLoggedIn &&
+                  !accountDone &&
+                  emailStatus === "new" && (
                   <div className="rounded-xl border border-[#426F59]/25 bg-[#F0F7F4] p-5 space-y-4">
                     <div>
                       <p className="font-semibold text-[#426F59]">

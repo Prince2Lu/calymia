@@ -38,6 +38,8 @@ export async function POST(request: Request) {
       patient_telephone,
     } = body;
 
+    const patientEmailNorm = patient_email?.trim().toLowerCase() ?? "";
+
     if (
       seance_id == null ||
       sophrologue_id == null ||
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
       .from("patients")
       .select("id, user_id")
       .eq("sophrologue_id", sophrologue_id)
-      .eq("email", patient_email)
+      .eq("email", patientEmailNorm)
       .maybeSingle<{ id: string | number; user_id: string | null }>();
 
     if (existing) {
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
           sophrologue_id,
           prenom: patient_prenom,
           nom: patient_nom,
-          email: patient_email,
+          email: patientEmailNorm,
           telephone: patient_telephone,
         })
         .select("id")

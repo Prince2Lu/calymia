@@ -516,116 +516,69 @@ export default function PatientSpacePage() {
         user_metadata: (user.user_metadata as Record<string, string>) ?? {},
       });
 
-      console.log("[patient/page] Auth user email:", user.email);
-
-      // 1) Cherche d'abord par user_id
-      let { data: patientData, error: patientError } = await supabase
-        .from("patients")
-        .select("id, prenom, nom, email, telephone, user_id")
-        .eq("user_id", user.id)
-        .maybeSingle<Patient>();
-
-      console.log("[patient/page] Recherche par user_id:", patientData?.id ?? "introuvable", patientError ?? "");
-
-      if (cancelled) { clearTimeout(timeout); return; }
-
-      if (patientError) {
-        setLoadError(`Erreur lors du chargement du profil : ${patientError.message}`);
-        setLoading(false);
-        clearTimeout(timeout);
-        return;
-      }
-
-      // 2) Si introuvable, cherche par email (réservation faite sans compte)
-      if (!patientData && user.email) {
-        console.log("[patient/page] Pas de fiche via user_id — recherche par email:", user.email);
-
-        const { data: byEmail, error: emailError } = await supabase
-          .from("patients")
-          .select("id, prenom, nom, email, telephone, user_id")
-          .eq("email", user.email)
-          .limit(1)
-          .maybeSingle<Patient>();
-
-        console.log("[patient/page] Fiche trouvée par email:", byEmail ?? null, emailError ?? "");
-
-        if (cancelled) { clearTimeout(timeout); return; }
-
-        if (emailError) {
-          setLoadError(`Erreur lors du chargement du profil : ${emailError.message}`);
-          setLoading(false);
-          clearTimeout(timeout);
-          return;
-        }
-
-        if (byEmail) {
-          patientData = byEmail;
-
-          // 3) Lier le user_id si absent (réservation anonyme → compte lié)
-          if (!byEmail.user_id) {
-            console.log("[patient/page] Liaison user_id sur la fiche client:", byEmail.id);
-            await fetch("/api/patients/update-info", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                patient_id: byEmail.id,
-                user_id: user.id,
-              }),
-            });
+      // Chargement dashboard UNIQUEMENT via l’API (service role + session cookies).
+      // Aucun supabase.from('patients'|'seances') ici — la RLS masquerait les lignes.
+      console.log("[patient] calling /api/patient/space");
+      const spaceRes = await fetch("/api/patient/space", {
+        credentials: "include",
+      });
+      const spaceJson = (await spaceRes.json().catch(() => null)) as
+        | {
+            patient: Patient | null;
+            upcoming: Seance[];
+            past: Seance[];
+            error?: string;
           }
-        } else {
-          console.log("[patient/page] Aucune fiche trouvée pour email:", user.email, "— vérifiez que l'email de la réservation correspond exactement.");
-        }
+        | null;
+
+      if (cancelled) {
+        clearTimeout(timeout);
+        return;
       }
 
-      if (!patientData) {
-        // New client — no patient record yet (registered but hasn't booked)
-        // Show the full dashboard with empty sections
-        console.log("[patient/page] Aucune fiche patient — nouveau client sans réservation");
+      if (!spaceRes.ok) {
+        setLoadError(
+          spaceJson?.error ??
+            (spaceRes.status === 401
+              ? "Vous devez être connecté pour accéder à cette page."
+              : "Impossible de charger votre espace. Merci de réessayer."),
+        );
         setLoading(false);
         clearTimeout(timeout);
         return;
       }
 
-      console.log("[patient/page] Fiche client chargée:", patientData.id);
-
-      setPatient(patientData);
-      const now = new Date().toISOString();
-
-      const SELECT = `
-        id, debut_at, fin_at, statut,
-        sophrologue:sophrologues(prenom, nom, adresse, ville),
-        type_seance:types_seances(nom),
-        paiement:paiements(montant_total, facture_url)
-      `;
-
-      // Prochains RDV (statut confirmee, dans le futur)
-      const { data: upcoming } = await supabase
-        .from("seances")
-        .select(SELECT)
-        .eq("patient_id", patientData.id)
-        .eq("statut", "confirmee")
-        .gt("debut_at", now)
-        .order("debut_at")
-        .returns<Seance[]>();
-
-      // Séances passées (debut_at < now)
-      const { data: past } = await supabase
-        .from("seances")
-        .select(SELECT)
-        .eq("patient_id", patientData.id)
-        .lt("debut_at", now)
-        .order("debut_at", { ascending: false })
-        .returns<Seance[]>();
-
-      console.log("[patient/page] Séances à venir:", upcoming?.length ?? 0, "| passées:", past?.length ?? 0);
-
-      if (!cancelled) {
-        setUpcomingSeances(upcoming ?? []);
-        setPastSeances(past ?? []);
+      if (!spaceJson) {
+        setLoadError("Réponse invalide du serveur.");
         setLoading(false);
         clearTimeout(timeout);
+        return;
       }
+
+      if (!spaceJson.patient) {
+        console.log("[patient/page] Aucune fiche patient — nouveau client sans réservation");
+        setPatient(null);
+        setUpcomingSeances([]);
+        setPastSeances([]);
+        setLoading(false);
+        clearTimeout(timeout);
+        return;
+      }
+
+      console.log(
+        "[patient/page] Espace chargé (API) — patient:",
+        spaceJson.patient.id,
+        "| RDV à venir:",
+        spaceJson.upcoming?.length ?? 0,
+        "| passés:",
+        spaceJson.past?.length ?? 0,
+      );
+
+      setPatient(spaceJson.patient);
+      setUpcomingSeances(spaceJson.upcoming ?? []);
+      setPastSeances(spaceJson.past ?? []);
+      setLoading(false);
+      clearTimeout(timeout);
     };
 
     load().catch((err) => {
