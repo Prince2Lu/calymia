@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { fetchAuthUserIdByEmail } from "@/lib/supabase/fetch-auth-user-id-by-email";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-02-25.clover",
@@ -55,8 +56,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── 1) Récupérer ou créer le client (évite les doublons par email) ────────
+    // ── 1) Récupérer ou créer le client (une fiche par couple email + sophrologue) ─
+    // Même email chez un autre sophrologue ⇒ nouvelle ligne `patients` (multi-cabinet).
     let patient: { id: string | number } | null = null;
+
+    const authUserId = await fetchAuthUserIdByEmail(patientEmailNorm);
 
     const { data: existing } = await supabase
       .from("patients")
@@ -66,12 +70,25 @@ export async function POST(request: Request) {
       .maybeSingle<{ id: string | number; user_id: string | null }>();
 
     if (existing) {
-      await supabase
-        .from("patients")
-        .update({ prenom: patient_prenom, nom: patient_nom, telephone: patient_telephone })
-        .eq("id", existing.id);
+      const patch: {
+        prenom: string;
+        nom: string;
+        telephone: string;
+        user_id?: string;
+      } = {
+        prenom: patient_prenom,
+        nom: patient_nom,
+        telephone: patient_telephone,
+      };
+      if (!existing.user_id && authUserId) {
+        patch.user_id = authUserId;
+      }
+      await supabase.from("patients").update(patch).eq("id", existing.id);
       patient = { id: existing.id };
-      console.log("Create PI - client existant réutilisé:", patient.id);
+      console.log(
+        "Create PI - client existant (même sophrologue + email) réutilisé:",
+        patient.id,
+      );
     } else {
       const { data: created, error: patientError } = await supabase
         .from("patients")
@@ -81,19 +98,25 @@ export async function POST(request: Request) {
           nom: patient_nom,
           email: patientEmailNorm,
           telephone: patient_telephone,
+          ...(authUserId ? { user_id: authUserId } : {}),
         })
         .select("id")
         .single<{ id: string | number }>();
 
       if (patientError || !created) {
         console.error("Create PI - patient insert error:", patientError);
+        if (patientError?.code === "23505") {
+          console.error(
+            "Create PI — contrainte unique (souvent email global sur patients). Attendu : une fiche par (email, sophrologue_id).",
+          );
+        }
         return NextResponse.json(
           { error: "Impossible de créer le client. Merci de réessayer." },
           { status: 500 },
         );
       }
       patient = created;
-      console.log("Create PI - nouveau client créé:", patient.id);
+      console.log("Create PI - nouveau client créé (sophrologue):", patient.id);
     }
 
     // ── 2) Attach patient to the blocked seance, clear expire_at ─────────────
