@@ -317,6 +317,15 @@ export async function POST(request: NextRequest) {
           to: patient.email,
           subject: "Annulation de votre séance Calymia",
           html,
+          log: {
+            sophrologue_id: seance.sophrologue_id,
+            patient_id: seance.patient_id,
+            seance_id: seance.id,
+            type: "annulation_client",
+            destinataire_nom:
+              [patient.prenom, patient.nom].filter(Boolean).join(" ").trim() ||
+              null,
+          },
         });
       }
 
@@ -331,6 +340,17 @@ export async function POST(request: NextRequest) {
           to: sophrologue.email,
           subject: "Séance annulée",
           html,
+          log: {
+            sophrologue_id: seance.sophrologue_id,
+            patient_id: seance.patient_id,
+            seance_id: seance.id,
+            type: "annulation_praticien",
+            destinataire_nom:
+              [sophrologue.prenom, sophrologue.nom]
+                .filter(Boolean)
+                .join(" ")
+                .trim() || null,
+          },
         });
       }
     } catch (emailErr) {

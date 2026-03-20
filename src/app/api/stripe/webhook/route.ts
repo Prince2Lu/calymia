@@ -143,6 +143,17 @@ export async function POST(request: NextRequest) {
               to: patient.email,
               subject: 'Confirmation de votre réservation Calymia',
               html,
+              log: {
+                sophrologue_id: String(seance.sophrologue_id),
+                patient_id: seance.patient_id
+                  ? String(seance.patient_id)
+                  : null,
+                seance_id: String(seance_id),
+                type: 'confirmation_reservation',
+                destinataire_nom:
+                  [patient.prenom, patient.nom].filter(Boolean).join(' ').trim() ||
+                  null,
+              },
             })
           }
 
@@ -160,6 +171,19 @@ export async function POST(request: NextRequest) {
               to: sophrologue.email,
               subject: 'Nouvelle réservation confirmée',
               html,
+              log: {
+                sophrologue_id: String(seance.sophrologue_id),
+                patient_id: seance.patient_id
+                  ? String(seance.patient_id)
+                  : null,
+                seance_id: String(seance_id),
+                type: 'confirmation_reservation_praticien',
+                destinataire_nom:
+                  [sophrologue.prenom, sophrologue.nom]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim() || null,
+              },
             })
           }
         }

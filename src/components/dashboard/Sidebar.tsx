@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
+  MessageSquare,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -43,6 +44,11 @@ const NAV_ITEMS: NavItem[] = [
     label: "Mes clients",
     href: "/clients",
     icon: <Users className="h-4 w-4" />,
+  },
+  {
+    label: "Communications",
+    href: "/communications",
+    icon: <MessageSquare className="h-4 w-4" />,
   },
   {
     label: "Paramètres",

@@ -48,6 +48,11 @@ export async function POST(request: NextRequest) {
       to: email,
       subject: "Bienvenue sur Calymia",
       html,
+      log: {
+        sophrologue_id,
+        type: "bienvenue_sophrologue",
+        destinataire_nom: sophrologue.prenom ?? null,
+      },
     });
 
     if (!result.success) {
