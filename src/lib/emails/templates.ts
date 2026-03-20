@@ -193,3 +193,29 @@ export function rappelJ1({
   `;
   return baseLayout(content);
 }
+
+export function postSeance({
+  prenom_client,
+  prenom_sophrologue,
+  nom_sophrologue,
+  type_seance,
+  date_seance,
+}: {
+  prenom_client: string;
+  prenom_sophrologue: string;
+  nom_sophrologue: string;
+  type_seance: string;
+  date_seance: string;
+}): string {
+  const sophroLabel = `${prenom_sophrologue} ${nom_sophrologue}`.trim() || "votre sophrologue";
+  const content = `
+    <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
+    <p style="margin:0 0 16px;">Nous espérons que votre séance de <strong>${type_seance}</strong> du <strong>${date_seance}</strong> avec ${sophroLabel} s'est bien passée.</p>
+    <p style="margin:0 0 16px;">Un grand merci pour votre confiance.</p>
+    <p style="margin:0 0 16px;">N'hésitez pas à réserver un nouveau créneau quand vous le souhaitez — tout se fait simplement depuis Calymia.</p>
+    <p style="margin:0 0 16px;">Vous pouvez aussi accéder à tout moment à <strong>votre espace personnel</strong> sur <a href="https://calymia.com" style="color:${BRAND};font-weight:600;">calymia.com</a> pour suivre vos rendez-vous et votre historique.</p>
+    <p style="margin:16px 0 0;"><a href="https://calymia.com" style="display:inline-block;background:${BRAND};color:#ffffff!important;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;">Accéder à mon espace</a></p>
+    <p style="margin:24px 0 0;">À très bientôt,<br><strong>L'équipe Calymia</strong></p>
+  `;
+  return baseLayout(content);
+}
