@@ -80,7 +80,7 @@ async function runRappelsJ1(): Promise<NextResponse> {
       .eq("statut", "confirmee")
       .gte("debut_at", fromIso)
       .lt("debut_at", toIso)
-      .or("rappel_envoye.is.null,rappel_envoye.eq.false")
+      .or("rappel_email_envoye.is.null,rappel_email_envoye.eq.false")
       .returns<SeanceRappelRow[]>();
 
     if (error) {
@@ -192,12 +192,12 @@ async function runRappelsJ1(): Promise<NextResponse> {
 
       const { error: upErr } = await supabase
         .from("seances")
-        .update({ rappel_envoye: true })
+        .update({ rappel_email_envoye: true })
         .eq("id", row.id);
 
       if (upErr) {
         console.error(
-          "[rappels-j1] Erreur mise à jour rappel_envoye:",
+          "[rappels-j1] Erreur mise à jour rappel_email_envoye:",
           row.id,
           upErr,
         );

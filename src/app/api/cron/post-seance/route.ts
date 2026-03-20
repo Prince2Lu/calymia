@@ -64,7 +64,7 @@ async function runPostSeance(): Promise<NextResponse> {
       )
       .eq("statut", "confirmee")
       .lt("fin_at", nowIso)
-      .or("post_seance_envoye.is.null,post_seance_envoye.eq.false")
+      .or("email_post_envoye.is.null,email_post_envoye.eq.false")
       .returns<SeancePostRow[]>();
 
     if (error) {
@@ -153,7 +153,7 @@ async function runPostSeance(): Promise<NextResponse> {
 
       const { error: upErr } = await supabase
         .from("seances")
-        .update({ post_seance_envoye: true, statut: "terminee" })
+        .update({ email_post_envoye: true, statut: "terminee" })
         .eq("id", row.id);
 
       if (upErr) {
