@@ -11,10 +11,15 @@ import {
   Loader2,
   CheckCircle2,
   Save,
+  X,
+  StickyNote,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatParisTime } from "@/lib/timezone";
+import { planAllowsSeanceNotes } from "@/lib/email-templates/placeholders";
+import { seanceNoteHtmlIsNonEmpty } from "@/lib/seance-notes";
+import NoteSeance from "@/components/dashboard/NoteSeance";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -152,12 +157,23 @@ function NotesSection({
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
+type SophrologueProfile = { id: string; plan: string | null };
+
 export default function FichePatientPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [seances, setSeances] = useState<Seance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sophrologue, setSophrologue] = useState<SophrologueProfile | null>(
+    null,
+  );
+  const [seanceHasNote, setSeanceHasNote] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [notesPanelSeanceId, setNotesPanelSeanceId] = useState<string | null>(
+    null,
+  );
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -194,8 +210,39 @@ export default function FichePatientPage() {
 
       if (!cancelled) {
         setSeances(seancesData ?? []);
-        setLoading(false);
       }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user && !cancelled) {
+        const { data: soph } = await supabase
+          .from("sophrologues")
+          .select("id, plan")
+          .eq("user_id", user.id)
+          .maybeSingle<SophrologueProfile>();
+
+        if (!cancelled && soph) {
+          setSophrologue(soph);
+          if (planAllowsSeanceNotes(soph.plan)) {
+            const { data: noteRows } = await supabase
+              .from("seance_notes")
+              .select("seance_id, contenu_html")
+              .eq("patient_id", params.id)
+              .eq("sophrologue_id", soph.id);
+
+            const map: Record<string, boolean> = {};
+            for (const row of noteRows ?? []) {
+              if (seanceNoteHtmlIsNonEmpty(row.contenu_html)) {
+                map[row.seance_id] = true;
+              }
+            }
+            if (!cancelled) setSeanceHasNote(map);
+          }
+        }
+      }
+
+      if (!cancelled) setLoading(false);
     };
 
     load();
@@ -203,6 +250,24 @@ export default function FichePatientPage() {
       cancelled = true;
     };
   }, [params.id, supabase, router]);
+
+  const refreshSeanceNotesMap = useCallback(async () => {
+    if (!patient || !sophrologue || !planAllowsSeanceNotes(sophrologue.plan)) {
+      return;
+    }
+    const { data: noteRows } = await supabase
+      .from("seance_notes")
+      .select("seance_id, contenu_html")
+      .eq("patient_id", patient.id)
+      .eq("sophrologue_id", sophrologue.id);
+    const map: Record<string, boolean> = {};
+    for (const row of noteRows ?? []) {
+      if (seanceNoteHtmlIsNonEmpty(row.contenu_html)) {
+        map[row.seance_id] = true;
+      }
+    }
+    setSeanceHasNote(map);
+  }, [patient, sophrologue, supabase]);
 
   if (loading) {
     return (
@@ -311,11 +376,27 @@ export default function FichePatientPage() {
                           </p>
                           <p className="text-xs text-slate-500">{typeNom}</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+                          {planAllowsSeanceNotes(sophrologue?.plan) &&
+                            seanceHasNote[s.id] && (
+                              <span className="inline-flex items-center rounded-full bg-[#426F59]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#426F59] ring-1 ring-[#426F59]/25">
+                                Note
+                              </span>
+                            )}
                           {montant !== null && (
                             <span className="text-sm font-medium text-slate-700">
                               {montant.toFixed(2)} €
                             </span>
+                          )}
+                          {sophrologue && (
+                            <button
+                              type="button"
+                              onClick={() => setNotesPanelSeanceId(s.id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#d1d5db] bg-white px-2.5 py-1 text-xs font-medium text-[#426F59] hover:bg-[#F0F7F4]"
+                            >
+                              <StickyNote className="h-3.5 w-3.5" />
+                              Notes
+                            </button>
                           )}
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statutColor(
@@ -334,6 +415,40 @@ export default function FichePatientPage() {
           </div>
         </div>
       </div>
+
+      {notesPanelSeanceId && patient && sophrologue && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/30"
+            aria-hidden
+            onClick={() => setNotesPanelSeanceId(null)}
+          />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-[#d1d5db] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#d1d5db] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[#1E3A5F]">
+                Notes de séance
+              </h2>
+              <button
+                type="button"
+                onClick={() => setNotesPanelSeanceId(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Fermer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <NoteSeance
+                seanceId={notesPanelSeanceId}
+                patientId={patient.id}
+                sophrologueId={sophrologue.id}
+                plan={sophrologue.plan}
+                onSaved={() => void refreshSeanceNotesMap()}
+              />
+            </div>
+          </aside>
+        </>
+      )}
     </main>
   );
 }

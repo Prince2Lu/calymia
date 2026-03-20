@@ -15,6 +15,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import NoteSeance from "@/components/dashboard/NoteSeance";
 import {
   addParisCalendarDays,
   formatParisTime,
@@ -28,6 +29,7 @@ import {
 
 type Seance = {
   id: string;
+  patient_id: string | null;
   debut_at: string;
   fin_at: string;
   statut: string;
@@ -99,12 +101,21 @@ function statutStyle(statut: string): StatutStyle {
 
 type DrawerProps = {
   seance: Seance;
+  sophrologueId: string;
+  plan: string | null;
   onClose: () => void;
   onMarkDone: (id: string) => Promise<void>;
   onCancel: (id: string) => Promise<void>;
 };
 
-function SeanceDrawer({ seance, onClose, onMarkDone, onCancel }: DrawerProps) {
+function SeanceDrawer({
+  seance,
+  sophrologueId,
+  plan,
+  onClose,
+  onMarkDone,
+  onCancel,
+}: DrawerProps) {
   const [acting, setActing] = useState<"done" | "cancel" | null>(null);
   const st = statutStyle(seance.statut);
 
@@ -142,7 +153,7 @@ function SeanceDrawer({ seance, onClose, onMarkDone, onCancel }: DrawerProps) {
         onClick={onClose}
       />
       {/* Panel */}
-      <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col bg-white shadow-2xl">
+      <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <h2 className="text-base font-semibold text-[#1E3A5F]">Détails de la séance</h2>
@@ -197,6 +208,18 @@ function SeanceDrawer({ seance, onClose, onMarkDone, onCancel }: DrawerProps) {
               <DrawerRow label="Montant" value={`${montant.toFixed(2)} €`} />
             )}
           </section>
+
+          {(seance.statut === "confirmee" || seance.statut === "terminee") &&
+            seance.patient_id && (
+              <section className="border-t border-[#d1d5db] pt-4">
+                <NoteSeance
+                  seanceId={seance.id}
+                  patientId={seance.patient_id}
+                  sophrologueId={sophrologueId}
+                  plan={plan}
+                />
+              </section>
+            )}
         </div>
 
         {/* Actions */}
@@ -262,6 +285,7 @@ function DrawerRow({
 
 export default function SeancesPage() {
   const [sophrologueId, setSophrologueId] = useState<string | null>(null);
+  const [sophrologuePlan, setSophrologuePlan] = useState<string | null>(null);
   const [seances, setSeances] = useState<Seance[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState<Date>(() =>
@@ -287,7 +311,7 @@ export default function SeancesPage() {
       const { data } = await supabase
         .from("seances")
         .select(
-          "id, debut_at, fin_at, statut, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom), paiement:paiements(montant_total)",
+          "id, patient_id, debut_at, fin_at, statut, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom), paiement:paiements(montant_total)",
         )
         .eq("sophrologue_id", sid)
         .gte("debut_at", from.toISOString())
@@ -312,12 +336,13 @@ export default function SeancesPage() {
 
       const { data: s } = await supabase
         .from("sophrologues")
-        .select("id")
+        .select("id, plan")
         .eq("user_id", user.id)
-        .maybeSingle<{ id: string }>();
+        .maybeSingle<{ id: string; plan: string | null }>();
 
       if (!s || cancelled) return;
       setSophrologueId(s.id);
+      setSophrologuePlan(s.plan ?? null);
       await loadSeances(s.id, weekStart, weekEnd);
     };
     init();
@@ -525,9 +550,11 @@ export default function SeancesPage() {
       </div>
 
       {/* ── Drawer ───────────────────────────────────────────────────────── */}
-      {selected && (
+      {selected && sophrologueId && (
         <SeanceDrawer
           seance={selected}
+          sophrologueId={sophrologueId}
+          plan={sophrologuePlan}
           onClose={() => setSelected(null)}
           onMarkDone={handleMarkDone}
           onCancel={handleCancel}

@@ -25,3 +25,10 @@ export function planAllowsCustomEmailTemplates(
   const p = (plan ?? "").toLowerCase();
   return p === "professionnel" || p === "cabinet";
 }
+
+/** Même règle métier : Professionnel + Cabinet (notes de séance, etc.). */
+export function planAllowsSeanceNotes(
+  plan: string | null | undefined,
+): boolean {
+  return planAllowsCustomEmailTemplates(plan);
+}

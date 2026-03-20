@@ -92,11 +92,6 @@ async function runRappelsJ1(): Promise<NextResponse> {
     }
 
     const list = rows ?? [];
-    console.log(
-      "Séances trouvées:",
-      list.length,
-      JSON.stringify(list),
-    );
     let sent_count = 0;
 
     for (const row of list) {
@@ -162,9 +157,6 @@ async function runRappelsJ1(): Promise<NextResponse> {
         nomSophro: nom_sophrologue,
         typeSeance: typeNom,
       });
-
-      const patientEmail = email;
-      console.log("Envoi email à:", patientEmail);
 
       const result = await sendEmail({
         to: email,
