@@ -8,6 +8,7 @@ import {
 } from "@react-pdf/renderer";
 import React from "react";
 import { createClient } from "@supabase/supabase-js";
+import { formatParisTime } from "@/lib/timezone";
 
 export type FactureData = {
   // Numéro de reçu
@@ -376,14 +377,7 @@ type PaiementRow = {
 };
 
 function formatDateFR(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "dateTimeLong");
 }
 
 // ─── Fonction principale : génère et stocke la facture pour une séance ───────

@@ -15,6 +15,14 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  addParisCalendarDays,
+  formatParisTime,
+  getParisHour,
+  getParisYMD,
+  isSameParisCalendarDay,
+  startOfWeekParisMonday,
+} from "@/lib/timezone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,59 +47,33 @@ const MONTHS_FR = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function startOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  // Monday = 0 offset
-  const diff = (day === 0 ? -6 : 1 - day);
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
+/** +n jours civils Paris (référence : jour civil de `date`). */
 function addDays(date: Date, n: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
+  return addParisCalendarDays(date, n);
 }
 
 function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  return isSameParisCalendarDay(a, b);
 }
 
 function formatWeekRange(monday: Date): string {
-  const sunday = addDays(monday, 6);
-  const d1 = monday.getDate();
-  const d2 = sunday.getDate();
-  const m1 = MONTHS_FR[monday.getMonth()];
-  const m2 = MONTHS_FR[sunday.getMonth()];
-  const y = sunday.getFullYear();
-  if (monday.getMonth() === sunday.getMonth()) {
-    return `${d1} – ${d2} ${m1} ${y}`;
+  const sunday = addParisCalendarDays(monday, 6);
+  const A = getParisYMD(monday);
+  const B = getParisYMD(sunday);
+  const m1 = MONTHS_FR[A.m - 1];
+  const m2 = MONTHS_FR[B.m - 1];
+  if (A.m === B.m && A.y === B.y) {
+    return `${A.d} – ${B.d} ${m1} ${B.y}`;
   }
-  return `${d1} ${m1} – ${d2} ${m2} ${y}`;
-}
-
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
+  return `${A.d} ${m1} – ${B.d} ${m2} ${B.y}`;
 }
 
 function formatTime(iso: string) {
-  const d = new Date(iso);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return formatParisTime(iso, "HH:mm");
 }
 
 function formatDateLong(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "date");
 }
 
 // ─── Statut styles ────────────────────────────────────────────────────────────
@@ -282,7 +264,9 @@ export default function SeancesPage() {
   const [sophrologueId, setSophrologueId] = useState<string | null>(null);
   const [seances, setSeances] = useState<Seance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState<Date>(() =>
+    startOfWeekParisMonday(new Date()),
+  );
   const [selected, setSelected] = useState<Seance | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -353,13 +337,13 @@ export default function SeancesPage() {
   // Navigation semaines
   const prevWeek = () => setWeekStart((d) => addDays(d, -7));
   const nextWeek = () => setWeekStart((d) => addDays(d, 7));
-  const goToday = () => setWeekStart(startOfWeek(new Date()));
+  const goToday = () => setWeekStart(startOfWeekParisMonday(new Date()));
 
   // Séances filtrées par jour + heure
   function seancesFor(day: Date, hour: number): Seance[] {
     return seances.filter((s) => {
       const d = new Date(s.debut_at);
-      return isSameDay(d, day) && d.getHours() === hour;
+      return isSameDay(d, day) && getParisHour(d) === hour;
     });
   }
 
@@ -481,7 +465,7 @@ export default function SeancesPage() {
                             : "text-slate-700"
                         }`}
                       >
-                        {day.getDate()}
+                        {getParisYMD(day).d}
                       </p>
                     </div>
                   );

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatParisTime } from "@/lib/timezone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,30 +52,15 @@ type Seance = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDateLong(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "date");
 }
 
 function formatDateShort(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "dateShort");
 }
 
 function formatTime(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "HH:mm");
 }
 
 function capitalize(s: string | null | undefined) {

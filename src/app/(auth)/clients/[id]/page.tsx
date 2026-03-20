@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { formatParisTime } from "@/lib/timezone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,17 +39,11 @@ type Seance = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "dateShort");
 }
 
 function formatTime(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return formatParisTime(iso, "HH:mm");
 }
 
 function statutColor(statut: string) {

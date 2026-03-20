@@ -6,6 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatParisTime } from "@/lib/timezone";
 
 type SeanceRow = {
   id: string;
@@ -26,14 +27,7 @@ type PaiementRow = {
 type Phase = "loading" | "ready" | "confirming" | "done" | "error";
 
 function formatDateFR(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "dateTimeLong");
 }
 
 function calcRefundInfo(debutAt: string): {

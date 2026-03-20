@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── Insert temporary block (NOW + 15 min) ─────────────────────────────────
+    // ── Insert temporary block (NOW + 15 min, stocké en UTC / ISO Z) ────────
     const expireAt = new Date(
       Date.now() + HOLD_MINUTES * 60 * 1000,
     ).toISOString();

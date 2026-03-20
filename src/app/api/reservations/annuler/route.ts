@@ -5,6 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { annulationClient, annulationSophrologue } from "@/lib/emails/templates";
 import { sendEmail } from "@/lib/emails/send";
+import { formatParisTime } from "@/lib/timezone";
 
 // ─── Clients Supabase ─────────────────────────────────────────────────────────
 
@@ -301,12 +302,7 @@ export async function POST(request: NextRequest) {
         ? "annulation_par_sophrologue_vers_praticien"
         : "annulation_par_client_vers_praticien";
 
-      const dateSeance = new Intl.DateTimeFormat("fr-FR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(new Date(seance.debut_at));
+      const dateSeance = formatParisTime(seance.debut_at, "date");
 
       const [{ data: patient }, { data: sophrologue }] = await Promise.all([
         supabaseAdmin.from("patients").select("prenom, nom, email").eq("id", seance.patient_id).single(),

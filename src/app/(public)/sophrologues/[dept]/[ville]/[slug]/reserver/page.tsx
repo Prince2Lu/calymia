@@ -9,6 +9,15 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PaymentForm } from "@/components/booking/PaymentForm";
+import {
+  addParisCalendarDays,
+  dispoWindowParisDay,
+  formatParisTime,
+  getParisJsDayOfWeek,
+  getParisYMD,
+  isSameParisCalendarDay,
+  startOfParisCalendarDay,
+} from "@/lib/timezone";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -52,59 +61,11 @@ type AvailabilityData = {
   delaiMinHeures: number;
 };
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-
-function pad2(n: number) {
-  return n.toString().padStart(2, "0");
-}
-
-function formatDateFR(d: Date) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(d);
-}
-
-function formatTime(d: Date) {
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function addDays(d: Date, days: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + days);
-  return x;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
+// ─── Date helpers (créneaux & affichage = Europe/Paris ; stockage = UTC) ─────
 
 /** Convertit jour_semaine BDD (0=Lun … 6=Dim) → JS getDay() (0=Dim, 1=Lun … 6=Sam) */
 function dbJourToJsDay(dbJour: number): number {
   return (dbJour + 1) % 7;
-}
-
-/** Bornes locales d'une plage dispo pour un jour calendaire */
-function dispoWindowOnDay(day: Date, dispo: DispoRow): { start: Date; end: Date } {
-  const [sh, sm = 0] = dispo.heure_debut.split(":").map(Number);
-  const [eh, em = 0] = dispo.heure_fin.split(":").map(Number);
-  const start = new Date(day);
-  start.setHours(sh, sm, 0, 0);
-  const end = new Date(day);
-  end.setHours(eh, em, 0, 0);
-  return { start, end };
 }
 
 /** Vérifie chevauchement avec une séance existante (durée = type choisi) */
@@ -134,7 +95,7 @@ function buildSlotsFromDispo(
   const cutoff = new Date(now.getTime() + delaiMinHeures * 60 * 60 * 1000);
 
   for (const dispo of dispos) {
-    const { start, end } = dispoWindowOnDay(day, dispo);
+    const { start, end } = dispoWindowParisDay(day, dispo);
     for (
       let t = start.getTime();
       t + slotDurationMs <= end.getTime();
@@ -170,7 +131,7 @@ export default function ReserverPage() {
 
   const [step, setStep] = useState<Step>(1);
   const [selectedDay, setSelectedDay] = useState<Date>(() =>
-    startOfDay(new Date()),
+    startOfParisCalendarDay(new Date()),
   );
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [patient, setPatient] = useState<PatientInfo>({
@@ -247,7 +208,10 @@ export default function ReserverPage() {
       setSophrologue(sophroData);
 
       const sid = sophroData.id;
-      const horizon = addDays(new Date(), 28).toISOString();
+      const horizon = addParisCalendarDays(
+        startOfParisCalendarDay(new Date()),
+        29,
+      ).toISOString();
 
       // 2) Disponibilités actives
       const { data: dispos } = await supabase
@@ -330,10 +294,10 @@ export default function ReserverPage() {
   useEffect(() => {
     if (!availability || !selectedTypeSeance) return;
     const durationMs = selectedTypeSeance.duree_minutes * 60 * 1000;
-    const today = startOfDay(new Date());
+    const today = startOfParisCalendarDay(new Date());
     for (let i = 0; i < 28; i++) {
-      const d = addDays(today, i);
-      const dayDispos = availability.dispoByJsDay.get(d.getDay());
+      const d = addParisCalendarDays(today, i);
+      const dayDispos = availability.dispoByJsDay.get(getParisJsDayOfWeek(d));
       if (!dayDispos?.length) continue;
       const slots = buildSlotsFromDispo(
         d,
@@ -357,9 +321,9 @@ export default function ReserverPage() {
   }, [sophrologue]);
 
   const days = useMemo(() => {
-    const today = startOfDay(new Date());
+    const today = startOfParisCalendarDay(new Date());
     const out: Date[] = [];
-    for (let i = 0; i < 28; i += 1) out.push(addDays(today, i));
+    for (let i = 0; i < 28; i += 1) out.push(addParisCalendarDays(today, i));
     return out;
   }, []);
 
@@ -371,7 +335,9 @@ export default function ReserverPage() {
 
   const slotsForSelectedDay = useMemo(() => {
     if (!availability || !selectedTypeSeance) return [];
-    const dayDispos = availability.dispoByJsDay.get(selectedDay.getDay());
+    const dayDispos = availability.dispoByJsDay.get(
+      getParisJsDayOfWeek(selectedDay),
+    );
     if (!dayDispos || dayDispos.length === 0) return [];
     const durationMs = selectedTypeSeance.duree_minutes * 60 * 1000;
     return buildSlotsFromDispo(
@@ -866,7 +832,10 @@ export default function ReserverPage() {
                                   availability.delaiMinHeures,
                                   durationMs,
                                 ).length > 0;
-                              const isSelected = isSameDay(d, selectedDay);
+                              const isSelected = isSameParisCalendarDay(
+                                d,
+                                selectedDay,
+                              );
                               const isDisabled = !hasSlots;
                               const titleText = isDisabled
                                 ? "Aucun créneau disponible"
@@ -879,7 +848,7 @@ export default function ReserverPage() {
                                   type="button"
                                   onClick={() => {
                                     if (isDisabled) return;
-                                    setSelectedDay(startOfDay(d));
+                                    setSelectedDay(startOfParisCalendarDay(d));
                                     setSelectedSlot(null);
                                   }}
                                   className={`rounded-lg border px-1 py-2 text-xs transition-colors ${
@@ -893,9 +862,11 @@ export default function ReserverPage() {
                                   title={titleText}
                                 >
                                   <div className="font-medium">
-                                    {d.toLocaleDateString("fr-FR", { weekday: "short" })}
+                                    {formatParisTime(d, "weekdayShort")}
                                   </div>
-                                  <div className="text-sm font-semibold">{d.getDate()}</div>
+                                  <div className="text-sm font-semibold">
+                                    {getParisYMD(d).d}
+                                  </div>
                                   {hasSlots && !isSelected && (
                                     <div className="mx-auto mt-1 h-1 w-1 rounded-full bg-[#27AE60]" />
                                   )}
@@ -913,7 +884,7 @@ export default function ReserverPage() {
                     {/* ── Créneaux du jour sélectionné ────────────────── */}
                     <div className="space-y-3">
                       <h2 className="text-sm font-semibold text-slate-800">
-                        Créneaux du {formatDateFR(selectedDay)}
+                        Créneaux du {formatParisTime(selectedDay, "date")}
                       </h2>
                       {slotsForSelectedDay.length === 0 ? (
                         <p className="text-sm text-slate-500">
@@ -938,7 +909,7 @@ export default function ReserverPage() {
                                       : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                                 }`}
                               >
-                                <span>{formatTime(slot)}</span>
+                                <span>{formatParisTime(slot, "HH:mm")}</span>
                                 {isBlocked && (
                                   <span className="text-xs font-normal text-gray-400">
                                     Indisponible
@@ -956,12 +927,14 @@ export default function ReserverPage() {
                             <span className="font-semibold text-[#1E3A5F]">
                               Créneau sélectionné
                             </span>{" "}
-                            : {formatDateFR(selectedSlot)} de {formatTime(selectedSlot)} à{" "}
-                            {formatTime(
+                            : {formatParisTime(selectedSlot, "date")} de{" "}
+                            {formatParisTime(selectedSlot, "HH:mm")} à{" "}
+                            {formatParisTime(
                               new Date(
                                 selectedSlot.getTime() +
                                   selectedTypeSeance.duree_minutes * 60 * 1000,
                               ),
+                              "HH:mm",
                             )}
                           </p>
                           <p className="mt-1 text-xs text-slate-600">
@@ -1107,11 +1080,12 @@ export default function ReserverPage() {
                     </span>{" "}
                     :{" "}
                     {selectedSlot && selectedTypeSeance
-                      ? `${formatDateFR(selectedSlot)} de ${formatTime(selectedSlot)} à ${formatTime(
+                      ? `${formatParisTime(selectedSlot, "date")} de ${formatParisTime(selectedSlot, "HH:mm")} à ${formatParisTime(
                           new Date(
                             selectedSlot.getTime() +
                               selectedTypeSeance.duree_minutes * 60 * 1000,
                           ),
+                          "HH:mm",
                         )}`
                       : "Non sélectionné"}
                   </p>
@@ -1142,11 +1116,12 @@ export default function ReserverPage() {
                     <span className="font-semibold text-[#1E3A5F]">Créneau</span>{" "}
                     :{" "}
                     {selectedSlot && selectedTypeSeance
-                      ? `${formatDateFR(selectedSlot)} de ${formatTime(selectedSlot)} à ${formatTime(
+                      ? `${formatParisTime(selectedSlot, "date")} de ${formatParisTime(selectedSlot, "HH:mm")} à ${formatParisTime(
                           new Date(
                             selectedSlot.getTime() +
                               selectedTypeSeance.duree_minutes * 60 * 1000,
                           ),
+                          "HH:mm",
                         )}`
                       : "—"}
                   </p>
@@ -1206,11 +1181,12 @@ export default function ReserverPage() {
                     </span>{" "}
                     :{" "}
                     {selectedSlot && selectedTypeSeance
-                      ? `${formatDateFR(selectedSlot)} de ${formatTime(selectedSlot)} à ${formatTime(
+                      ? `${formatParisTime(selectedSlot, "date")} de ${formatParisTime(selectedSlot, "HH:mm")} à ${formatParisTime(
                           new Date(
                             selectedSlot.getTime() +
                               selectedTypeSeance.duree_minutes * 60 * 1000,
                           ),
+                          "HH:mm",
                         )}`
                       : "—"}
                   </p>

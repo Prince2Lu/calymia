@@ -7,6 +7,7 @@ import {
   confirmationReservationSophrologue,
 } from '@/lib/emails/templates'
 import { sendEmail } from '@/lib/emails/send'
+import { formatParisTime } from '@/lib/timezone'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -16,19 +17,11 @@ const supabase = createClient(
 )
 
 function formatDateFR(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(iso))
+  return formatParisTime(iso, 'date')
 }
 
 function formatTimeFR(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso))
+  return formatParisTime(iso, 'HH:mm')
 }
 
 export async function POST(request: NextRequest) {

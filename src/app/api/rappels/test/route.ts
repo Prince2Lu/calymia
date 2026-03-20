@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { formatParisTime } from "@/lib/timezone";
 
 // ─── Supabase (service role — bypasse RLS) ────────────────────────────────────
 
@@ -33,21 +34,11 @@ type SeanceRappel = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDateFR(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "date");
 }
 
 function formatTimeFR(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "HH:mm");
 }
 
 function buildEmailHtml(seance: SeanceRappel): string {

@@ -13,6 +13,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import {
+  addParisCalendarDays,
+  formatParisTime,
+  parisCalendarMonthBounds,
+  startOfParisCalendarDay,
+} from "@/lib/timezone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,21 +50,12 @@ type KpiData = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function pad2(n: number) {
-  return n.toString().padStart(2, "0");
-}
-
 function formatTime(iso: string) {
-  const d = new Date(iso);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return formatParisTime(iso, "HH:mm");
 }
 
 function formatDateShort(iso: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-  }).format(new Date(iso));
+  return formatParisTime(iso, "dateShort");
 }
 
 function statutColor(statut: string) {
@@ -160,17 +157,15 @@ export default function DashboardPage() {
 
       const sid = sophrologue.id;
 
-      // Bornes du mois courant
       const now = new Date();
-      const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const finMois = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      const { start: debutMois, endExclusive: finMoisExcl } =
+        parisCalendarMonthBounds(now);
 
-      // Bornes d'aujourd'hui
-      const debutJour = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const finJour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
-
-      // Début des 7 prochains jours (dès maintenant)
-      const dans7Jours = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const debutJourParis = startOfParisCalendarDay(now);
+      const finJourExcl = addParisCalendarDays(debutJourParis, 1);
+      const dans7Jours = new Date(
+        now.getTime() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString();
 
       // 3) KPI 1 : RDV ce mois (confirmées)
       const { count: rdvMois } = await supabase
@@ -178,8 +173,8 @@ export default function DashboardPage() {
         .select("id", { count: "exact", head: true })
         .eq("sophrologue_id", sid)
         .eq("statut", "confirmee")
-        .gte("debut_at", debutMois)
-        .lte("debut_at", finMois);
+        .gte("debut_at", debutMois.toISOString())
+        .lt("debut_at", finMoisExcl.toISOString());
 
       // 4) KPI 2 : CA ce mois
       const { data: paiements } = await supabase
@@ -187,8 +182,8 @@ export default function DashboardPage() {
         .select("montant_sophrologue, created_at")
         .eq("sophrologue_id", sid)
         .eq("statut", "reussi")
-        .gte("created_at", debutMois)
-        .lte("created_at", finMois)
+        .gte("created_at", debutMois.toISOString())
+        .lt("created_at", finMoisExcl.toISOString())
         .returns<Paiement[]>();
 
       const caMois = (paiements ?? []).reduce(
@@ -205,8 +200,8 @@ export default function DashboardPage() {
         .from("patients")
         .select("id", { count: "exact", head: true })
         .eq("sophrologue_id", sid)
-        .gte("created_at", debutMois)
-        .lte("created_at", finMois);
+        .gte("created_at", debutMois.toISOString())
+        .lt("created_at", finMoisExcl.toISOString());
 
       // 7) Séances du jour
       const { data: seancesJour } = await supabase
@@ -216,8 +211,8 @@ export default function DashboardPage() {
         )
         .eq("sophrologue_id", sid)
         .neq("statut", "annulee")
-        .gte("debut_at", debutJour)
-        .lte("debut_at", finJour)
+        .gte("debut_at", debutJourParis.toISOString())
+        .lt("debut_at", finJourExcl.toISOString())
         .order("debut_at")
         .returns<Seance[]>();
 
@@ -229,7 +224,7 @@ export default function DashboardPage() {
         )
         .eq("sophrologue_id", sid)
         .neq("statut", "annulee")
-        .gt("debut_at", finJour)
+        .gte("debut_at", finJourExcl.toISOString())
         .lte("debut_at", dans7Jours)
         .order("debut_at")
         .limit(5)
