@@ -13,10 +13,10 @@ const supabase = createClient(
 );
 
 type Payload = {
-  // Existing blocked seance (from bloquer-creneau)
   seance_id: string | number;
   sophrologue_id: string | number;
-  montant?: number;
+  /** Doit correspondre au type déjà posé sur la séance (bloquer-creneau). Le tarif est lu en BDD. */
+  type_seance_id: string | number;
   debut_at: string;
   patient_prenom: string;
   patient_nom: string;
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const {
       seance_id,
       sophrologue_id,
-      montant,
+      type_seance_id,
       debut_at,
       patient_prenom,
       patient_nom,
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     if (
       seance_id == null ||
       sophrologue_id == null ||
+      type_seance_id == null ||
       !debut_at ||
       !patient_prenom ||
       !patient_nom ||
@@ -55,6 +56,72 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    // ── 0) Vérifier la séance + type — montant = tarif BDD (pas le client) ─────
+    const { data: seanceRow, error: seanceReadErr } = await supabase
+      .from("seances")
+      .select("id, sophrologue_id, type_seance_id, statut")
+      .eq("id", seance_id)
+      .maybeSingle<{
+        id: string;
+        sophrologue_id: string | number;
+        type_seance_id: string | number | null;
+        statut: string;
+      }>();
+
+    if (seanceReadErr || !seanceRow) {
+      console.error("Create PI - séance introuvable:", seanceReadErr);
+      return NextResponse.json(
+        { error: "Séance introuvable." },
+        { status: 404 },
+      );
+    }
+
+    if (String(seanceRow.sophrologue_id) !== String(sophrologue_id)) {
+      return NextResponse.json({ error: "Sophrologue incorrect." }, { status: 400 });
+    }
+
+    if (seanceRow.statut !== "en_attente") {
+      return NextResponse.json(
+        { error: "Cette séance n'est plus en attente de paiement." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      seanceRow.type_seance_id == null ||
+      String(seanceRow.type_seance_id) !== String(type_seance_id)
+    ) {
+      return NextResponse.json(
+        { error: "Le type de séance ne correspond pas au créneau réservé." },
+        { status: 400 },
+      );
+    }
+
+    const { data: typeRow, error: typeReadErr } = await supabase
+      .from("types_seances")
+      .select("id, tarif, actif, sophrologue_id")
+      .eq("id", type_seance_id)
+      .eq("sophrologue_id", sophrologue_id)
+      .maybeSingle<{ id: string; tarif: number; actif: boolean; sophrologue_id: string | number }>();
+
+    if (typeReadErr || !typeRow || !typeRow.actif) {
+      return NextResponse.json(
+        { error: "Type de séance introuvable ou inactif." },
+        { status: 400 },
+      );
+    }
+
+    const tarifEuros = Number(typeRow.tarif);
+    if (!Number.isFinite(tarifEuros) || tarifEuros < 0) {
+      console.error("Create PI - tarif invalide:", typeRow.tarif);
+      return NextResponse.json(
+        { error: "Tarif de la séance invalide." },
+        { status: 500 },
+      );
+    }
+
+    const amountCents = Math.round(tarifEuros * 100);
 
     // ── 1) Récupérer ou créer le client (une fiche par couple email + sophrologue) ─
     // Même email chez un autre sophrologue ⇒ nouvelle ligne `patients` (multi-cabinet).
@@ -139,9 +206,7 @@ export async function POST(request: Request) {
 
     console.log("Create PI - séance liée au client:", seance_id, "→ patient:", patient.id);
 
-    // ── 3) Créer le PaymentIntent Stripe ─────────────────────────────────────
-    const amountCents = Math.round((montant ?? 60) * 100);
-
+    // ── 3) Créer le PaymentIntent Stripe (montant = tarif types_seances) ─────
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "eur",
@@ -149,6 +214,8 @@ export async function POST(request: Request) {
         seance_id: String(seance_id),
         sophrologue_id: String(sophrologue_id),
         patient_id: String(patient.id),
+        type_seance_id: String(type_seance_id),
+        tarif_euros: String(tarifEuros),
       },
       automatic_payment_methods: { enabled: true },
     });

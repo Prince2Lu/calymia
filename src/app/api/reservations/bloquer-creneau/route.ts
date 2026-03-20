@@ -8,15 +8,31 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { sophrologue_id, debut_at, fin_at } = await request.json() as {
+    const { sophrologue_id, debut_at, fin_at, type_seance_id } = await request.json() as {
       sophrologue_id?: string | number;
       debut_at?: string;
       fin_at?: string;
+      type_seance_id?: string | number;
     };
 
-    if (!sophrologue_id || !debut_at || !fin_at) {
+    if (!sophrologue_id || !debut_at || !fin_at || type_seance_id == null) {
       return NextResponse.json(
-        { error: "sophrologue_id, debut_at et fin_at sont requis." },
+        { error: "sophrologue_id, debut_at, fin_at et type_seance_id sont requis." },
+        { status: 400 },
+      );
+    }
+
+    const { data: typeOk, error: typeErr } = await supabase
+      .from("types_seances")
+      .select("id")
+      .eq("id", type_seance_id)
+      .eq("sophrologue_id", sophrologue_id)
+      .eq("actif", true)
+      .maybeSingle();
+
+    if (typeErr || !typeOk) {
+      return NextResponse.json(
+        { error: "Type de séance invalide ou inactif pour ce sophrologue." },
         { status: 400 },
       );
     }
@@ -43,32 +59,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── Resolve type_seance_id ────────────────────────────────────────────────
-    let { data: typeSeance } = await supabase
-      .from("types_seances")
-      .select("id")
-      .eq("sophrologue_id", sophrologue_id)
-      .eq("actif", true)
-      .limit(1)
-      .maybeSingle<{ id: string | number }>();
-
-    if (!typeSeance) {
-      const { data: fallback } = await supabase
-        .from("types_seances")
-        .select("id")
-        .eq("sophrologue_id", sophrologue_id)
-        .limit(1)
-        .maybeSingle<{ id: string | number }>();
-      typeSeance = fallback;
-    }
-
-    if (!typeSeance) {
-      return NextResponse.json(
-        { error: "Aucun type de séance configuré pour ce sophrologue." },
-        { status: 400 },
-      );
-    }
-
     // ── Insert temporary block (15-minute hold) ───────────────────────────────
     const expireAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
@@ -76,7 +66,7 @@ export async function POST(request: Request) {
       .from("seances")
       .insert({
         sophrologue_id,
-        type_seance_id: typeSeance.id,
+        type_seance_id,
         debut_at,
         fin_at,
         statut: "en_attente",

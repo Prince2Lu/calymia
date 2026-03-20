@@ -10,7 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PaymentForm } from "@/components/booking/PaymentForm";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
+
+/** Type de séance choisi (tarif = colonne `tarif` en BDD) */
+type SelectedTypeSeance = {
+  id: string;
+  nom: string;
+  duree_minutes: number;
+  tarif: number;
+};
 
 type SophrologueLite = {
   id: string | number;
@@ -88,39 +96,53 @@ function dbJourToJsDay(dbJour: number): number {
   return (dbJour + 1) % 7;
 }
 
-const SLOT_DURATION_MS = 60 * 60 * 1000; // 60 minutes
+/** Bornes locales d'une plage dispo pour un jour calendaire */
+function dispoWindowOnDay(day: Date, dispo: DispoRow): { start: Date; end: Date } {
+  const [sh, sm = 0] = dispo.heure_debut.split(":").map(Number);
+  const [eh, em = 0] = dispo.heure_fin.split(":").map(Number);
+  const start = new Date(day);
+  start.setHours(sh, sm, 0, 0);
+  const end = new Date(day);
+  end.setHours(eh, em, 0, 0);
+  return { start, end };
+}
 
-/** Vérifie si un créneau chevauchement avec une séance existante */
-function isSlotBooked(slotStart: Date, bookedIntervals: BookedInterval[]): boolean {
-  const slotEnd = new Date(slotStart.getTime() + SLOT_DURATION_MS);
+/** Vérifie chevauchement avec une séance existante (durée = type choisi) */
+function isSlotBooked(
+  slotStart: Date,
+  bookedIntervals: BookedInterval[],
+  slotDurationMs: number,
+): boolean {
+  const slotEnd = new Date(slotStart.getTime() + slotDurationMs);
   return bookedIntervals.some(
     ({ debut, fin }) => debut < slotEnd && fin > slotStart,
   );
 }
 
-/** Génère les créneaux horaires disponibles pour un jour donné.
- *  Accepte plusieurs plages (ex: 09-12 et 14-18) et fusionne les créneaux. */
+const SLOT_GRID_STEP_MS = 15 * 60 * 1000; // pas de 15 min (30, 45, 60, 90…)
+
+/** Créneaux disponibles pour un jour, selon la durée du type de séance */
 function buildSlotsFromDispo(
   day: Date,
   dispos: DispoRow[],
   bookedIntervals: BookedInterval[],
   delaiMinHeures: number,
+  slotDurationMs: number,
 ): Date[] {
   const allSlots: Date[] = [];
   const now = new Date();
   const cutoff = new Date(now.getTime() + delaiMinHeures * 60 * 60 * 1000);
 
   for (const dispo of dispos) {
-    const [startH] = dispo.heure_debut.split(":").map(Number);
-    const [endH] = dispo.heure_fin.split(":").map(Number);
-    const lastSlotH = endH - 1;
-
-    for (let h = startH; h <= lastSlotH; h++) {
-      const slot = new Date(day);
-      slot.setHours(h, 0, 0, 0);
+    const { start, end } = dispoWindowOnDay(day, dispo);
+    for (
+      let t = start.getTime();
+      t + slotDurationMs <= end.getTime();
+      t += SLOT_GRID_STEP_MS
+    ) {
+      const slot = new Date(t);
       if (slot <= cutoff) continue;
-      if (isSlotBooked(slot, bookedIntervals)) {
-        console.log(`[reserver] Créneau exclu (déjà réservé) : ${slot.toLocaleString("fr-FR")}`);
+      if (isSlotBooked(slot, bookedIntervals, slotDurationMs)) {
         continue;
       }
       allSlots.push(slot);
@@ -164,15 +186,20 @@ export default function ReserverPage() {
   const [sophrologue, setSophrologue] = useState<SophrologueLite | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [seanceId, setSeanceId] = useState<string | number | null>(null);
-  // Temporary block held while patient fills their info (step 2)
+  // Temporary block held while patient fills their info (step 3)
   const [blockedSeanceId, setBlockedSeanceId] = useState<string | number | null>(null);
   // Slots confirmed taken by a concurrent booking (show as unavailable)
   const [blockedSlots, setBlockedSlots] = useState<number[]>([]); // slot.getTime() values
   const [availability, setAvailability] = useState<AvailabilityData | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [noAvailability, setNoAvailability] = useState(false);
+  const [sessionTypes, setSessionTypes] = useState<SelectedTypeSeance[]>([]);
+  const [typesLoading, setTypesLoading] = useState(true);
+  const [selectedTypeSeance, setSelectedTypeSeance] = useState<SelectedTypeSeance | null>(
+    null,
+  );
 
-  // ── Account detection & inline login (step 2) ──────────────────────────────
+  // ── Account detection & inline login (étape infos client) ────────────────
   type EmailStatus = "idle" | "checking" | "exists" | "new";
   const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
   const [loginPassword, setLoginPassword] = useState("");
@@ -210,7 +237,13 @@ export default function ReserverPage() {
         .eq("actif", true)
         .maybeSingle<SophrologueLite>();
 
-      if (!sophroData || cancelled) return;
+      if (!sophroData || cancelled) {
+        if (!cancelled) {
+          setTypesLoading(false);
+          setAvailabilityLoading(false);
+        }
+        return;
+      }
       setSophrologue(sophroData);
 
       const sid = sophroData.id;
@@ -265,28 +298,56 @@ export default function ReserverPage() {
 
       const delaiMinHeures = params_cabinet?.delai_min_reservation_heures ?? 24;
 
+      const { data: typesRows } = await supabase
+        .from("types_seances")
+        .select("id, nom, duree_minutes, tarif")
+        .eq("sophrologue_id", sid)
+        .eq("actif", true)
+        .order("nom");
+
+      if (cancelled) return;
+
+      const types: SelectedTypeSeance[] = (typesRows ?? []).map((r) => ({
+        id: String(r.id),
+        nom: r.nom ?? "Séance",
+        duree_minutes: Number(r.duree_minutes) || 60,
+        tarif: Number(r.tarif) || 0,
+      }));
+
+      setSessionTypes(types);
+      setTypesLoading(false);
+
       const avail: AvailabilityData = { dispoByJsDay, bookedIntervals, delaiMinHeures };
       setAvailability(avail);
       setNoAvailability(dispoByJsDay.size === 0);
       setAvailabilityLoading(false);
-
-      // Sélectionner automatiquement le premier jour disponible
-      const today = startOfDay(new Date());
-      for (let i = 0; i < 28; i++) {
-        const d = addDays(today, i);
-        const dayDispos = avail.dispoByJsDay.get(d.getDay());
-        if (dayDispos && dayDispos.length > 0) {
-          const slots = buildSlotsFromDispo(d, dayDispos, avail.bookedIntervals, delaiMinHeures);
-          if (slots.length > 0) {
-            if (!cancelled) setSelectedDay(d);
-            break;
-          }
-        }
-      }
     };
     run();
     return () => { cancelled = true; };
   }, [params.slug, supabase]);
+
+  /** Premier jour avec au moins un créneau pour le type choisi */
+  useEffect(() => {
+    if (!availability || !selectedTypeSeance) return;
+    const durationMs = selectedTypeSeance.duree_minutes * 60 * 1000;
+    const today = startOfDay(new Date());
+    for (let i = 0; i < 28; i++) {
+      const d = addDays(today, i);
+      const dayDispos = availability.dispoByJsDay.get(d.getDay());
+      if (!dayDispos?.length) continue;
+      const slots = buildSlotsFromDispo(
+        d,
+        dayDispos,
+        availability.bookedIntervals,
+        availability.delaiMinHeures,
+        durationMs,
+      );
+      if (slots.length > 0) {
+        setSelectedDay(d);
+        return;
+      }
+    }
+  }, [availability, selectedTypeSeance]);
 
   const sophrologueName = useMemo(() => {
     const prenom = sophrologue?.prenom ?? "";
@@ -309,18 +370,20 @@ export default function ReserverPage() {
   }, [days]);
 
   const slotsForSelectedDay = useMemo(() => {
-    if (!availability) return [];
+    if (!availability || !selectedTypeSeance) return [];
     const dayDispos = availability.dispoByJsDay.get(selectedDay.getDay());
     if (!dayDispos || dayDispos.length === 0) return [];
+    const durationMs = selectedTypeSeance.duree_minutes * 60 * 1000;
     return buildSlotsFromDispo(
       selectedDay,
       dayDispos,
       availability.bookedIntervals,
       availability.delaiMinHeures,
+      durationMs,
     );
-  }, [availability, selectedDay]);
+  }, [availability, selectedDay, selectedTypeSeance]);
 
-  const progress = (step / 4) * 100;
+  const progress = (step / 5) * 100;
 
   const releaseBlock = async (id: string | number) => {
     try {
@@ -342,8 +405,7 @@ export default function ReserverPage() {
       router.push(`/sophrologues/${params.dept}/${params.ville}/${params.slug}`);
       return;
     }
-    // Release the temporary block when going back to slot selection
-    if (step === 2 && blockedSeanceId != null) {
+    if (step === 3 && blockedSeanceId != null) {
       void releaseBlock(blockedSeanceId);
     }
     setStep((s) => (s - 1) as Step);
@@ -352,22 +414,33 @@ export default function ReserverPage() {
   const goNext = async () => {
     setError(null);
     if (step === 1) {
+      if (!selectedTypeSeance) {
+        setError("Merci de choisir un type de séance.");
+        return;
+      }
+      setSelectedSlot(null);
+      setStep(2);
+      return;
+    }
+    if (step === 2) {
       if (!selectedSlot) {
         setError("Merci de sélectionner un créneau.");
         return;
       }
-      if (!sophrologue?.id) {
-        setError("Impossible d'identifier le sophrologue. Merci de réessayer.");
+      if (!sophrologue?.id || !selectedTypeSeance) {
+        setError("Impossible d'identifier le sophrologue ou le type de séance. Merci de réessayer.");
         return;
       }
 
       setLoading(true);
-      const finAt = new Date(selectedSlot.getTime() + 60 * 60 * 1000);
+      const durationMs = selectedTypeSeance.duree_minutes * 60 * 1000;
+      const finAt = new Date(selectedSlot.getTime() + durationMs);
       const res = await fetch("/api/reservations/bloquer-creneau", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sophrologue_id: sophrologue.id,
+          type_seance_id: selectedTypeSeance.id,
           debut_at: selectedSlot.toISOString(),
           fin_at: finAt.toISOString(),
         }),
@@ -381,7 +454,6 @@ export default function ReserverPage() {
 
       if (!res.ok || !data?.seance_id) {
         if (res.status === 409) {
-          // Mark slot as taken so it renders disabled immediately
           setBlockedSlots((prev) => [...prev, selectedSlot.getTime()]);
           setSelectedSlot(null);
         }
@@ -391,10 +463,10 @@ export default function ReserverPage() {
 
       console.log("[reserver] Créneau bloqué:", data.seance_id);
       setBlockedSeanceId(data.seance_id);
-      setStep(2);
+      setStep(3);
       return;
     }
-    if (step === 2) return;
+    if (step === 3) return;
   };
 
   const createPaymentIntent = async () => {
@@ -421,17 +493,21 @@ export default function ReserverPage() {
       return;
     }
 
+    if (!selectedTypeSeance) {
+      setError("Type de séance manquant. Recommencez depuis l’étape 1.");
+      return;
+    }
+
     if (blockedSeanceId == null) {
       setError("Le créneau n'est plus réservé. Veuillez recommencer.");
       return;
     }
 
     setLoading(true);
-    const montant = 60; // placeholder (types de séances à venir)
     const payload = {
       seance_id: blockedSeanceId,
       sophrologue_id: sophrologue.id,
-      montant,
+      type_seance_id: selectedTypeSeance.id,
       debut_at: selectedSlot.toISOString(),
       patient_prenom: patient.prenom,
       patient_nom: patient.nom,
@@ -461,7 +537,7 @@ export default function ReserverPage() {
     setClientSecret(data.clientSecret);
     setSeanceId(data.seance_id);
     setLoading(false);
-    setStep(3);
+    setStep(4);
   };
 
   // ── Email blur: check if account exists ────────────────────────────────────
@@ -570,9 +646,9 @@ export default function ReserverPage() {
     }
   };
 
-  /** Si l’email n’a pas été vérifié à l’étape 2 (pas de blur), re-vérifier à l’étape 4 */
+  /** Si l’email n’a pas été vérifié à l’étape infos (pas de blur), re-vérifier à la confirmation */
   useEffect(() => {
-    if (step !== 4 || isLoggedIn) return;
+    if (step !== 5 || isLoggedIn) return;
     const email = patient.email.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
     if (emailStatus !== "idle") return;
@@ -621,7 +697,13 @@ export default function ReserverPage() {
 
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs font-medium">
-            {["Créneau", "Infos client", "Paiement", "Confirmation"].map((t, i) => {
+            {[
+              "Type de séance",
+              "Créneau",
+              "Infos client",
+              "Paiement",
+              "Confirmation",
+            ].map((t, i) => {
               const n = (i + 1) as Step;
               const active = n === step;
               const done = n < step;
@@ -647,7 +729,7 @@ export default function ReserverPage() {
                   >
                     {t}
                   </span>
-                  {n < 4 ? (
+                  {n < 5 ? (
                     <div className="ml-2 hidden h-0.5 flex-1 rounded bg-[#C5D9CC] sm:block">
                       <div
                         className={`h-0.5 rounded transition-all ${
@@ -670,21 +752,75 @@ export default function ReserverPage() {
 
         <Card>
           <CardTitle>
-            {step === 1 && "Étape 1 — Choix du créneau"}
-            {step === 2 && "Étape 2 — Informations client"}
-            {step === 3 && "Étape 3 — Paiement"}
-            {step === 4 && "Étape 4 — Confirmation"}
+            {step === 1 && "Étape 1 — Type de séance"}
+            {step === 2 && "Étape 2 — Choix du créneau"}
+            {step === 3 && "Étape 3 — Informations client"}
+            {step === 4 && "Étape 4 — Paiement"}
+            {step === 5 && "Étape 5 — Confirmation"}
           </CardTitle>
           <CardDescription className="mt-1">
-            {step === 1 && "Sélectionnez un créneau sur les 4 prochaines semaines."}
+            {step === 1 &&
+              "Choisissez la formule : durée et tarif s’appliquent à votre réservation."}
             {step === 2 &&
+              "Sélectionnez un créneau sur les 4 prochaines semaines."}
+            {step === 3 &&
               "Renseignez vos informations pour confirmer la réservation."}
-            {step === 3 && "Procédez au paiement sécurisé pour confirmer la séance."}
-            {step === 4 && "Votre réservation est confirmée."}
+            {step === 4 &&
+              "Procédez au paiement sécurisé pour confirmer la séance."}
+            {step === 5 && "Votre réservation est confirmée."}
           </CardDescription>
 
           <div className="mt-6 space-y-6">
             {step === 1 ? (
+              <section className="space-y-4">
+                {typesLoading ? (
+                  <div className="flex items-center gap-3 py-8 text-sm text-slate-500">
+                    <svg className="h-5 w-5 animate-spin text-[#2E75B6]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Chargement des types de séance…
+                  </div>
+                ) : sessionTypes.length === 0 ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
+                    <p className="text-sm font-medium text-amber-800">
+                      Aucun type de séance disponible
+                    </p>
+                    <p className="mt-1 text-xs text-amber-700">
+                      Ce sophrologue n’a pas encore configuré de séances. Revenez plus tard ou contactez-le directement.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {sessionTypes.map((t) => {
+                      const selected = selectedTypeSeance?.id === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSelectedTypeSeance(t)}
+                          className={`rounded-xl border p-4 text-left transition-colors ${
+                            selected
+                              ? "border-[#426F59] bg-[#F0F7F4] ring-2 ring-[#426F59]/30"
+                              : "border-slate-200 bg-white hover:border-[#426F59]/40 hover:bg-slate-50"
+                          }`}
+                        >
+                          <p className="font-semibold text-[#1E3A5F]">{t.nom}</p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            Durée : {t.duree_minutes} min
+                          </p>
+                          <p className="mt-2 text-lg font-semibold text-[#426F59]">
+                            {t.tarif.toFixed(2)}&nbsp;€
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {step === 2 ? (
               <section className="space-y-4">
                 {availabilityLoading ? (
                   <div className="flex items-center gap-3 py-8 text-sm text-slate-500">
@@ -715,8 +851,12 @@ export default function ReserverPage() {
                           <div key={`w-${wi}`} className="grid grid-cols-7 gap-1.5">
                             {week.map((d) => {
                               const dayDispos = availability?.dispoByJsDay.get(d.getDay());
+                              const durationMs = selectedTypeSeance
+                                ? selectedTypeSeance.duree_minutes * 60 * 1000
+                                : 0;
                               const hasSlots =
                                 availability != null &&
+                                selectedTypeSeance != null &&
                                 dayDispos != null &&
                                 dayDispos.length > 0 &&
                                 buildSlotsFromDispo(
@@ -724,12 +864,13 @@ export default function ReserverPage() {
                                   dayDispos,
                                   availability.bookedIntervals,
                                   availability.delaiMinHeures,
+                                  durationMs,
                                 ).length > 0;
                               const isSelected = isSameDay(d, selectedDay);
                               const isDisabled = !hasSlots;
                               const titleText = isDisabled
                                 ? "Aucun créneau disponible"
-                                : dayDispos!
+                                : (dayDispos ?? [])
                                     .map((dp) => `${dp.heure_debut} – ${dp.heure_fin}`)
                                     .join(", ");
                               return (
@@ -809,13 +950,22 @@ export default function ReserverPage() {
                         </div>
                       )}
 
-                      {selectedSlot && (
+                      {selectedSlot && selectedTypeSeance && (
                         <div className="rounded-xl border border-[#27AE60]/30 bg-[#27AE60]/5 p-3">
                           <p className="text-sm text-slate-800">
                             <span className="font-semibold text-[#1E3A5F]">
                               Créneau sélectionné
                             </span>{" "}
-                            : {formatDateFR(selectedSlot)} à {formatTime(selectedSlot)}
+                            : {formatDateFR(selectedSlot)} de {formatTime(selectedSlot)} à{" "}
+                            {formatTime(
+                              new Date(
+                                selectedSlot.getTime() +
+                                  selectedTypeSeance.duree_minutes * 60 * 1000,
+                              ),
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {selectedTypeSeance.nom} · {selectedTypeSeance.tarif.toFixed(2)}&nbsp;€
                           </p>
                         </div>
                       )}
@@ -825,7 +975,7 @@ export default function ReserverPage() {
               </section>
             ) : null}
 
-            {step === 2 ? (
+            {step === 3 ? (
               <section className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1">
@@ -941,15 +1091,27 @@ export default function ReserverPage() {
                   </span>
                 </label>
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1">
+                  <p className="text-sm text-slate-800">
+                    <span className="font-semibold text-[#1E3A5F]">
+                      Type de séance
+                    </span>{" "}
+                    :{" "}
+                    {selectedTypeSeance
+                      ? `${selectedTypeSeance.nom} (${selectedTypeSeance.duree_minutes} min, ${selectedTypeSeance.tarif.toFixed(2)} €)`
+                      : "—"}
+                  </p>
                   <p className="text-sm text-slate-800">
                     <span className="font-semibold text-[#1E3A5F]">
                       Créneau
                     </span>{" "}
                     :{" "}
-                    {selectedSlot
-                      ? `${formatDateFR(selectedSlot)} à ${formatTime(
-                          selectedSlot,
+                    {selectedSlot && selectedTypeSeance
+                      ? `${formatDateFR(selectedSlot)} de ${formatTime(selectedSlot)} à ${formatTime(
+                          new Date(
+                            selectedSlot.getTime() +
+                              selectedTypeSeance.duree_minutes * 60 * 1000,
+                          ),
                         )}`
                       : "Non sélectionné"}
                   </p>
@@ -966,15 +1128,25 @@ export default function ReserverPage() {
               </section>
             ) : null}
 
-            {step === 3 ? (
+            {step === 4 ? (
               <section className="space-y-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 space-y-1">
+                  <p>
+                    <span className="font-semibold text-[#1E3A5F]">Type</span>{" "}
+                    :{" "}
+                    {selectedTypeSeance
+                      ? `${selectedTypeSeance.nom} — ${selectedTypeSeance.tarif.toFixed(2)} €`
+                      : "—"}
+                  </p>
                   <p>
                     <span className="font-semibold text-[#1E3A5F]">Créneau</span>{" "}
                     :{" "}
-                    {selectedSlot
-                      ? `${formatDateFR(selectedSlot)} à ${formatTime(
-                          selectedSlot,
+                    {selectedSlot && selectedTypeSeance
+                      ? `${formatDateFR(selectedSlot)} de ${formatTime(selectedSlot)} à ${formatTime(
+                          new Date(
+                            selectedSlot.getTime() +
+                              selectedTypeSeance.duree_minutes * 60 * 1000,
+                          ),
                         )}`
                       : "—"}
                   </p>
@@ -986,12 +1158,12 @@ export default function ReserverPage() {
                   </p>
                 </div>
 
-                {clientSecret && seanceId != null ? (
+                {clientSecret && seanceId != null && selectedTypeSeance ? (
                   <PaymentForm
-                    amount={60}
+                    amount={selectedTypeSeance.tarif}
                     clientSecret={clientSecret}
                     seanceId={seanceId}
-                    onSuccess={() => setStep(4)}
+                    onSuccess={() => setStep(5)}
                   />
                 ) : (
                   <p className="text-sm text-slate-600">
@@ -1001,7 +1173,7 @@ export default function ReserverPage() {
               </section>
             ) : null}
 
-            {step === 4 ? (
+            {step === 5 ? (
               <section className="space-y-4">
                 <div className="rounded-2xl border border-[#27AE60]/25 bg-[#27AE60]/10 p-4">
                   <p className="text-lg font-semibold text-[#1E3A5F]">
@@ -1021,12 +1193,24 @@ export default function ReserverPage() {
                   </p>
                   <p>
                     <span className="font-semibold text-[#1E3A5F]">
+                      Type de séance
+                    </span>{" "}
+                    :{" "}
+                    {selectedTypeSeance
+                      ? `${selectedTypeSeance.nom} (${selectedTypeSeance.tarif.toFixed(2)} €)`
+                      : "—"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-[#1E3A5F]">
                       Date &amp; heure
                     </span>{" "}
                     :{" "}
-                    {selectedSlot
-                      ? `${formatDateFR(selectedSlot)} à ${formatTime(
-                          selectedSlot,
+                    {selectedSlot && selectedTypeSeance
+                      ? `${formatDateFR(selectedSlot)} de ${formatTime(selectedSlot)} à ${formatTime(
+                          new Date(
+                            selectedSlot.getTime() +
+                              selectedTypeSeance.duree_minutes * 60 * 1000,
+                          ),
                         )}`
                       : "—"}
                   </p>
@@ -1171,24 +1355,47 @@ export default function ReserverPage() {
               <Button
                 type="button"
                 onClick={goNext}
-                disabled={loading}
+                disabled={
+                  loading ||
+                  typesLoading ||
+                  !selectedTypeSeance ||
+                  sessionTypes.length === 0
+                }
               >
                 Continuer
               </Button>
             ) : step === 2 ? (
               <Button
                 type="button"
-                variant="ghost"
-                onClick={() => setStep(1)}
+                onClick={goNext}
                 disabled={loading}
               >
-                Modifier le créneau
+                Continuer
               </Button>
             ) : step === 3 ? (
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => setStep(2)}
+                onClick={() => {
+                  setError(null);
+                  if (blockedSeanceId != null) {
+                    void releaseBlock(blockedSeanceId);
+                  }
+                  setSelectedSlot(null);
+                  setStep(2);
+                }}
+                disabled={loading}
+              >
+                Modifier le créneau
+              </Button>
+            ) : step === 4 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setError(null);
+                  setStep(3);
+                }}
                 disabled={loading}
               >
                 Modifier les infos
@@ -1198,11 +1405,16 @@ export default function ReserverPage() {
                 type="button"
                 variant="ghost"
                 onClick={() => {
+                  if (blockedSeanceId != null) {
+                    void releaseBlock(blockedSeanceId);
+                  }
                   setStep(1);
+                  setSelectedTypeSeance(null);
                   setSelectedSlot(null);
                   setError(null);
                   setClientSecret(null);
                   setSeanceId(null);
+                  setBlockedSlots([]);
                 }}
               >
                 Nouvelle réservation
