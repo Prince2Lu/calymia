@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { postSeance } from "@/lib/emails/templates";
+import { buildCronPostSeanceEmail } from "@/lib/email-templates/cron-build";
 import { sendEmail } from "@/lib/emails/send";
 import { formatParisTime } from "@/lib/timezone";
 
@@ -90,26 +90,46 @@ async function runPostSeance(): Promise<NextResponse> {
       }
 
       const prenomClient = (patient?.prenom ?? "").trim() || "cher client";
+      const nomClient = (patient?.nom ?? "").trim();
       const prenom_sophrologue = sophrologue?.prenom ?? "";
       const nom_sophrologue = sophrologue?.nom ?? "";
 
+      const { data: sophrologueAccount, error: sophLookupErr } = await supabase
+        .from("sophrologues")
+        .select("user_id, plan")
+        .eq("id", row.sophrologue_id)
+        .maybeSingle();
+
+      if (sophLookupErr) {
+        console.warn(
+          "[post-seance] Lecture sophrologue:",
+          row.sophrologue_id,
+          sophLookupErr.message,
+        );
+      }
+
+      const authUserId = sophrologueAccount?.user_id ?? null;
+      const plan = sophrologueAccount?.plan ?? null;
+
       const date_seance = formatParisTime(row.debut_at, "date");
+      const heure_seance = formatParisTime(row.debut_at, "HH:mm");
       const typeNom = typeSeance?.nom ?? "Séance de sophrologie";
 
-      const html = postSeance({
-        prenom_client: prenomClient,
-        prenom_sophrologue,
-        nom_sophrologue,
-        type_seance: typeNom,
-        date_seance,
+      const { subject, html } = await buildCronPostSeanceEmail(supabase, {
+        plan,
+        authUserId,
+        prenomClient,
+        nomClient,
+        dateParis: date_seance,
+        heureParis: heure_seance,
+        prenomSophro: prenom_sophrologue,
+        nomSophro: nom_sophrologue,
+        typeSeance: typeNom,
       });
-
-      const sophroForSubject =
-        `${prenom_sophrologue} ${nom_sophrologue}`.trim() || "votre sophrologue";
 
       const result = await sendEmail({
         to: email,
-        subject: `Merci pour votre séance avec ${sophroForSubject}`,
+        subject,
         html,
         log: {
           sophrologue_id: String(row.sophrologue_id),

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { DEFAULT_EMAIL_TEMPLATE_ROWS } from "@/lib/email-templates/defaults";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -87,6 +88,39 @@ export async function POST(request: Request) {
         },
         { status: 500 },
       );
+    }
+
+    const templateRows = DEFAULT_EMAIL_TEMPLATE_ROWS.map((row) => ({
+      sophrologue_id: userId,
+      type: row.type,
+      nom: row.nom,
+      sujet: row.sujet,
+      corps_html: row.corps_html,
+      actif: row.actif,
+    }));
+
+    const { error: tplError } = await supabase
+      .from("email_templates")
+      .insert(templateRows);
+
+    if (tplError) {
+      if (tplError.code === "23505") {
+        console.warn(
+          "Register API — templates déjà présents pour cet utilisateur, ignoré.",
+        );
+      } else {
+        console.error(
+          "Register API — insertion email_templates:",
+          tplError.message,
+        );
+        return NextResponse.json(
+          {
+            error:
+              "Profil créé mais les modèles d’emails par défaut n’ont pas pu être enregistrés. Contactez le support ou réessayez.",
+          },
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json({ success: true });

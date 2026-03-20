@@ -1,0 +1,18 @@
+/* Contenu éditable Tiptap (.tiptap + .proseMirror) */
+.proseMirror :global(p) {
+  margin-bottom: 0.75rem;
+}
+
+.proseMirror :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.proseMirror :global(ul) {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.proseMirror :global(strong) {
+  font-weight: 600;
+}

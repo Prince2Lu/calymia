@@ -219,3 +219,8 @@ export function postSeance({
   `;
   return baseLayout(content);
 }
+
+/** Fragment HTML sophrologue → email complet (en-tête / pied Calymia). */
+export function wrapSophrologueEmailHtml(fragment: string): string {
+  return baseLayout(fragment);
+}

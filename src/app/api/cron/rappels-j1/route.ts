@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { rappelJ1 } from "@/lib/emails/templates";
+import { buildCronRappelJ1Email } from "@/lib/email-templates/cron-build";
 import { sendEmail } from "@/lib/emails/send";
 import {
   addParisCalendarDays,
@@ -106,25 +106,46 @@ async function runRappelsJ1(): Promise<NextResponse> {
       }
 
       const prenomClient = (patient?.prenom ?? "").trim() || "cher client";
+      const nomClient = (patient?.nom ?? "").trim();
       const prenom_sophrologue = sophrologue?.prenom ?? "";
       const nom_sophrologue = sophrologue?.nom ?? "";
+
+      const { data: sophrologueAccount, error: sophLookupErr } = await supabase
+        .from("sophrologues")
+        .select("user_id, plan")
+        .eq("id", row.sophrologue_id)
+        .maybeSingle();
+
+      if (sophLookupErr) {
+        console.warn(
+          "[rappels-j1] Lecture sophrologue:",
+          row.sophrologue_id,
+          sophLookupErr.message,
+        );
+      }
+
+      const authUserId = sophrologueAccount?.user_id ?? null;
+      const plan = sophrologueAccount?.plan ?? null;
 
       const date_seance = formatParisTime(row.debut_at, "date");
       const heure_seance = formatParisTime(row.debut_at, "HH:mm");
       const typeNom = typeSeance?.nom ?? "Séance de sophrologie";
 
-      const html = rappelJ1({
-        prenom_client: prenomClient,
-        prenom_sophrologue,
-        nom_sophrologue,
-        date_seance,
-        heure_seance,
-        type_seance: typeNom,
+      const { subject, html } = await buildCronRappelJ1Email(supabase, {
+        plan,
+        authUserId,
+        prenomClient,
+        nomClient,
+        dateParis: date_seance,
+        heureParis: heure_seance,
+        prenomSophro: prenom_sophrologue,
+        nomSophro: nom_sophrologue,
+        typeSeance: typeNom,
       });
 
       const result = await sendEmail({
         to: email,
-        subject: `Rappel : votre séance demain avec ${`${prenom_sophrologue} ${nom_sophrologue}`.trim() || "votre sophrologue"}`,
+        subject,
         html,
         log: {
           sophrologue_id: String(row.sophrologue_id),

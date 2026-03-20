@@ -9,6 +9,7 @@ import {
   Calendar,
   Users,
   MessageSquare,
+  Mail,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -49,6 +50,11 @@ const NAV_ITEMS: NavItem[] = [
     label: "Communications",
     href: "/communications",
     icon: <MessageSquare className="h-4 w-4" />,
+  },
+  {
+    label: "Modèles d'emails",
+    href: "/dashboard/emails",
+    icon: <Mail className="h-4 w-4" />,
   },
   {
     label: "Paramètres",
@@ -112,7 +118,7 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   const fullName =
