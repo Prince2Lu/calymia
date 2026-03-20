@@ -92,6 +92,11 @@ async function runRappelsJ1(): Promise<NextResponse> {
     }
 
     const list = rows ?? [];
+    console.log(
+      "Séances trouvées:",
+      list.length,
+      JSON.stringify(list),
+    );
     let sent_count = 0;
 
     for (const row of list) {
@@ -127,6 +132,21 @@ async function runRappelsJ1(): Promise<NextResponse> {
       const authUserId = sophrologueAccount?.user_id ?? null;
       const plan = sophrologueAccount?.plan ?? null;
 
+      console.log("Sophrologue:", sophrologueAccount);
+
+      let template: { sujet: string; corps_html: string } | null = null;
+      if (authUserId) {
+        const { data: templateRow } = await supabase
+          .from("email_templates")
+          .select("sujet, corps_html")
+          .eq("sophrologue_id", authUserId)
+          .eq("type", "rappel")
+          .eq("actif", true)
+          .maybeSingle();
+        template = templateRow;
+      }
+      console.log("Template trouvé:", template);
+
       const date_seance = formatParisTime(row.debut_at, "date");
       const heure_seance = formatParisTime(row.debut_at, "HH:mm");
       const typeNom = typeSeance?.nom ?? "Séance de sophrologie";
@@ -142,6 +162,9 @@ async function runRappelsJ1(): Promise<NextResponse> {
         nomSophro: nom_sophrologue,
         typeSeance: typeNom,
       });
+
+      const patientEmail = email;
+      console.log("Envoi email à:", patientEmail);
 
       const result = await sendEmail({
         to: email,
