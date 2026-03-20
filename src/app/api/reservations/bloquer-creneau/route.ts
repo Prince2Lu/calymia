@@ -6,6 +6,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+/** Durée du blocage temporaire (alignée avec le cron cleanup) */
+const HOLD_MINUTES = 15;
+
 export async function POST(request: Request) {
   try {
     const { sophrologue_id, debut_at, fin_at, type_seance_id } = await request.json() as {
@@ -59,8 +62,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── Insert temporary block (15-minute hold) ───────────────────────────────
-    const expireAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    // ── Insert temporary block (NOW + 15 min) ─────────────────────────────────
+    const expireAt = new Date(
+      Date.now() + HOLD_MINUTES * 60 * 1000,
+    ).toISOString();
 
     const { data: seance, error: insertError } = await supabase
       .from("seances")
@@ -73,11 +78,22 @@ export async function POST(request: Request) {
         origine: "en_ligne",
         expire_at: expireAt,
       })
-      .select("id")
-      .single<{ id: string | number }>();
+      .select("id, expire_at")
+      .single<{ id: string | number; expire_at: string | null }>();
 
     if (insertError || !seance) {
       console.error("[bloquer-creneau] Insert error:", insertError);
+      return NextResponse.json(
+        { error: "Impossible de bloquer le créneau. Merci de réessayer." },
+        { status: 500 },
+      );
+    }
+
+    if (seance.expire_at == null) {
+      console.error(
+        "[bloquer-creneau] expire_at absent après insert — vérifiez la colonne / triggers BDD",
+        seance.id,
+      );
       return NextResponse.json(
         { error: "Impossible de bloquer le créneau. Merci de réessayer." },
         { status: 500 },
