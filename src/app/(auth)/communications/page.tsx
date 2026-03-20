@@ -17,7 +17,12 @@ type CommRow = {
   destinataire_nom: string | null;
 };
 
-type TypeFilter = "tous" | "confirmation" | "annulation" | "rappel";
+type TypeFilter =
+  | "tous"
+  | "confirmation"
+  | "annulation"
+  | "rappel"
+  | "post_seance";
 
 function labelType(type: string) {
   const map: Record<string, string> = {
@@ -32,7 +37,7 @@ function labelType(type: string) {
     bienvenue_sophrologue: "Bienvenue praticien",
     bienvenue_client: "Bienvenue client",
     rappel_j1: "Rappel J-1",
-    post_seance: "Après séance",
+    post_seance: "Post-séance",
   };
   return map[type] ?? type.replace(/_/g, " ");
 }
@@ -58,8 +63,8 @@ function badgeTypeClass(type: string) {
   }
   if (type.startsWith("annulation"))
     return "bg-red-50 text-red-700 ring-1 ring-red-200";
-  if (type.includes("rappel"))
-    return "bg-[#2E75B6]/10 text-[#2E75B6] ring-1 ring-[#2E75B6]/20";
+  if (type === "rappel_j1" || type === "post_seance")
+    return "bg-[#3B82F6]/15 text-[#3B82F6] ring-1 ring-[#3B82F6]/25";
   if (type.startsWith("bienvenue"))
     return "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200";
   return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
@@ -124,7 +129,9 @@ export default function CommunicationsPage() {
       } else if (filter === "annulation") {
         q = q.like("type", "annulation%");
       } else if (filter === "rappel") {
-        q = q.ilike("type", "%rappel%");
+        q = q.eq("type", "rappel_j1");
+      } else if (filter === "post_seance") {
+        q = q.eq("type", "post_seance");
       }
 
       const { data, error, count } = await q.range(from, to);
@@ -186,6 +193,7 @@ export default function CommunicationsPage() {
     { key: "confirmation", label: "Confirmation" },
     { key: "annulation", label: "Annulation" },
     { key: "rappel", label: "Rappel" },
+    { key: "post_seance", label: "Post-séance" },
   ];
 
   if (notSophrologue) {
