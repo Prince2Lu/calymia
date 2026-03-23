@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
-import { ArrowUpRight, Mail, X } from "lucide-react";
+import { Mail, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RichTextEditor from "@/components/dashboard/RichTextEditor";
+import { PlanGuard } from "@/components/plan/PlanGuard";
+import { usePlan } from "@/hooks/usePlan";
 
 type EmailTemplateRow = {
   id: string;
@@ -32,9 +34,8 @@ const formatTemplateType = (type: string) => {
   return labels[type] ?? type;
 };
 
-export default function DashboardEmailsPage() {
+function DashboardEmailsContent() {
   const [loading, setLoading] = useState(true);
-  const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<EmailTemplateRow[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export default function DashboardEmailsPage() {
         credentials: "include",
       });
       if (res.status === 403) {
-        setLocked(true);
+        setError("Accès refusé pour votre formule.");
         setTemplates([]);
         return;
       }
@@ -78,7 +79,6 @@ export default function DashboardEmailsPage() {
         setError(j?.error ?? "Chargement impossible.");
         return;
       }
-      setLocked(false);
       const data = (await res.json()) as { templates: EmailTemplateRow[] };
       setTemplates(data.templates ?? []);
     } catch {
@@ -180,41 +180,11 @@ export default function DashboardEmailsPage() {
     }
   };
 
-  if (loading && !locked && templates.length === 0 && !error) {
+  if (loading && templates.length === 0 && !error) {
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-6xl px-4 py-10">
           <p className="text-sm text-slate-500">Chargement…</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (locked) {
-    return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-          <div>
-            <h1 className="text-3xl font-semibold text-[#1E3A5F]">
-              Modèles d&apos;emails
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Personnalisez les emails automatiques envoyés à vos clients.
-            </p>
-          </div>
-          <div className="flex flex-col gap-4 rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium text-amber-900">
-              Cette fonctionnalité est disponible à partir du plan{" "}
-              <strong>Professionnel</strong>.
-            </p>
-            <a
-              href="/parametres"
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#426F59] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#355a49]"
-            >
-              Upgrader
-              <ArrowUpRight className="h-4 w-4" />
-            </a>
-          </div>
         </div>
       </main>
     );
@@ -428,5 +398,27 @@ export default function DashboardEmailsPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function DashboardEmailsPage() {
+  const { plan, loading } = usePlan();
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <p className="text-sm text-slate-500">Chargement…</p>
+        </div>
+      </main>
+    );
+  }
+  return (
+    <PlanGuard
+      requiredPlan="professionnel"
+      currentPlan={plan}
+      featureName="Modèles d'emails"
+    >
+      <DashboardEmailsContent />
+    </PlanGuard>
   );
 }

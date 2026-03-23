@@ -332,7 +332,7 @@ export default function ClientsPage() {
             </Button>
           ) : (
             <a
-              href="/parametres"
+              href="/dashboard/abonnement"
               className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600"
             >
               <ArrowUpRight className="h-4 w-4" />
@@ -343,20 +343,21 @@ export default function ClientsPage() {
 
         {/* ── Bannière limite plan Essentiel ───────────────────────────── */}
         {limitReached && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div>
-              <p className="text-sm font-semibold text-amber-800">
-                Limite de {LIMITE_ESSENTIEL} clients atteinte
+              <p className="text-sm font-medium text-amber-800">
+                Limite de 15 clients atteinte
               </p>
-              <p className="mt-0.5 text-sm text-amber-700">
-                Votre plan Essentiel est limité à {LIMITE_ESSENTIEL} clients actifs. Passez au plan{" "}
-                <a href="/parametres" className="font-medium underline">
-                  Professionnel
-                </a>{" "}
-                pour en ajouter davantage.
+              <p className="text-xs text-amber-600">
+                Passez au plan Professionnel pour des clients illimités.
               </p>
             </div>
+            <a
+              href="/dashboard/abonnement"
+              className="text-xs font-medium text-amber-800 underline"
+            >
+              Upgrader
+            </a>
           </div>
         )}
 

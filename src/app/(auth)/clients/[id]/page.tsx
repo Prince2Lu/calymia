@@ -20,6 +20,8 @@ import { formatParisTime } from "@/lib/timezone";
 import { planAllowsSeanceNotes } from "@/lib/email-templates/placeholders";
 import { seanceNoteHtmlIsNonEmpty } from "@/lib/seance-notes";
 import NoteSeance from "@/components/dashboard/NoteSeance";
+import { PlanGuard } from "@/components/plan/PlanGuard";
+import { normalizePlan } from "@/hooks/usePlan";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -438,13 +440,18 @@ export default function FichePatientPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <NoteSeance
-                seanceId={notesPanelSeanceId}
-                patientId={patient.id}
-                sophrologueId={sophrologue.id}
-                plan={sophrologue.plan}
-                onSaved={() => void refreshSeanceNotesMap()}
-              />
+              <PlanGuard
+                requiredPlan="professionnel"
+                currentPlan={normalizePlan(sophrologue.plan)}
+                featureName="Notes de séance"
+              >
+                <NoteSeance
+                  seanceId={notesPanelSeanceId}
+                  patientId={patient.id}
+                  sophrologueId={sophrologue.id}
+                  onSaved={() => void refreshSeanceNotesMap()}
+                />
+              </PlanGuard>
             </div>
           </aside>
         </>

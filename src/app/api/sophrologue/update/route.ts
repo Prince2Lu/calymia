@@ -24,6 +24,14 @@ export async function POST(request: Request) {
       phone,
       photo_url,
       onboarding_completed,
+      photos_cabinet,
+      horaires,
+      horaires_texte,
+      infos_pratiques,
+      modes_paiement,
+      formations,
+      certifications,
+      syndicats,
     } = body as {
       userId?: string;
       prenom?: string;
@@ -38,6 +46,14 @@ export async function POST(request: Request) {
       phone?: string;
       photo_url?: string | null;
       onboarding_completed?: boolean;
+      photos_cabinet?: string[];
+      horaires?: Record<string, unknown>;
+      horaires_texte?: string;
+      infos_pratiques?: string;
+      modes_paiement?: string[];
+      formations?: string[];
+      certifications?: string[];
+      syndicats?: string[];
     };
 
     console.log("[sophrologue/update] userId reçu :", userId);
@@ -67,6 +83,14 @@ export async function POST(request: Request) {
       ...(phone !== undefined && { telephone: phone }),
       ...(photo_url !== undefined && { photo_url }),
       ...(onboarding_completed !== undefined && { onboarding_completed }),
+      ...(photos_cabinet !== undefined && { photos_cabinet }),
+      ...(horaires !== undefined && { horaires }),
+      ...(horaires_texte !== undefined && { horaires_texte }),
+      ...(infos_pratiques !== undefined && { infos_pratiques }),
+      ...(modes_paiement !== undefined && { modes_paiement }),
+      ...(formations !== undefined && { formations }),
+      ...(certifications !== undefined && { certifications }),
+      ...(syndicats !== undefined && { syndicats }),
     };
 
     console.log("[sophrologue/update] Colonnes mises à jour :", updatePayload);

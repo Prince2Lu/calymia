@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { planAllowsSeanceNotes } from "@/lib/email-templates/placeholders";
 import { seanceNoteHtmlIsNonEmpty } from "@/lib/seance-notes";
 import RichTextEditor from "@/components/dashboard/RichTextEditor";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ export interface NoteSeanceProps {
   seanceId: string;
   patientId: string;
   sophrologueId: string;
-  plan: string | null;
   /** Après enregistrement réussi (ex. rafraîchir les badges sur la liste). */
   onSaved?: () => void;
 }
@@ -20,11 +18,8 @@ export default function NoteSeance({
   seanceId,
   patientId: _patientId,
   sophrologueId: _sophrologueId,
-  plan,
   onSaved,
 }: NoteSeanceProps) {
-  const allowed = planAllowsSeanceNotes(plan);
-
   const [html, setHtml] = useState("");
   const [editorEpoch, setEditorEpoch] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -97,14 +92,6 @@ export default function NoteSeance({
       setSaving(false);
     }
   };
-
-  if (!allowed) {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Disponible à partir du plan <strong>Professionnel</strong>.
-      </div>
-    );
-  }
 
   const showExistingBadge =
     savedSnapshotNonEmpty || seanceNoteHtmlIsNonEmpty(html);

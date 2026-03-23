@@ -3,11 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { Loader2 } from "lucide-react";
 import { uploadAvatarWithSession } from "@/lib/supabase/upload-avatar-client";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  OnboardingVitrineStep,
+  createInitialVitrineData,
+  type OnboardingVitrineData,
+} from "@/components/onboarding/OnboardingVitrineStep";
+import { usePlan } from "@/hooks/usePlan";
 
 type Specialty =
   | "stress"
@@ -53,6 +60,8 @@ type OnboardingState = {
   >;
   sessionTypes: SessionType[];
   minBookingDelay: "6" | "12" | "24" | "48";
+  /** Étape 4 — vitrine (optionnel) */
+  vitrine: OnboardingVitrineData;
 };
 
 const INITIAL_STATE: OnboardingState = {
@@ -75,6 +84,7 @@ const INITIAL_STATE: OnboardingState = {
   },
   sessionTypes: [],
   minBookingDelay: "24",
+  vitrine: createInitialVitrineData(),
 };
 
 const SPECIALTY_OPTIONS: { value: Specialty; label: string }[] = [
@@ -113,15 +123,20 @@ const STEP_TITLES = [
   "Profil public",
   "Cabinet",
   "Disponibilités et tarifs",
+  "Votre vitrine",
   "Récapitulatif",
 ] as const;
 
+const TOTAL_STEPS = STEP_TITLES.length;
+
 export default function OnboardingPage() {
+  const { maxPhotos } = usePlan();
   const [step, setStep] = useState(1);
   const [state, setState] = useState<OnboardingState>(INITIAL_STATE);
   const [photoPreviewLocal, setPhotoPreviewLocal] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [sophrologueId, setSophrologueId] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [loading, setLoading] = useState(false);
@@ -149,6 +164,7 @@ export default function OnboardingPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user || cancelled) return;
+      if (!cancelled) setAuthUserId(user.id);
       const { data } = await supabase
         .from("sophrologues")
         .select("id, prenom, nom")
@@ -165,7 +181,15 @@ export default function OnboardingPage() {
     };
   }, [supabase]);
 
-  const goNext = () => setStep((s) => Math.min(4, s + 1));
+  const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
+  const skipVitrineStep = () => setStep(5);
+
+  const vitrineOnChange = (field: keyof OnboardingVitrineData, value: unknown) => {
+    setState((prev) => ({
+      ...prev,
+      vitrine: { ...prev.vitrine, [field]: value } as OnboardingVitrineData,
+    }));
+  };
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   const toggleSpecialty = (value: Specialty) => {
@@ -387,6 +411,14 @@ export default function OnboardingPage() {
         postalCode: state.postalCode,
         phone: state.phone,
         ...(state.photoUrl ? { photo_url: state.photoUrl } : {}),
+        photos_cabinet: state.vitrine.photos_cabinet,
+        horaires: state.vitrine.horaires,
+        horaires_texte: state.vitrine.horaires_texte,
+        infos_pratiques: state.vitrine.infos_pratiques,
+        modes_paiement: state.vitrine.modes_paiement,
+        formations: state.vitrine.formations,
+        certifications: state.vitrine.certifications,
+        syndicats: state.vitrine.syndicats,
       }),
     });
 
@@ -490,7 +522,7 @@ export default function OnboardingPage() {
     router.push("/dashboard");
   };
 
-  const progress = (step / 4) * 100;
+  const progress = (step / TOTAL_STEPS) * 100;
 
   return (
     <main className="flex min-h-screen justify-center bg-slate-50 py-10">
@@ -528,7 +560,7 @@ export default function OnboardingPage() {
                   <span className="ml-2 hidden text-xs text-slate-700 sm:inline">
                     {title}
                   </span>
-                  {stepNumber < 4 && (
+                  {stepNumber < TOTAL_STEPS && (
                     <div className="ml-2 hidden h-0.5 flex-1 rounded bg-slate-200 sm:block">
                       <div
                         className={`h-0.5 rounded ${
@@ -559,6 +591,8 @@ export default function OnboardingPage() {
             {step === 3 &&
               "Définissez vos créneaux d’ouverture et vos types de séances."}
             {step === 4 &&
+              "Enrichissez votre page publique : photos, horaires affichés, infos pratiques… Tout est optionnel."}
+            {step === 5 &&
               "Vérifiez les informations avant d’accéder à votre tableau de bord."}
           </CardDescription>
 
@@ -967,6 +1001,25 @@ export default function OnboardingPage() {
             )}
 
             {step === 4 && (
+              <section>
+                {!authUserId ? (
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#426F59]" />
+                  </div>
+                ) : (
+                  <OnboardingVitrineStep
+                    data={state.vitrine}
+                    onChange={vitrineOnChange}
+                    supabase={supabase}
+                    userId={authUserId}
+                    maxPhotos={maxPhotos}
+                    onError={(msg) => setError(msg)}
+                  />
+                )}
+              </section>
+            )}
+
+            {step === 5 && (
               <section className="space-y-4 text-sm text-slate-800">
                 <div>
                   <h2 className="text-sm font-semibold text-[#426F59]">
@@ -1065,6 +1118,45 @@ export default function OnboardingPage() {
                     </ul>
                   )}
                 </div>
+
+                <div>
+                  <h2 className="text-sm font-semibold text-[#426F59]">Vitrine</h2>
+                  <p className="mt-1 text-xs text-slate-700">
+                    {state.vitrine.photos_cabinet.length > 0
+                      ? `${state.vitrine.photos_cabinet.length} photo(s) du cabinet`
+                      : "Aucune photo du cabinet"}
+                  </p>
+                  {state.vitrine.horaires_texte.trim() !== "" && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      Précisions horaires : {state.vitrine.horaires_texte}
+                    </p>
+                  )}
+                  {state.vitrine.infos_pratiques.trim() !== "" && (
+                    <p className="mt-1 whitespace-pre-line text-xs text-slate-700">
+                      {state.vitrine.infos_pratiques}
+                    </p>
+                  )}
+                  {state.vitrine.modes_paiement.length > 0 && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      Paiements : {state.vitrine.modes_paiement.join(", ")}
+                    </p>
+                  )}
+                  {(state.vitrine.formations.length > 0 ||
+                    state.vitrine.certifications.length > 0 ||
+                    state.vitrine.syndicats.length > 0) && (
+                    <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
+                      {state.vitrine.formations.length > 0 && (
+                        <li>Formations : {state.vitrine.formations.length}</li>
+                      )}
+                      {state.vitrine.certifications.length > 0 && (
+                        <li>Certifications : {state.vitrine.certifications.length}</li>
+                      )}
+                      {state.vitrine.syndicats.length > 0 && (
+                        <li>Syndicats : {state.vitrine.syndicats.length}</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               </section>
             )}
 
@@ -1075,7 +1167,7 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          <div className="mt-8 flex justify-between">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
               variant="outline"
@@ -1084,25 +1176,38 @@ export default function OnboardingPage() {
             >
               Retour
             </Button>
-            {step < 4 ? (
-              <Button
-                type="button"
-                className="bg-[#426F59] hover:bg-[#355447]"
-                onClick={goNext}
-                disabled={loading}
-              >
-                Continuer
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                className="bg-[#426F59] hover:bg-[#355447]"
-                onClick={handleFinish}
-                disabled={loading}
-              >
-                Terminer et accéder à mon dashboard
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {step === 4 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-[#426F59]"
+                  onClick={skipVitrineStep}
+                  disabled={loading}
+                >
+                  Passer cette étape →
+                </Button>
+              )}
+              {step < TOTAL_STEPS ? (
+                <Button
+                  type="button"
+                  className="bg-[#426F59] hover:bg-[#355447]"
+                  onClick={goNext}
+                  disabled={loading || (step === 4 && !authUserId)}
+                >
+                  Continuer
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="bg-[#426F59] hover:bg-[#355447]"
+                  onClick={handleFinish}
+                  disabled={loading}
+                >
+                  Terminer et accéder à mon dashboard
+                </Button>
+              )}
+            </div>
           </div>
         </Card>
       </div>

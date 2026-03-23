@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { uploadAvatarWithSession } from "@/lib/supabase/upload-avatar-client";
+import { CabinetVitrineTab } from "@/components/parametres/CabinetVitrineTab";
 import {
   Loader2,
   Save,
@@ -10,12 +11,12 @@ import {
   Trash2,
   Pencil,
   X,
-  Check,
   ToggleLeft,
   ToggleRight,
   User,
   Clock,
   CalendarDays,
+  Images,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,18 @@ type Sophrologue = {
   ville: string | null;
   code_postal: string | null;
   photo_url: string | null;
+  photos_cabinet: string[] | null;
+  horaires: unknown;
+  horaires_texte: string | null;
+  infos_pratiques: string | null;
+  modes_paiement: string[] | null;
+  formations: string[] | null;
+  certifications: string[] | null;
+  syndicats: string[] | null;
 };
+
+const SOPHROLOGUE_SELECT =
+  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
 
 type TypeSeance = {
   id: string;
@@ -47,16 +59,12 @@ type TypeSeance = {
   actif: boolean;
 };
 
-type DispoSlot = { heure_debut: string; heure_fin: string };
-type DispoByDay = Record<number, { actif: boolean; slots: DispoSlot[] }>;
-
 type ParamsCabinet = {
   delai_min_reservation_heures: number;
 };
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const DUREES = [30, 45, 60, 90];
 const DELAIS = [
   { label: "6 heures", value: 6 },
@@ -91,28 +99,30 @@ function Toast({ toast }: { toast: { msg: string; ok: boolean } | null }) {
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
-type Tab = "profil" | "seances" | "disponibilites";
+type Tab = "profil" | "seances" | "disponibilites" | "cabinet";
 
 function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
-  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { key: Tab; label: string; icon: React.ReactNode; shortLabel?: string }[] = [
     { key: "profil", label: "Mon profil", icon: <User className="h-4 w-4" /> },
-    { key: "seances", label: "Types de séances", icon: <Clock className="h-4 w-4" /> },
-    { key: "disponibilites", label: "Disponibilités", icon: <CalendarDays className="h-4 w-4" /> },
+    { key: "seances", label: "Types de séances", shortLabel: "Séances", icon: <Clock className="h-4 w-4" /> },
+    { key: "disponibilites", label: "Disponibilités", shortLabel: "Dispo.", icon: <CalendarDays className="h-4 w-4" /> },
+    { key: "cabinet", label: "Cabinet / vitrine", shortLabel: "Vitrine", icon: <Images className="h-4 w-4" /> },
   ];
   return (
-    <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+    <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 sm:flex-nowrap">
       {tabs.map((t) => (
         <button
           key={t.key}
           onClick={() => onChange(t.key)}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
             active === t.key
               ? "bg-white text-[#1E3A5F] shadow-sm"
               : "text-slate-500 hover:text-slate-700"
           }`}
         >
           {t.icon}
-          {t.label}
+          <span className="truncate sm:hidden">{t.shortLabel ?? t.label}</span>
+          <span className="hidden truncate sm:inline">{t.label}</span>
         </button>
       ))}
     </div>
@@ -670,18 +680,7 @@ function TabSeances({
   );
 }
 
-// ─── Onglet 3 : Disponibilités ────────────────────────────────────────────────
-
-function getDefaultDispoByDay(): DispoByDay {
-  const out: DispoByDay = {};
-  for (let i = 0; i < 7; i++) {
-    out[i] = {
-      actif: i < 5,
-      slots: [{ heure_debut: "09:00", heure_fin: "18:00" }],
-    };
-  }
-  return out;
-}
+// ─── Onglet 3 : Disponibilités (délai de réservation uniquement) ─────────────
 
 function TabDisponibilites({
   sophrologueId,
@@ -690,7 +689,6 @@ function TabDisponibilites({
   sophrologueId: string;
   showToast: (msg: string, ok?: boolean) => void;
 }) {
-  const [disposByDay, setDisposByDay] = useState<DispoByDay>(getDefaultDispoByDay());
   const [delai, setDelai] = useState(24);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -702,26 +700,6 @@ function TabDisponibilites({
 
   useEffect(() => {
     const load = async () => {
-      const { data: dispoData } = await supabase
-        .from("disponibilites")
-        .select("jour_semaine, heure_debut, heure_fin, actif")
-        .eq("sophrologue_id", sophrologueId)
-        .returns<{ jour_semaine: number; heure_debut: string; heure_fin: string; actif: boolean }[]>();
-
-      const byDay: DispoByDay = getDefaultDispoByDay();
-      if (dispoData && dispoData.length > 0) {
-        for (let i = 0; i < 7; i++) {
-          const rows = dispoData.filter((d) => d.jour_semaine === i);
-          if (rows.length > 0) {
-            byDay[i] = {
-              actif: rows[0].actif,
-              slots: rows.map((r) => ({ heure_debut: r.heure_debut, heure_fin: r.heure_fin })),
-            };
-          }
-        }
-        setDisposByDay(byDay);
-      }
-
       const { data: params } = await supabase
         .from("parametres_cabinet")
         .select("delai_min_reservation_heures")
@@ -731,76 +709,27 @@ function TabDisponibilites({
       if (params) setDelai(params.delai_min_reservation_heures);
       setLoading(false);
     };
-    load();
+    void load();
   }, [sophrologueId, supabase]);
 
-  const updateDayActif = (i: number, actif: boolean) => {
-    setDisposByDay((prev) => ({
-      ...prev,
-      [i]: { ...prev[i], actif },
-    }));
-  };
-
-  const addSlot = (i: number) => {
-    setDisposByDay((prev) => ({
-      ...prev,
-      [i]: {
-        ...prev[i],
-        slots: [...prev[i].slots, { heure_debut: "14:00", heure_fin: "18:00" }],
-      },
-    }));
-  };
-
-  const updateSlot = (i: number, slotIdx: number, field: "heure_debut" | "heure_fin", value: string) => {
-    setDisposByDay((prev) => ({
-      ...prev,
-      [i]: {
-        ...prev[i],
-        slots: prev[i].slots.map((s, idx) =>
-          idx === slotIdx ? { ...s, [field]: value } : s,
-        ),
-      },
-    }));
-  };
-
-  const removeSlot = (i: number, slotIdx: number) => {
-    setDisposByDay((prev) => {
-      const slots = prev[i].slots.filter((_, idx) => idx !== slotIdx);
-      return {
-        ...prev,
-        [i]: {
-          ...prev[i],
-          slots: slots.length === 0 ? [{ heure_debut: "09:00", heure_fin: "18:00" }] : slots,
-        },
-      };
-    });
-  };
-
   const handleSave = async () => {
-    const dispos = Object.entries(disposByDay)
-      .filter(([, d]) => d.actif)
-      .flatMap(([jourStr, d]) =>
-        d.slots.map((s) => ({
-          jour_semaine: Number(jourStr),
-          heure_debut: s.heure_debut,
-          heure_fin: s.heure_fin,
-          actif: true,
-        })),
-      );
-
     setSaving(true);
     try {
       const res = await fetch("/api/sophrologue/disponibilites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sophrologue_id: sophrologueId, dispos, delai }),
+        body: JSON.stringify({
+          sophrologue_id: sophrologueId,
+          delai,
+          delaiOnly: true,
+        }),
       });
       if (!res.ok) {
-        const j = await res.json();
+        const j = (await res.json()) as { error?: string };
         showToast(j.error ?? "Erreur lors de la sauvegarde.", false);
         return;
       }
-      showToast("Disponibilités enregistrées.");
+      showToast("Paramètres de réservation enregistrés.");
     } finally {
       setSaving(false);
     }
@@ -816,103 +745,38 @@ function TabDisponibilites({
 
   return (
     <div className="space-y-6">
-      {/* Jours + heures */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700">Jours et horaires</h3>
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {JOURS.map((label, i) => {
-            const d = disposByDay[i] ?? { actif: false, slots: [{ heure_debut: "09:00", heure_fin: "18:00" }] };
-            return (
-              <div
-                key={i}
-                className={`flex flex-wrap items-start gap-4 border-b border-slate-100 px-5 py-3 last:border-0 ${
-                  !d.actif ? "opacity-50" : ""
-                }`}
-              >
-                {/* Toggle jour */}
-                <label className="flex w-28 cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={d.actif}
-                    onChange={(e) => updateDayActif(i, e.target.checked)}
-                    className="h-4 w-4 rounded accent-[#426F59]"
-                  />
-                  <span className="text-sm font-medium text-slate-800">{label}</span>
-                </label>
+      <p className="text-sm text-slate-600">
+        Les <strong>horaires d&apos;ouverture</strong> et les précisions affichées sur votre vitrine se
+        configurent dans l&apos;onglet <strong>Cabinet / vitrine</strong>. Ici vous réglez le{" "}
+        <strong>délai minimum</strong> entre une réservation et le début de la séance (règle appliquée au
+        parcours de réservation en ligne).
+      </p>
 
-                {/* Plages horaires */}
-                <div className="flex-1 space-y-2">
-                  {d.actif && d.slots.map((slot, slotIdx) => (
-                    <div key={slotIdx} className="flex items-center gap-2">
-                      <input
-                        type="time"
-                        value={slot.heure_debut}
-                        onChange={(e) => updateSlot(i, slotIdx, "heure_debut", e.target.value)}
-                        className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#426F59]/30"
-                      />
-                      <span className="text-xs text-slate-400">à</span>
-                      <input
-                        type="time"
-                        value={slot.heure_fin}
-                        onChange={(e) => updateSlot(i, slotIdx, "heure_fin", e.target.value)}
-                        className="h-9 rounded-lg border border-slate-200 px-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#426F59]/30"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeSlot(i, slotIdx)}
-                        disabled={d.slots.length <= 1}
-                        className="text-slate-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Supprimer la plage"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                  {d.actif && (
-                    <button
-                      type="button"
-                      onClick={() => addSlot(i)}
-                      className="text-xs font-medium text-[#426F59] hover:underline"
-                    >
-                      + Ajouter une plage
-                    </button>
-                  )}
-                </div>
-
-                {d.actif && (
-                  <span className="ml-auto flex items-center gap-1 text-xs text-[#426F59]">
-                    <Check className="h-3.5 w-3.5" /> Disponible
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Délai minimum */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-slate-700">
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
+        <h3 className="text-sm font-semibold text-slate-800">
           Délai minimum avant réservation
         </h3>
         <select
           value={delai}
           onChange={(e) => setDelai(Number(e.target.value))}
-          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#426F59]/30"
         >
           {DELAIS.map((d) => (
-            <option key={d.value} value={d.value}>{d.label}</option>
+            <option key={d.value} value={d.value}>
+              {d.label}
+            </option>
           ))}
         </select>
         <p className="text-xs text-slate-500">
-          Les clients ne pourront pas réserver moins de {DELAIS.find((d) => d.value === delai)?.label.toLowerCase()} avant la séance.
+          Les clients ne pourront pas réserver moins de{" "}
+          {DELAIS.find((d) => d.value === delai)?.label.toLowerCase()} avant la séance.
         </p>
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
+        <Button onClick={() => void handleSave()} disabled={saving} className="gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Enregistrer les disponibilités
+          Enregistrer
         </Button>
       </div>
     </div>
@@ -932,15 +796,31 @@ export default function ParametresPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
+  const refetchSophrologue = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("sophrologues")
+      .select(SOPHROLOGUE_SELECT)
+      .eq("user_id", user.id)
+      .maybeSingle<Sophrologue>();
+    if (data) setSophrologue(data);
+  }, [supabase]);
+
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
+      if (!user || cancelled) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
 
       const { data } = await supabase
         .from("sophrologues")
-        .select("id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, code_postal, photo_url")
+        .select(SOPHROLOGUE_SELECT)
         .eq("user_id", user.id)
         .maybeSingle<Sophrologue>();
 
@@ -975,7 +855,7 @@ export default function ParametresPage() {
         <div>
           <h1 className="text-2xl font-semibold text-[#1E3A5F]">Paramètres</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Gérez votre profil, vos types de séances et vos disponibilités.
+            Gérez votre profil, vos séances, disponibilités et la vitrine de votre cabinet.
           </p>
         </div>
 
@@ -994,6 +874,14 @@ export default function ParametresPage() {
           )}
           {tab === "disponibilites" && (
             <TabDisponibilites sophrologueId={sophrologue.id} showToast={showToast} />
+          )}
+          {tab === "cabinet" && (
+            <CabinetVitrineTab
+              sophrologue={sophrologue}
+              supabase={supabase}
+              showToast={showToast}
+              refetchSophrologue={refetchSophrologue}
+            />
           )}
         </div>
       </div>

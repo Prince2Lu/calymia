@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Mail,
   Settings,
+  CreditCard,
   LogOut,
 } from "lucide-react";
 
@@ -57,23 +58,16 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Mail className="h-4 w-4" />,
   },
   {
+    label: "Abonnement",
+    href: "/dashboard/abonnement",
+    icon: <CreditCard className="h-4 w-4" />,
+  },
+  {
     label: "Paramètres",
     href: "/parametres",
     icon: <Settings className="h-4 w-4" />,
   },
 ];
-
-// ─── Plan badge ───────────────────────────────────────────────────────────────
-
-function PlanBadge({ plan }: { plan: string | null }) {
-  if (!plan) return null;
-  const label = plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase();
-  return (
-    <span className="inline-block rounded-full bg-[#426F59] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-      {label}
-    </span>
-  );
-}
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -173,6 +167,25 @@ export default function Sidebar() {
 
       {/* ── Pied de sidebar ──────────────────────────────────────── */}
       <div className="border-t border-[#E5E7EB] px-4 py-4">
+        <div className="mb-3 border-b border-gray-100 px-0 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Plan actuel</span>
+            <span
+              className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${
+                (sophrologue?.plan ?? "").toLowerCase() === "essentiel"
+                  ? "bg-gray-100 text-gray-600"
+                  : (sophrologue?.plan ?? "").toLowerCase() === "professionnel"
+                    ? "bg-[#EAF3DE] text-[#3B6D11]"
+                    : (sophrologue?.plan ?? "").toLowerCase() === "cabinet"
+                      ? "bg-[#EEF2FF] text-[#4338CA]"
+                      : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {sophrologue?.plan ?? "—"}
+            </span>
+          </div>
+        </div>
+
         {/* Infos utilisateur */}
         <div className="mb-3 flex items-center gap-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F0F7F4] text-xs font-bold text-[#426F59]">
@@ -182,7 +195,6 @@ export default function Sidebar() {
             <p className="truncate text-sm font-medium text-[#426F59]">
               {fullName}
             </p>
-            <PlanBadge plan={sophrologue?.plan ?? null} />
           </div>
         </div>
 

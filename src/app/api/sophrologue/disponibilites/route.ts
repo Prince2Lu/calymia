@@ -13,15 +13,71 @@ type DispoInput = {
   actif: boolean;
 };
 
+async function upsertDelaiMinReservation(
+  sophrologue_id: string,
+  delai: number,
+): Promise<{ error?: string }> {
+  const { data: existing } = await supabase
+    .from("parametres_cabinet")
+    .select("sophrologue_id")
+    .eq("sophrologue_id", sophrologue_id)
+    .maybeSingle();
+
+  if (existing) {
+    const { error: updateError } = await supabase
+      .from("parametres_cabinet")
+      .update({ delai_min_reservation_heures: Number(delai) })
+      .eq("sophrologue_id", sophrologue_id);
+
+    if (updateError) {
+      console.error("[sophrologue/disponibilites] update params:", updateError);
+      return { error: updateError.message };
+    }
+  } else {
+    const { error: insertParamError } = await supabase
+      .from("parametres_cabinet")
+      .insert({ sophrologue_id, delai_min_reservation_heures: Number(delai) });
+
+    if (insertParamError) {
+      console.error("[sophrologue/disponibilites] insert params:", insertParamError);
+      return { error: insertParamError.message };
+    }
+  }
+  return {};
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { sophrologue_id, dispos, delai } = (await request.json()) as {
+    const { sophrologue_id, dispos, delai, delaiOnly } = (await request.json()) as {
       sophrologue_id: string;
-      dispos: DispoInput[];
-      delai: number;
+      dispos?: DispoInput[];
+      delai?: number;
+      delaiOnly?: boolean;
     };
 
-    if (!sophrologue_id || !Array.isArray(dispos)) {
+    if (!sophrologue_id) {
+      return NextResponse.json(
+        { error: "sophrologue_id est requis." },
+        { status: 400 },
+      );
+    }
+
+    /** Mise à jour du délai sans toucher aux lignes `disponibilites` (onglet Paramètres). */
+    if (delaiOnly === true) {
+      if (delai == null) {
+        return NextResponse.json(
+          { error: "delai est requis." },
+          { status: 400 },
+        );
+      }
+      const { error } = await upsertDelaiMinReservation(sophrologue_id, delai);
+      if (error) {
+        return NextResponse.json({ error }, { status: 500 });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (!Array.isArray(dispos)) {
       return NextResponse.json(
         { error: "sophrologue_id et dispos sont requis." },
         { status: 400 },
@@ -58,32 +114,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[sophrologue/disponibilites] ${rows.length} lignes sauvegardées pour sophrologue ${sophrologue_id}`);
 
-    // Upsert du délai dans parametres_cabinet
     if (delai != null) {
-      // Essayer UPDATE d'abord, puis INSERT si aucune ligne trouvée
-      const { data: existing } = await supabase
-        .from("parametres_cabinet")
-        .select("sophrologue_id")
-        .eq("sophrologue_id", sophrologue_id)
-        .maybeSingle();
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from("parametres_cabinet")
-          .update({ delai_min_reservation_heures: Number(delai) })
-          .eq("sophrologue_id", sophrologue_id);
-
-        if (updateError) {
-          console.error("[sophrologue/disponibilites] update params:", updateError);
-        }
-      } else {
-        const { error: insertParamError } = await supabase
-          .from("parametres_cabinet")
-          .insert({ sophrologue_id, delai_min_reservation_heures: Number(delai) });
-
-        if (insertParamError) {
-          console.error("[sophrologue/disponibilites] insert params:", insertParamError);
-        }
+      const { error } = await upsertDelaiMinReservation(sophrologue_id, delai);
+      if (error) {
+        return NextResponse.json({ error }, { status: 500 });
       }
     }
 

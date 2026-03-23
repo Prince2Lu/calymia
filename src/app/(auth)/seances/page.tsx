@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import NoteSeance from "@/components/dashboard/NoteSeance";
+import { PlanGuard } from "@/components/plan/PlanGuard";
+import { normalizePlan } from "@/hooks/usePlan";
 import {
   addParisCalendarDays,
   formatParisTime,
@@ -212,12 +214,17 @@ function SeanceDrawer({
           {(seance.statut === "confirmee" || seance.statut === "terminee") &&
             seance.patient_id && (
               <section className="border-t border-[#d1d5db] pt-4">
-                <NoteSeance
-                  seanceId={seance.id}
-                  patientId={seance.patient_id}
-                  sophrologueId={sophrologueId}
-                  plan={plan}
-                />
+                <PlanGuard
+                  requiredPlan="professionnel"
+                  currentPlan={normalizePlan(plan)}
+                  featureName="Notes de séance"
+                >
+                  <NoteSeance
+                    seanceId={seance.id}
+                    patientId={seance.patient_id}
+                    sophrologueId={sophrologueId}
+                  />
+                </PlanGuard>
               </section>
             )}
         </div>

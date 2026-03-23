@@ -1,26 +1,21 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-type SophrologueRow = {
-  id: string | number;
-  slug: string;
-  actif: boolean;
-  prenom: string | null;
-  nom: string | null;
-  ville: string | null;
-  departement: string | null;
-  bio: string | null;
-  photo_url: string | null;
-  specialites: string[] | string | null;
-  numero_rpps: string | null;
-  lien_teleconsultation: string | null;
-  adresse: string | null;
-  code_postal: string | null;
-  telephone: string | null;
-};
+import { CreditCard, Info, MapPin, Star } from "lucide-react";
+import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
+import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
+import { computeNextAvailableSlotIso } from "@/lib/booking/compute-next-slot";
+import { getParisJsDayOfWeek } from "@/lib/timezone";
+import {
+  JOURS_LABELS,
+  JOURS_SEMAINE,
+  normalizeHoraires,
+  type HorairesSophrologue,
+  type JourSemaine,
+} from "@/types/horaires";
 
 const getSupabase = () =>
   createClient(
@@ -28,39 +23,155 @@ const getSupabase = () =>
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
-const fetchSophrologueBySlug = cache(async (slug: string) => {
+type TypeSeanceRow = {
+  id: string | number;
+  nom: string | null;
+  duree_minutes: number | null;
+  tarif: number | null;
+  actif: boolean | null;
+};
+
+type SophrologuePublicRow = {
+  id: string;
+  user_id: string;
+  slug: string;
+  nom: string | null;
+  prenom: string | null;
+  bio: string | null;
+  photo_url: string | null;
+  adresse: string | null;
+  ville: string | null;
+  departement: string | null;
+  code_postal: string | null;
+  actif: boolean;
+  photos_cabinet: string[] | null;
+  horaires: unknown;
+  horaires_texte: string | null;
+  infos_pratiques: string | null;
+  modes_paiement: string[] | null;
+  formations: string[] | null;
+  certifications: string[] | null;
+  syndicats: string[] | null;
+  specialites: string[] | null;
+  types_seances: TypeSeanceRow[] | null;
+};
+
+const PUBLIC_SELECT = `
+  id,
+  user_id,
+  slug,
+  nom,
+  prenom,
+  bio,
+  photo_url,
+  adresse,
+  ville,
+  departement,
+  code_postal,
+  actif,
+  photos_cabinet,
+  horaires,
+  horaires_texte,
+  infos_pratiques,
+  modes_paiement,
+  formations,
+  certifications,
+  syndicats,
+  specialites,
+  types_seances ( id, nom, duree_minutes, tarif, actif )
+`;
+
+const fetchSophrologuePublic = cache(async (slug: string) => {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("sophrologues")
-    .select("*")
+    .select(PUBLIC_SELECT)
     .eq("slug", slug)
     .eq("actif", true)
-    .maybeSingle<SophrologueRow>();
+    .maybeSingle<SophrologuePublicRow>();
 
-  if (error) {
-    // Pour l'instant, on masque l'erreur côté public
-    return { data: null as SophrologueRow | null };
-  }
-
-  return { data };
+  if (error || !data) return null;
+  return data;
 });
 
-function normalizeSpecialites(value: SophrologueRow["specialites"]): string[] {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.filter(Boolean);
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+const MODES_LABELS: Record<string, string> = {
+  cb: "Carte bancaire",
+  cheque: "Chèque",
+  especes: "Espèces",
+};
+
+/** getParisJsDayOfWeek : 0 = dimanche … 6 = samedi */
+const JS_TO_JOUR: JourSemaine[] = [
+  "dimanche",
+  "lundi",
+  "mardi",
+  "mercredi",
+  "jeudi",
+  "vendredi",
+  "samedi",
+];
+
+const SCHEMA_DAY: Record<JourSemaine, string> = {
+  lundi: "Monday",
+  mardi: "Tuesday",
+  mercredi: "Wednesday",
+  jeudi: "Thursday",
+  vendredi: "Friday",
+  samedi: "Saturday",
+  dimanche: "Sunday",
+};
+
+function buildOpeningHoursSpecification(horaires: HorairesSophrologue) {
+  return JOURS_SEMAINE.flatMap((jour) =>
+    (horaires[jour] ?? [])
+      .filter((p) => p.debut && p.fin)
+      .map((p) => ({
+        "@type": "OpeningHoursSpecification" as const,
+        dayOfWeek: `https://schema.org/${SCHEMA_DAY[jour]}`,
+        opens: p.debut,
+        closes: p.fin,
+      })),
+  );
 }
 
-function initials(prenom?: string | null, nom?: string | null) {
-  const p = (prenom ?? "").trim();
-  const n = (nom ?? "").trim();
-  const a = p ? p[0] : "";
-  const b = n ? n[0] : "";
-  const result = `${a}${b}`.toUpperCase();
-  return result || "C";
+function formatProchain(iso: string): string {
+  const d = new Date(iso);
+  const aujourdhui = new Date();
+  const demain = new Date();
+  demain.setDate(aujourdhui.getDate() + 1);
+  if (d.toDateString() === aujourdhui.toDateString()) {
+    return `Aujourd'hui · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  if (d.toDateString() === demain.toDateString()) {
+    return `Demain · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  return d.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const formatPrix = (prix: number) =>
+  new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(prix) + " €";
+
+function slugifyVille(ville: string) {
+  return ville
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function normalizeSpecialites(value: string[] | null | undefined): string[] {
+  if (!value?.length) return [];
+  return value.filter(Boolean);
 }
 
 function specialtyLabel(raw: string) {
@@ -79,13 +190,16 @@ function specialtyLabel(raw: string) {
   return map[raw] ?? raw;
 }
 
-function specialtyColorClass(index: number) {
-  const classes = [
-    "bg-[#2E75B6]/10 text-[#1E3A5F] ring-[#2E75B6]/30",
-    "bg-[#27AE60]/10 text-[#1E3A5F] ring-[#27AE60]/30",
-    "bg-[#1E3A5F]/10 text-[#1E3A5F] ring-[#1E3A5F]/30",
-  ];
-  return classes[index % classes.length];
+function initials(prenom?: string | null, nom?: string | null) {
+  const p = (prenom ?? "").trim();
+  const n = (nom ?? "").trim();
+  const a = p ? p[0] : "";
+  const b = n ? n[0] : "";
+  return `${a}${b}`.toUpperCase() || "S";
+}
+
+function hasHorairesContenu(h: HorairesSophrologue): boolean {
+  return JOURS_SEMAINE.some((j) => (h[j] ?? []).length > 0);
 }
 
 export async function generateMetadata({
@@ -93,8 +207,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ dept: string; ville: string; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
-  const { data } = await fetchSophrologueBySlug(slug);
+  const { dept, ville, slug } = await params;
+  const data = await fetchSophrologuePublic(slug);
 
   if (!data) {
     return {
@@ -105,25 +219,31 @@ export async function generateMetadata({
 
   const prenom = data.prenom ?? "";
   const nom = data.nom ?? "";
-  const ville = data.ville ?? "";
-  const specialites = normalizeSpecialites(data.specialites)
-    .map(specialtyLabel)
-    .join(", ");
+  const city = data.ville ?? "";
+  const bio = data.bio?.trim() ?? "";
+  const desc =
+    bio.length > 0
+      ? bio.slice(0, 155) + (bio.length > 155 ? "…" : "")
+      : `Prenez rendez-vous avec ${prenom} ${nom}, sophrologue à ${city}. Séances en cabinet et à distance.`;
+
+  const canonical = `https://calymia.com/sophrologues/${dept}/${ville}/${slug}`;
 
   return {
-    title: `${prenom} ${nom} — Sophrologue à ${ville}`.trim(),
-    description: `Prenez RDV avec ${prenom} ${nom}, sophrologue à ${ville}. Spécialités : ${specialites}.`.trim(),
+    title: `${prenom} ${nom} – Sophrologue à ${city} | Calymia`.trim(),
+    description: desc,
+    openGraph: {
+      title: `${prenom} ${nom} – Sophrologue à ${city}`.trim(),
+      description: desc,
+      images: data.photo_url
+        ? [{ url: data.photo_url, width: 800, height: 600 }]
+        : [],
+      type: "profile",
+      locale: "fr_FR",
+    },
+    alternates: {
+      canonical,
+    },
   };
-}
-
-/** Transforme "Sarreguemines" → "sarreguemines", gère les accents */
-function slugifyVille(ville: string) {
-  return ville
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 export default async function SophrologueProfilPage({
@@ -131,43 +251,106 @@ export default async function SophrologueProfilPage({
 }: {
   params: Promise<{ dept: string; ville: string; slug: string }>;
 }) {
-  const { slug } = await params;
-  const { data } = await fetchSophrologueBySlug(slug);
+  const { dept, ville, slug } = await params;
+  const sophrologue = await fetchSophrologuePublic(slug);
 
-  if (!data) notFound();
+  if (!sophrologue) notFound();
 
-  const prenom = data.prenom ?? "";
-  const nom = data.nom ?? "";
-  const fullName = `${prenom} ${nom}`.trim();
-  const city = data.ville ?? "";          // toujours depuis la base de données
-  const specialites = normalizeSpecialites(data.specialites);
+  const supabase = getSupabase();
+  const prochainIso = await computeNextAvailableSlotIso(
+    supabase,
+    String(sophrologue.id),
+  );
 
-  // Construit le segment URL de la ville et du département depuis la BDD
-  // (pas depuis les params URL qui peuvent être obsolètes)
-  const villeSlug = city ? slugifyVille(city) : "ville";
-  const deptSlug = data.departement ?? "fr";
+  const horaires = normalizeHoraires(sophrologue.horaires);
+  const prenom = sophrologue.prenom ?? "";
+  const nom = sophrologue.nom ?? "";
+  const fullName = `${prenom} ${nom}`.trim() || "Sophrologue";
+  const city = sophrologue.ville ?? "";
+  const deptSlug = sophrologue.departement ?? dept;
+  const villeSlug = city ? slugifyVille(city) : ville;
+  const reserverHref = `/sophrologues/${deptSlug}/${villeSlug}/${sophrologue.slug}/reserver`;
 
-  const description = `Prenez RDV avec ${fullName}, sophrologue à ${city}. Spécialités : ${specialites
-    .map(specialtyLabel)
-    .join(", ")}.`;
+  const typesActifs =
+    sophrologue.types_seances?.filter((t) => t.actif !== false) ?? [];
+  const tarifsNum = typesActifs
+    .map((t) => Number(t.tarif))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  const prixMin = tarifsNum.length > 0 ? Math.min(...tarifsNum) : null;
+
+  const specialites = normalizeSpecialites(sophrologue.specialites).map(
+    specialtyLabel,
+  );
+  const photos = (sophrologue.photos_cabinet ?? []).filter(Boolean);
+  const modes = (sophrologue.modes_paiement ?? []).filter(Boolean);
+
+  const hasAdresse = Boolean(sophrologue.adresse?.trim());
+  const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
+  const showInfos =
+    hasAdresse || hasInfosPratiques || modes.length > 0;
+
+  const showHorairesBloc =
+    hasHorairesContenu(horaires) ||
+    Boolean(sophrologue.horaires_texte?.trim());
+
+  const formations = sophrologue.formations ?? [];
+  const certifications = sophrologue.certifications ?? [];
+  const syndicats = sophrologue.syndicats ?? [];
+  const showTags =
+    formations.length > 0 ||
+    certifications.length > 0 ||
+    syndicats.length > 0;
+
+  const showGallery = photos.length > 0;
+  const showSeances = typesActifs.length > 0;
+
+  const todayJour = JS_TO_JOUR[getParisJsDayOfWeek(new Date())];
+
+  const openingSpecs = buildOpeningHoursSpecification(horaires);
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "MedicalBusiness",
+    "@type": "Person",
     name: fullName,
-    description,
-    url: `https://calymia.fr/sophrologues/${deptSlug}/${villeSlug}/${data.slug}`,
-    image: data.photo_url || undefined,
-    telephone: data.telephone || undefined,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: data.adresse || undefined,
-      addressLocality: data.ville || undefined,
-      postalCode: data.code_postal || undefined,
-      addressCountry: "FR",
-    },
-    sameAs: data.lien_teleconsultation ? [data.lien_teleconsultation] : undefined,
+    jobTitle: "Sophrologue",
+    ...(sophrologue.bio?.trim()
+      ? { description: sophrologue.bio.trim() }
+      : {}),
+    ...(sophrologue.photo_url ? { image: sophrologue.photo_url } : {}),
+    ...(sophrologue.adresse
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: sophrologue.adresse,
+            addressLocality: city,
+            ...(sophrologue.code_postal
+              ? { postalCode: sophrologue.code_postal }
+              : {}),
+            addressCountry: "FR",
+          },
+        }
+      : {}),
+    url: `https://calymia.com/sophrologues/${dept}/${ville}/${slug}`,
+    ...(prixMin != null
+      ? { priceRange: `À partir de ${formatPrix(prixMin)}` }
+      : {}),
+    ...(openingSpecs.length > 0
+      ? { openingHoursSpecification: openingSpecs }
+      : {}),
   };
+
+  const sectionMeta = [
+    { id: "gallery", show: showGallery },
+    { id: "seances", show: showSeances },
+    { id: "infos", show: showInfos },
+    { id: "horaires", show: showHorairesBloc },
+    { id: "tags", show: showTags },
+    { id: "avis", show: true },
+  ];
+  const visibleIdx = sectionMeta
+    .map((s, i) => (s.show ? i : -1))
+    .filter((i) => i >= 0);
+  const sepBefore = (idx: number) => visibleIdx.indexOf(idx) > 0;
 
   return (
     <main className="min-h-screen bg-white">
@@ -177,167 +360,323 @@ export default async function SophrologueProfilPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="bg-gradient-to-b from-slate-50 to-white">
-        <div className="mx-auto max-w-5xl px-4 py-10">
-          <div className="grid gap-8 md:grid-cols-[240px,1fr] md:items-center">
-            <div className="flex items-center justify-center">
-              {data.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={data.photo_url}
-                  alt={`Photo de ${fullName}`}
-                  className="h-44 w-44 rounded-2xl object-cover ring-1 ring-slate-200"
-                />
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+        {/* Deux enfants DIRECTS : colonne + sidebar (classe CSS globals pour colonnes lg garanties) */}
+        <div className="sophro-public-profile-grid">
+          {/* ── Colonne gauche ───────────────────────────────────────── */}
+          <div className="min-w-0 max-w-full space-y-8">
+            <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
+              {sophrologue.photo_url ? (
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-200">
+                  <Image
+                    src={sophrologue.photo_url}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                  />
+                </div>
               ) : (
-                <div className="flex h-44 w-44 items-center justify-center rounded-2xl bg-[#1E3A5F] text-5xl font-semibold text-white ring-1 ring-slate-200">
+                <div
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-semibold text-[#426F59] font-[family-name:var(--font-playfair)]"
+                  style={{ backgroundColor: "#EAF3DE" }}
+                >
                   {initials(prenom, nom)}
                 </div>
               )}
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Image src="/logo.webp" alt="Calymia" width={120} height={48} style={{ height: "auto" }} />
-                <h1 className="text-3xl font-semibold tracking-tight text-[#1E3A5F] sm:text-4xl">
-                  {fullName || "Sophrologue"}
-                </h1>
-                <p className="text-sm text-slate-600">
-                  Sophrologue à{" "}
-                  <span className="font-medium text-slate-800">{city}</span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#426F59]">
+                  {city || "France"}
                 </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {specialites.length > 0 ? (
-                  specialites.map((s, i) => (
-                    <span
-                      key={`${s}-${i}`}
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ${specialtyColorClass(
-                        i,
-                      )}`}
-                    >
-                      {specialtyLabel(s)}
-                    </span>
-                  ))
+                <h1 className="text-[32px] font-semibold leading-tight text-slate-900 font-[family-name:var(--font-playfair)]">
+                  {fullName}
+                </h1>
+                {sophrologue.bio?.trim() ? (
+                  <SophrologueBioExpandable bio={sophrologue.bio} />
                 ) : (
-                  <span className="text-xs text-slate-500">
-                    Spécialités non renseignées
+                  <p className="text-sm italic text-slate-400">
+                    Présentation à venir.
+                  </p>
+                )}
+              </div>
+            </header>
+
+            {specialites.length > 0 && (
+              <div className="mb-8 flex flex-wrap gap-2">
+                {specialites.map((s, i) => (
+                  <span
+                    key={`${s}-${i}`}
+                    className="rounded-full bg-[#EAF3DE] px-3 py-1 text-xs font-medium text-[#3B6D11]"
+                  >
+                    {s}
                   </span>
+                ))}
+              </div>
+            )}
+
+            {sepBefore(0) && <hr className="my-10 border-slate-200" />}
+            {showGallery && (
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
+                  Le cabinet
+                </h2>
+                <CabinetPhotoGallery urls={photos} />
+              </section>
+            )}
+
+            {sepBefore(1) && <hr className="my-10 border-slate-200" />}
+            {showSeances && (
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
+                  Séances &amp; tarifs
+                </h2>
+                <ul className="divide-y divide-slate-200 border-y border-slate-200">
+                  {typesActifs.map((t) => {
+                    const duree = Number(t.duree_minutes) || 0;
+                    const tarif = Number(t.tarif);
+                    return (
+                      <li
+                        key={String(t.id)}
+                        className="flex items-center justify-between gap-4 py-3 text-sm"
+                      >
+                        <span className="text-slate-800">
+                          {t.nom ?? "Séance"} · {duree} min
+                        </span>
+                        <span className="shrink-0 font-medium text-[#426F59]">
+                          {Number.isFinite(tarif) ? formatPrix(tarif) : "—"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
+            {sepBefore(2) && <hr className="my-10 border-slate-200" />}
+            {showInfos && (
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
+                  Informations pratiques
+                </h2>
+                {hasAdresse && (
+                  <div className="flex gap-3 text-sm text-slate-700">
+                    <MapPin
+                      className="mt-0.5 h-5 w-5 shrink-0 text-[#426F59]"
+                      aria-hidden
+                    />
+                    <p>
+                      {sophrologue.adresse}
+                      <br />
+                      {sophrologue.code_postal
+                        ? `${sophrologue.code_postal} `
+                        : ""}
+                      {city}
+                    </p>
+                  </div>
+                )}
+                {hasInfosPratiques && (
+                  <div className="flex gap-3 text-sm text-slate-700">
+                    <Info
+                      className="mt-0.5 h-5 w-5 shrink-0 text-[#426F59]"
+                      aria-hidden
+                    />
+                    <p className="whitespace-pre-line">
+                      {sophrologue.infos_pratiques}
+                    </p>
+                  </div>
+                )}
+                {modes.length > 0 && (
+                  <div className="flex gap-3 text-sm text-slate-700">
+                    <CreditCard
+                      className="mt-0.5 h-5 w-5 shrink-0 text-[#426F59]"
+                      aria-hidden
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {modes.map((m) => (
+                        <span
+                          key={m}
+                          className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700"
+                        >
+                          {MODES_LABELS[m] ?? m}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {sepBefore(3) && <hr className="my-10 border-slate-200" />}
+            {showHorairesBloc && (
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
+                  Horaires
+                </h2>
+                <ul className="space-y-1 text-sm">
+                  {JOURS_SEMAINE.map((j) => {
+                    const plages = horaires[j] ?? [];
+                    const isToday = j === todayJour;
+                    return (
+                      <li
+                        key={j}
+                        className={`flex flex-col gap-0.5 rounded-lg px-2 py-2 sm:flex-row sm:justify-between sm:gap-4 ${
+                          isToday ? "bg-[#EAF3DE]/60" : ""
+                        }`}
+                      >
+                        <span className="font-medium text-slate-800">
+                          {JOURS_LABELS[j]}
+                        </span>
+                        {plages.length === 0 ? (
+                          <span className="text-slate-400 italic">Fermé</span>
+                        ) : (
+                          <span className="text-slate-700">
+                            {plages.map((p, i) => (
+                              <span key={i}>
+                                {i > 0 && " · "}
+                                {p.debut} – {p.fin}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {sophrologue.horaires_texte?.trim() && (
+                  <p className="text-sm italic text-slate-500">
+                    {sophrologue.horaires_texte}
+                  </p>
+                )}
+              </section>
+            )}
+
+            {sepBefore(4) && <hr className="my-10 border-slate-200" />}
+            {showTags && (
+              <section className="space-y-6">
+                {formations.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      Formations
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {formations.map((f, i) => (
+                        <span
+                          key={`${f}-${i}`}
+                          className="rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white"
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {certifications.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      Certifications
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {certifications.map((c, i) => (
+                        <span
+                          key={`${c}-${i}`}
+                          className="rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white"
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {syndicats.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      Syndicats
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {syndicats.map((s, i) => (
+                        <span
+                          key={`${s}-${i}`}
+                          className="rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {sepBefore(5) && <hr className="my-10 border-slate-200" />}
+            <section>
+              <h2 className="mb-3 text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
+                Avis clients
+              </h2>
+              <div className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm italic text-gray-400">
+                Les avis clients arrivent bientôt.
+              </div>
+            </section>
+          </div>
+
+          {/* ── Sidebar : enfant direct du grid (pas dans la colonne gauche) ─ */}
+          <div className="w-full space-y-4 lg:sticky lg:top-8">
+            <div className="space-y-4 rounded-2xl border border-gray-200 p-5">
+              <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-gray-100">
+                {sophrologue.photo_url ? (
+                  <Image
+                    src={sophrologue.photo_url}
+                    alt={`Portrait de ${fullName}`}
+                    fill
+                    className="object-cover"
+                    sizes="280px"
+                    priority
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-[#426F59] font-[family-name:var(--font-playfair)]">
+                    {initials(prenom, nom)}
+                  </div>
                 )}
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <a
-                  href={`/sophrologues/${deptSlug}/${villeSlug}/${data.slug}/reserver`}
-                  className="btn-primary inline-flex items-center justify-center rounded-md font-medium transition-all duration-150 bg-[#426F59] text-white hover:bg-[#355849] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 h-10 px-6 py-2 text-sm"
-                >
-                  Prendre rendez-vous
-                </a>
-                {data.lien_teleconsultation ? (
-                  <a
-                    href={data.lien_teleconsultation}
-                    className="text-sm font-medium text-[#2E75B6]"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Téléconsultation disponible
-                  </a>
-                ) : null}
+              {prixMin != null && (
+                <div className="text-center">
+                  <p className="text-[11px] text-slate-500">À partir de</p>
+                  <p className="text-[28px] font-semibold text-[#426F59] font-[family-name:var(--font-playfair)]">
+                    {formatPrix(prixMin)}
+                  </p>
+                </div>
+              )}
+
+              {prochainIso && (
+                <div className="rounded-lg bg-[#EAF3DE] px-3 py-2 text-center">
+                  <p className="text-[10px] font-semibold text-[#3B6D11]">
+                    Prochain disponible
+                  </p>
+                  <p className="text-xs font-bold text-[#426F59]">
+                    {formatProchain(prochainIso)}
+                  </p>
+                </div>
+              )}
+
+              <Link
+                href={reserverHref}
+                className="flex w-full items-center justify-center rounded-full bg-[#426F59] py-3 text-center text-sm font-medium text-white transition hover:bg-[#355849]"
+              >
+                Prendre rendez-vous
+              </Link>
+
+              <div className="border-t border-gray-100 pt-4 text-center">
+                <div className="mb-1 flex justify-center gap-0.5 text-slate-300">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className="h-4 w-4 fill-current" aria-hidden />
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500">Bientôt disponible</p>
               </div>
             </div>
           </div>
-
-          {data.lien_teleconsultation ? (
-            <div className="mt-8 rounded-2xl border border-[#2E75B6]/20 bg-[#2E75B6]/5 px-5 py-4">
-              <p className="text-sm text-slate-800">
-                <span className="font-semibold text-[#1E3A5F]">
-                  Téléconsultation
-                </span>{" "}
-                : prenez rendez-vous en visioconférence via{" "}
-                <a
-                  className="font-medium text-[#2E75B6] underline underline-offset-2"
-                  href={data.lien_teleconsultation}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  ce lien
-                </a>
-                .
-              </p>
-            </div>
-          ) : null}
         </div>
-      </div>
-
-      <div className="mx-auto max-w-5xl space-y-6 px-4 pb-14">
-        <Card>
-          <CardTitle>À propos</CardTitle>
-          <CardDescription className="mt-2 whitespace-pre-line">
-            {data.bio?.trim()
-              ? data.bio
-              : "La bio n’est pas encore renseignée."}
-          </CardDescription>
-          {data.numero_rpps ? (
-            <div className="mt-4">
-              <span className="inline-flex items-center gap-2 rounded-full bg-[#27AE60]/10 px-3 py-1 text-xs font-medium text-[#1E3A5F] ring-1 ring-[#27AE60]/30">
-                RPPS vérifié · {data.numero_rpps}
-              </span>
-            </div>
-          ) : null}
-        </Card>
-
-        <Card>
-          <CardTitle>Spécialités</CardTitle>
-          <CardDescription className="mt-2">
-            {specialites.length > 0
-              ? "Domaines d’accompagnement."
-              : "Spécialités non renseignées."}
-          </CardDescription>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {specialites.map((s, i) => (
-              <span
-                key={`${s}-list-${i}`}
-                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ${specialtyColorClass(
-                  i,
-                )}`}
-              >
-                {specialtyLabel(s)}
-              </span>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Tarifs</CardTitle>
-          <CardDescription className="mt-2">
-            Tarifs disponibles sur demande.
-          </CardDescription>
-        </Card>
-
-        <Card>
-          <CardTitle>Localisation</CardTitle>
-          <CardDescription className="mt-2">
-            {data.adresse ? (
-              <>
-                {data.adresse}
-                <br />
-                {data.code_postal ? `${data.code_postal} ` : ""}
-                {data.ville ?? ""}
-              </>
-            ) : (
-              "Adresse du cabinet non renseignée."
-            )}
-          </CardDescription>
-        </Card>
-
-        <Card>
-          <CardTitle id="planning">Planning</CardTitle>
-          <CardDescription className="mt-2">
-            Le planning de réservation sera ajouté prochainement.
-          </CardDescription>
-        </Card>
       </div>
     </main>
   );
 }
-
