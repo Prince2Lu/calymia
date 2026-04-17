@@ -1,0 +1,658 @@
+{
+  "name": "Calymia — Generation Articles v2",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6904a9c9-a1e0-46f8-896d-60c6bc8817ec",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": {}
+      },
+      "id": "aa364270-d266-449b-b10b-f3bc86f4fd27",
+      "name": "Claude API — Générer article",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        672,
+        224
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HvoZJIsIuzU8eEFp",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rawText = response.content[0].text;\n\nlet article;\ntry {\n  const cleaned = rawText.replace(/^```json\\s*/i, '').replace(/```\\s*$/i, '').trim();\n  article = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Impossible de parser la réponse Claude en JSON. Réponse brute : ' + rawText.substring(0, 500));\n}\n\nif (!article.titre_seo || !article.contenu_html || !article.slug) {\n  throw new Error('Réponse Claude incomplète — champs manquants');\n}\n\nconst prevData = $('Lire sujet suivant').first().json;\nconst subject = {\n  ...prevData,\n  categorie_id: parseInt(prevData.categorie_id),\n  mots_cles_secondaires: prevData.mots_cles_secondaires.split(',').map(s => s.trim())\n};\n\nreturn [{ json: { article, subject, filePath: '' } }];"
+      },
+      "id": "c951d56b-2273-4a40-9ce4-b86dbd143681",
+      "name": "Parser réponse Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"dall-e-3\",\"prompt\":\"={{ $json.subject.prompt_image + ' Style: clean, professional, editorial photography aesthetic. No text, no logos. High quality.' }}\",\"n\":1,\"size\":\"1792x1024\",\"quality\":\"standard\",\"response_format\":\"url\"}",
+        "options": {}
+      },
+      "id": "0de6ceb5-89b1-4184-995a-09e8e3565153",
+      "name": "DALL-E 3 — Générer image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1104,
+        224
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8Rn7KNp5X8xnDQ13",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const imageUrl = $input.first().json.data[0].url;\nconst prevData = $('Parser réponse Claude').first().json;\nreturn [{ json: { imageUrl, article: prevData.article, subject: prevData.subject, allSubjects: prevData.allSubjects, filePath: prevData.filePath } }];"
+      },
+      "id": "551a106c-49a4-4032-8d80-beee51182ecb",
+      "name": "Extraire URL image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.imageUrl}}",
+        "options": {}
+      },
+      "id": "57110d07-e3b7-472d-87fd-944187c2741e",
+      "name": "Télécharger image DALL-E",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1552,
+        224
+      ],
+      "options": {
+        "response": {
+          "response": {
+            "responseFormat": "file"
+          }
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.calymia.com/wp-json/wp/v2/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Disposition",
+              "value": "=attachment; filename=\"{{$('Extraire URL image').first().json.article.slug}}.webp\""
+            },
+            {
+              "name": "Content-Type",
+              "value": "image/webp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "c85e4b8b-4cbe-43fd-9999-5da2033f4876",
+      "name": "WordPress — Upload image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1792,
+        224
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "evraelfnbnAD6iQj",
+          "name": "WordPress Application Password"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const mediaId = parseInt($input.first().json.id);\nconst articleData = $('Extraire URL image').first().json;\nconst article = articleData.article;\nconst subject = articleData.subject;\n\n// Construire le body WP comme objet puis le stringifier\n// status 'draft' garanti — pas de risque de publication accidentelle\nconst wpBodyObj = {\n  title: article.titre_seo,\n  content: article.contenu_html,\n  slug: article.slug,\n  status: 'draft',\n  featured_media: mediaId,\n  categories: [parseInt(subject.categorie_id)]\n};\n\nreturn [{\n  json: {\n    mediaId,\n    article,\n    subject,\n    allSubjects: articleData.allSubjects,\n    filePath: articleData.filePath,\n    wpTitle: wpBodyObj.title,\n    wpContent: wpBodyObj.content,\n    wpSlug: wpBodyObj.slug,\n    wpStatus: 'draft',\n    wpFeaturedMedia: mediaId,\n    wpCategories: [parseInt(subject.categorie_id)]\n  }\n}];"
+      },
+      "id": "50245088-907f-495f-b749-1e2f12658dd4",
+      "name": "Préparer payload WordPress",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.calymia.com/wp-json/wp/v2/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $json.wpTitle }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $json.wpContent }}"
+            },
+            {
+              "name": "slug",
+              "value": "={{ $json.wpSlug }}"
+            },
+            {
+              "name": "status",
+              "value": "draft"
+            },
+            {
+              "name": "featured_media",
+              "value": "={{ $json.wpFeaturedMedia }}"
+            },
+            {
+              "name": "categories",
+              "value": "={{ $json.wpCategories }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6e433fec-8212-43f2-8c56-a0252371d82b",
+      "name": "WordPress — Créer article brouillon",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2240,
+        224
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "evraelfnbnAD6iQj",
+          "name": "WordPress Application Password"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const postId = $input.first().json.id;\nconst postStatus = $input.first().json.status;\nconst prevData = $('Préparer payload WordPress').first().json;\n\nreturn [{\n  json: {\n    id: prevData.subject.id,\n    postId: postId,\n    postStatus: postStatus,\n    postLink: 'https://www.calymia.com/?p=' + postId,\n    postTitle: prevData.article.titre_seo,\n    categorie: prevData.subject.categorie,\n    statut: 'done',\n    wp_post_id: postId,\n    date_publication: new Date().toISOString().split('T')[0]\n  }\n}];"
+      },
+      "id": "568b06dd-8311-4c2b-a307-5344e82d4c6c",
+      "name": "Marquer sujet done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Marquer sujet done').first().json;\nreturn [{\n  json: {\n    success: true,\n    message: 'Article créé avec succès. Statut : ' + data.postStatus,\n    postId: data.postId,\n    postStatus: data.postStatus,\n    postTitle: data.postTitle,\n    postLink: data.postLink\n  }\n}];"
+      },
+      "id": "fe6f993b-272e-4e64-bbbb-548d5e23d2be",
+      "name": "Résumé final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q",
+          "mode": "list",
+          "cachedResultName": "calymia-calendrier-editorial",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 765539264,
+          "mode": "list",
+          "cachedResultName": "Calendrier éditorial",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q/edit#gid=765539264"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "statut",
+              "lookupValue": "pending"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        224
+      ],
+      "id": "d0d34fb8-71b2-4de5-887e-098e01c9182b",
+      "name": "Lire sujet suivant",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q",
+          "mode": "list",
+          "cachedResultName": "calymia-calendrier-editorial",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 765539264,
+          "mode": "list",
+          "cachedResultName": "Calendrier éditorial",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q/edit#gid=765539264"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "=={{ $json.id }}",
+            "statut": "=={{ $json.statut }}",
+            "wp_post_id": "=={{ $json.wp_post_id }}",
+            "date_publication": "=={{ $json.date_publication }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "statut",
+              "displayName": "statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titre",
+              "displayName": "titre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categorie",
+              "displayName": "categorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categorie_id",
+              "displayName": "categorie_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mot_cle_principal",
+              "displayName": "mot_cle_principal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mots_cles_secondaires",
+              "displayName": "mots_cles_secondaires",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "meta_description",
+              "displayName": "meta_description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prompt_image",
+              "displayName": "prompt_image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "angle",
+              "displayName": "angle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "wp_post_id",
+              "displayName": "wp_post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_publication",
+              "displayName": "date_publication",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2688,
+        224
+      ],
+      "id": "d172cd5e-8182-4de9-a81a-73f536216dbc",
+      "name": "Marquer sujet done1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst system = \"Tu es un rédacteur expert en bien-être et thérapies douces pour le blog Calymia. Génère des articles en HTML pur en français.\\n\\nRègles absolues :\\n- Jamais de promesses médicales\\n- Toujours complémentaire au suivi médical pour les sujets santé mentale\\n- Ton chaleureux, pédagogique, accessible\\n\\nStructure obligatoire (dans cet ordre) :\\n1. Premier <p> = accroche empathique 2-3 phrases\\n2. Sommaire si > 1500 mots : <blockquote><p><strong>Dans cet article :</strong> Point 1 · Point 2</p></blockquote>\\n3. Sections <h2> et sous-sections <h3>\\n4. Au moins 1 bloc pratique — utilise EXACTEMENT ces classes :\\n\\n<div class=\\\"technique-card\\\"><div class=\\\"technique-num\\\">01</div><div><div class=\\\"technique-title\\\">Titre</div><div class=\\\"technique-desc\\\">Description.</div><span class=\\\"technique-time\\\">⏱ X minutes</span></div></div>\\n\\nOU\\n\\n<div class=\\\"calymia-exercise-card\\\"><div class=\\\"calymia-exercise-header\\\"><div class=\\\"calymia-exercise-meta\\\"><span class=\\\"calymia-exercise-num\\\">Exercice 01</span><span class=\\\"calymia-exercise-duration\\\">· X minutes</span></div><div class=\\\"calymia-exercise-title\\\">Titre</div></div><div class=\\\"calymia-exercise-body\\\"><div class=\\\"calymia-exercise-context\\\">Contexte.</div><div class=\\\"calymia-exercise-steps-label\\\">Comment pratiquer :</div><ol class=\\\"calymia-exercise-steps\\\"><li>Étape 1</li></ol><div class=\\\"calymia-exercise-tip\\\"><strong>Conseil :</strong> Astuce.</div></div></div>\\n\\n5. Highlight box : <blockquote><p><strong>À retenir :</strong> Info clé.</p></blockquote>\\n\\n6. CTA double OBLIGATOIRE :\\n<div class=\\\"calymia-cta-double\\\"><div class=\\\"calymia-cta-col calymia-cta-sophro\\\"><div class=\\\"calymia-cta-label\\\">Vous êtes sophrologue ?</div><div class=\\\"calymia-cta-title\\\">Développez votre clientèle <em>sans effort marketing</em></div><div class=\\\"calymia-cta-desc\\\">Page Google optimisée, réservation en ligne, rappels automatiques — en 3 minutes.</div><a href=\\\"https://www.calymia.com/\\\" class=\\\"calymia-cta-btn\\\">Créer mon profil gratuit →</a></div><div class=\\\"calymia-cta-col calymia-cta-client\\\"><div class=\\\"calymia-cta-label\\\">Vous cherchez un praticien ?</div><div class=\\\"calymia-cta-title\\\">Trouvez votre sophrologue <em>près de chez vous</em></div><div class=\\\"calymia-cta-desc\\\">Profils vérifiés, réservation en ligne 24h/24, séances en visio disponibles.</div><a href=\\\"https://calymia.vercel.app/inscription\\\" class=\\\"calymia-cta-btn\\\">Trouver un sophrologue →</a></div></div>\\n\\n7. Bio auteur OBLIGATOIRE :\\n<div class=\\\"calymia-author-bio\\\"><div class=\\\"calymia-author-avatar\\\">MD</div><div><div class=\\\"calymia-author-name\\\">Marie Delorme</div><div class=\\\"calymia-author-title\\\">Sophrologue certifiée RNCP · Membre de la Chambre Syndicale de la Sophrologie</div><div class=\\\"calymia-author-text\\\">Marie Delorme accompagne ses clients depuis plus de 8 ans dans la gestion du stress, l'amélioration du sommeil et le développement personnel. Elle exerce en cabinet à Lyon et propose également des séances en visioconférence.</div></div></div>\\n\\nRéponds UNIQUEMENT avec un objet JSON valide, sans backticks :\\n{\\\"titre_seo\\\":\\\"55-60 chars\\\",\\\"meta_description\\\":\\\"150-160 chars\\\",\\\"slug\\\":\\\"url-tirets\\\",\\\"contenu_html\\\":\\\"HTML complet\\\"}\";\n\nconst userMessage = \"Génère un article de blog Calymia. Titre : \" + d.titre + \". Catégorie : \" + d.categorie + \". Mot-clé principal : \" + d.mot_cle_principal + \". Mots-clés secondaires : \" + d.mots_cles_secondaires + \". Angle éditorial : \" + d.angle + \". Longueur cible : 1200 à 2000 mots.\";\n\nconst body = {\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 16000,\n  system: system,\n  messages: [{ role: \"user\", content: userMessage }]\n};\n\nconst bodyStr = JSON.stringify(body);\n\nif (!bodyStr.startsWith('{')) {\n  throw new Error('Body invalide : ' + bodyStr.substring(0, 100));\n}\n\nreturn [{ json: { ...d, claudeBody: bodyStr } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        224
+      ],
+      "id": "bb921dbd-1779-45a0-b5ea-cc648e8d105e",
+      "name": "Préparer body Claude"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire sujet suivant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude API — Générer article": {
+      "main": [
+        [
+          {
+            "node": "Parser réponse Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser réponse Claude": {
+      "main": [
+        [
+          {
+            "node": "DALL-E 3 — Générer image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DALL-E 3 — Générer image": {
+      "main": [
+        [
+          {
+            "node": "Extraire URL image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire URL image": {
+      "main": [
+        [
+          {
+            "node": "Télécharger image DALL-E",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Télécharger image DALL-E": {
+      "main": [
+        [
+          {
+            "node": "WordPress — Upload image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WordPress — Upload image": {
+      "main": [
+        [
+          {
+            "node": "Préparer payload WordPress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer payload WordPress": {
+      "main": [
+        [
+          {
+            "node": "WordPress — Créer article brouillon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WordPress — Créer article brouillon": {
+      "main": [
+        [
+          {
+            "node": "Marquer sujet done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marquer sujet done": {
+      "main": [
+        [
+          {
+            "node": "Marquer sujet done1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire sujet suivant": {
+      "main": [
+        [
+          {
+            "node": "Préparer body Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marquer sujet done1": {
+      "main": [
+        [
+          {
+            "node": "Résumé final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer body Claude": {
+      "main": [
+        [
+          {
+            "node": "Claude API — Générer article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8e779084-e45d-4bd0-b343-e2ed0cc1992b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "Uh6TLAb7qNJOBCC1",
+  "tags": []
+}

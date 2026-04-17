@@ -1,0 +1,73 @@
+{
+  "name": "Calymia — Post-séance",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/15 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "b293b77a-52aa-4d3d-952b-7ec470299740",
+      "name": "Schedule Post-séance",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.com') + '/api/cron/post-seance' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CRON_SECRET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d7afd3f7-0919-48dc-86e4-304dd11539d0",
+      "name": "HTTP Post-séance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Post-séance": {
+      "main": [
+        [
+          {
+            "node": "HTTP Post-séance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "42a79eac-3796-41b5-9c39-5b389bcd7951",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "jp2IA2iK7Ps8Dx9C",
+  "tags": []
+}

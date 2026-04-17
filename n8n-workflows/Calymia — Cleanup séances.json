@@ -1,0 +1,73 @@
+{
+  "name": "Calymia — Cleanup séances",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "1231aa94-e1b4-48b6-9d42-62a066aa753c",
+      "name": "Schedule Cleanup",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.com') + '/api/reservations/cleanup' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CRON_SECRET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8ba29af7-afe8-48e9-881e-51e01e5ffdb1",
+      "name": "HTTP Cleanup séances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Cleanup": {
+      "main": [
+        [
+          {
+            "node": "HTTP Cleanup séances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8c958b51-58cd-4f5a-8295-3c74a65dc489",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "uO0HpThsObQk4pVF",
+  "tags": []
+}

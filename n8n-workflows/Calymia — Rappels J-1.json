@@ -1,0 +1,73 @@
+{
+  "name": "Calymia — Rappels J-1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "dfbb8471-a1cc-4349-b6ea-a65e8d13e84c",
+      "name": "Schedule Rappels J-1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.vercel.app') + '/api/cron/rappels-j1' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CRON_SECRET }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f151aa10-9bd8-4b25-823c-04e3240b3597",
+      "name": "HTTP Rappels J-1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Rappels J-1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Rappels J-1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0cb6e44d-9267-4bca-8b8d-31d6eb2ec1c3",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "fBlGY5XLZHanWIlh",
+  "tags": []
+}
