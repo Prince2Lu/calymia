@@ -10,7 +10,10 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { sophrologue_id } = (await request.json()) as { sophrologue_id?: string };
+    const { sophrologue_id, public_url } = (await request.json()) as {
+      sophrologue_id?: string;
+      public_url?: string;
+    };
 
     if (!sophrologue_id) {
       return NextResponse.json(
@@ -21,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const { data: sophrologue, error } = await supabase
       .from("sophrologues")
-      .select("prenom, email")
+      .select("prenom, email, slug, ville, departement")
       .eq("id", sophrologue_id)
       .single();
 
@@ -31,6 +34,15 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       );
     }
+
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://calymia.vercel.app";
+    const dept = (sophrologue.departement ?? "").toLowerCase().replace(/\s+/g, "-");
+    const ville = (sophrologue.ville ?? "").toLowerCase().replace(/\s+/g, "-");
+    const profileUrl =
+      public_url ??
+      (sophrologue.slug
+        ? `${base}/sophrologues/${dept}/${ville}/${sophrologue.slug}`
+        : null);
 
     const email = sophrologue.email ?? null;
     if (!email) {
@@ -42,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     const html = welcomeSophrologue({
       prenom: sophrologue.prenom ?? "Sophrologue",
+      publicUrl: profileUrl ?? undefined,
     });
 
     const result = await sendEmail({

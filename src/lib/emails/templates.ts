@@ -38,11 +38,28 @@ function baseLayout(content: string): string {
 </html>`;
 }
 
-export function welcomeSophrologue({ prenom }: { prenom: string }): string {
+export function welcomeSophrologue({
+  prenom,
+  publicUrl,
+}: {
+  prenom: string;
+  publicUrl?: string;
+}): string {
+  const urlBlock = publicUrl
+    ? `
+    <div style="margin:24px 0;padding:16px;background:#F0F7F4;border-radius:8px;border:1px solid #C8DDD4;">
+      <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#426F59;">Votre page publique Calymia</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#6B7280;">Partagez cette URL à vos clients pour qu'ils puissent vous trouver et réserver en ligne :</p>
+      <p style="margin:0 0 12px;font-size:13px;word-break:break-all;"><a href="${publicUrl}" style="color:#426F59;font-weight:600;">${publicUrl}</a></p>
+      <p style="margin:0;"><a href="${publicUrl}" style="display:inline-block;background:#426F59;color:#ffffff!important;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Voir ma page publique →</a></p>
+    </div>`
+    : "";
+
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom},</p>
     <p style="margin:0 0 16px;">Bienvenue sur Calymia ! Votre espace sophrologue est prêt.</p>
     <p style="margin:0 0 16px;">Vous pouvez dès à présent configurer votre profil, vos disponibilités et vos types de séances pour recevoir vos premiers clients en ligne.</p>
+    ${urlBlock}
     <p style="margin:0 0 16px;">Si vous avez des questions, n'hésitez pas à nous contacter.</p>
     <p style="margin:24px 0 0;">À bientôt,<br><strong>L'équipe Calymia</strong></p>
   `;

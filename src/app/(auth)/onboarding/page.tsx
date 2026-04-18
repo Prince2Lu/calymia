@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Loader2 } from "lucide-react";
@@ -141,6 +141,10 @@ export default function OnboardingPage() {
   const [nom, setNom] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slug, setSlug] = useState("");
+  const [villeSlug, setVilleSlug] = useState("");
+  const [departement, setDepartement] = useState("");
+  const [copied, setCopied] = useState(false);
   const router = useRouter();
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,19 +171,37 @@ export default function OnboardingPage() {
       if (!cancelled) setAuthUserId(user.id);
       const { data } = await supabase
         .from("sophrologues")
-        .select("id, prenom, nom")
+        .select("id, prenom, nom, slug, ville, departement")
         .eq("user_id", user.id)
-        .maybeSingle<{ id: string; prenom: string | null; nom: string | null }>();
+        .maybeSingle<{
+          id: string;
+          prenom: string | null;
+          nom: string | null;
+          slug: string | null;
+          ville: string | null;
+          departement: string | null;
+        }>();
       if (!cancelled && data?.id) {
         setSophrologueId(data.id);
         setPrenom(data.prenom ?? "");
         setNom(data.nom ?? "");
+        setSlug(data.slug ?? "");
+        setVilleSlug(data.ville ?? "");
+        setDepartement(data.departement ?? "");
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [supabase]);
+
+  const publicUrl = useMemo(() => {
+    if (!slug || !villeSlug || !departement) return null;
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://calymia.vercel.app";
+    const dept = departement.toLowerCase().replace(/\s+/g, "-");
+    const ville = villeSlug.toLowerCase().replace(/\s+/g, "-");
+    return `${base}/sophrologues/${dept}/${ville}/${slug}`;
+  }, [slug, villeSlug, departement]);
 
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   const skipVitrineStep = () => setStep(5);
@@ -511,7 +533,10 @@ export default function OnboardingPage() {
         await fetch("/api/emails/welcome-sophrologue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sophrologue_id: sophrologueId }),
+          body: JSON.stringify({
+            sophrologue_id: sophrologueId,
+            public_url: publicUrl ?? undefined,
+          }),
         });
       } catch {
         // Ignoré — l'email ne doit pas bloquer la redirection
@@ -1021,6 +1046,57 @@ export default function OnboardingPage() {
 
             {step === 5 && (
               <section className="space-y-4 text-sm text-slate-800">
+                {publicUrl && (
+                  <div className="space-y-3 rounded-xl border-2 border-[#426F59]/30 bg-[#F0F7F4] p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#426F59]">
+                        <svg
+                          className="h-4 w-4 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-semibold text-[#426F59]">
+                        Votre page publique est prête !
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Partagez cette URL à vos clients :
+                    </p>
+                    <div className="flex items-center gap-2 rounded-lg border border-[#426F59]/20 bg-white px-3 py-2">
+                      <code className="flex-1 truncate text-xs text-slate-700">
+                        {publicUrl}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(publicUrl);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="shrink-0 rounded-md bg-[#426F59] px-2 py-1 text-xs font-medium text-white hover:bg-[#355447]"
+                      >
+                        {copied ? "Copié !" : "Copier"}
+                      </button>
+                    </div>
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[#426F59] hover:underline"
+                    >
+                      Voir ma page publique →
+                    </a>
+                  </div>
+                )}
                 <div>
                   <h2 className="text-sm font-semibold text-[#426F59]">
                     Profil public
