@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, CalendarDays } from "lucide-react";
+import { DEPARTEMENTS } from "@/lib/departements";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,11 +27,42 @@ function slugify(value: string) {
 function SophrologueForm({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedDeptCode, setSelectedDeptCode] = useState("");
+  const [villeInput, setVilleInput] = useState("");
+  const [villeSuggestions, setVilleSuggestions] = useState<string[]>([]);
+  const [villeSuggestionsOpen, setVilleSuggestionsOpen] = useState(false);
+  const [villeLoading, setVilleLoading] = useState(false);
   const router = useRouter();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
+
+  const fetchVilles = async (codeDept: string, search: string) => {
+    if (!codeDept || search.length < 2) {
+      setVilleSuggestions([]);
+      setVilleSuggestionsOpen(false);
+      return;
+    }
+    setVilleLoading(true);
+    try {
+      const res = await fetch(
+        `https://geo.api.gouv.fr/communes?codeDepartement=${codeDept}&fields=nom&format=json&limit=100`,
+      );
+      const data = (await res.json()) as { nom: string }[];
+      const filtered = data
+        .map((c) => c.nom)
+        .filter((nom) => nom.toLowerCase().includes(search.toLowerCase()))
+        .slice(0, 8);
+      setVilleSuggestions(filtered);
+      setVilleSuggestionsOpen(filtered.length > 0);
+    } catch {
+      setVilleSuggestions([]);
+      setVilleSuggestionsOpen(false);
+    } finally {
+      setVilleLoading(false);
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -42,12 +74,23 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
     const password = fd.get("password")?.toString() ?? "";
     const prenom = fd.get("prenom")?.toString().trim() ?? "";
     const nom = fd.get("nom")?.toString().trim() ?? "";
-    const ville = fd.get("ville")?.toString().trim() ?? "";
-    const departement = fd.get("departement")?.toString().trim() ?? "";
+    const deptObj = DEPARTEMENTS.find((d) => d.code === selectedDeptCode);
+    const departement = deptObj?.slug ?? "";
+    const ville = villeInput.trim();
     const plan = fd.get("plan")?.toString() ?? "essentiel";
 
-    if (!email || !password || !prenom || !nom || !ville || !departement) {
+    if (!email || !password || !prenom || !nom) {
       setError("Merci de remplir tous les champs obligatoires.");
+      setLoading(false);
+      return;
+    }
+    if (!selectedDeptCode || !deptObj) {
+      setError("Merci de sélectionner un département.");
+      setLoading(false);
+      return;
+    }
+    if (!ville) {
+      setError("Merci de renseigner votre ville.");
       setLoading(false);
       return;
     }
@@ -108,13 +151,65 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
+        <div className="relative space-y-1">
           <label htmlFor="ville" className="text-sm font-medium text-slate-800">Ville</label>
-          <Input id="ville" name="ville" required />
+          <Input
+            id="ville"
+            value={villeInput}
+            autoComplete="off"
+            required
+            placeholder="Commencez à taper..."
+            onChange={(e) => {
+              setVilleInput(e.target.value);
+              void fetchVilles(selectedDeptCode, e.target.value);
+            }}
+            onBlur={() => setTimeout(() => setVilleSuggestionsOpen(false), 150)}
+            onFocus={() => {
+              if (villeSuggestions.length > 0) setVilleSuggestionsOpen(true);
+            }}
+          />
+          {villeSuggestionsOpen && villeSuggestions.length > 0 && (
+            <ul className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-md">
+              {villeLoading ? (
+                <li className="px-3 py-2 text-xs text-slate-400">Chargement...</li>
+              ) : (
+                villeSuggestions.map((ville) => (
+                  <li
+                    key={ville}
+                    className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-[#F0F7F4] hover:text-[#426F59]"
+                    onMouseDown={() => {
+                      setVilleInput(ville);
+                      setVilleSuggestionsOpen(false);
+                    }}
+                  >
+                    {ville}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
         <div className="space-y-1">
           <label htmlFor="departement" className="text-sm font-medium text-slate-800">Département</label>
-          <Input id="departement" name="departement" required />
+          <select
+            id="departement"
+            name="departement"
+            required
+            value={selectedDeptCode}
+            onChange={(e) => {
+              setSelectedDeptCode(e.target.value);
+              setVilleInput("");
+              setVilleSuggestions([]);
+            }}
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#426F59]"
+          >
+            <option value="">Sélectionnez un département</option>
+            {DEPARTEMENTS.map((dept) => (
+              <option key={dept.code} value={dept.code}>
+                {dept.code} — {dept.nom}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
