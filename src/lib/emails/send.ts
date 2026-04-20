@@ -1,7 +1,7 @@
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+const resend = new Resend(process.env.RESEND_API_KEY!);
 
 /** Métadonnées optionnelles pour alimenter le journal `communications` */
 export type EmailJournalLog = {
@@ -66,12 +66,15 @@ export async function sendEmail({
   log?: EmailJournalLog;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    await sgMail.send({
+    const { error: resendError } = await resend.emails.send({
+      from: "Calymia <noreply@calymia.com>",
       to,
-      from: { email: "noreply@calymia.com", name: "Calymia" },
       subject,
       html,
     });
+    if (resendError) {
+      throw new Error(resendError.message);
+    }
     console.log(`[email] Envoyé à ${to} — ${subject}`);
     if (log?.sophrologue_id && log.type) {
       logCommunicationEntry({
