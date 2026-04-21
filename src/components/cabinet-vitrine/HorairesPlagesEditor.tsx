@@ -5,6 +5,10 @@ import type { HorairesSophrologue, JourSemaine } from "@/types/horaires";
 import { JOURS_LABELS, JOURS_SEMAINE } from "@/types/horaires";
 
 const MAX_PLAGES_PAR_JOUR = 3;
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) =>
+  String(i).padStart(2, "0"),
+);
+const MINUTE_OPTIONS = ["00", "15", "30", "45"] as const;
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map((x) => Number(x));
@@ -56,6 +60,28 @@ export function HorairesPlagesEditor({ horaires, onChange }: Props) {
     setDayPlages(jour, cur);
   };
 
+  const splitTime = (value: string): { hour: string; minute: string } => {
+    if (!value || !value.includes(":")) return { hour: "", minute: "" };
+    const [hour, minute] = value.split(":");
+    return { hour: hour ?? "", minute: minute ?? "" };
+  };
+
+  const updateTimePart = (
+    jour: JourSemaine,
+    index: number,
+    field: "debut" | "fin",
+    part: "hour" | "minute",
+    value: string,
+  ) => {
+    const current = horaires[jour]?.[index]?.[field] ?? "";
+    const parsed = splitTime(current);
+    const nextHour = part === "hour" ? value : parsed.hour;
+    const nextMinute = part === "minute" ? value : parsed.minute;
+    const nextTime =
+      nextHour !== "" && nextMinute !== "" ? `${nextHour}:${nextMinute}` : "";
+    updatePlage(jour, index, field, nextTime);
+  };
+
   return (
     <div className="space-y-6">
       {JOURS_SEMAINE.map((jour) => {
@@ -92,23 +118,93 @@ export function HorairesPlagesEditor({ horaires, onChange }: Props) {
                         <span className="text-xs text-slate-500">
                           Plage {idx + 1}
                         </span>
-                        <input
-                          type="time"
-                          value={p.debut}
-                          onChange={(e) =>
-                            updatePlage(jour, idx, "debut", e.target.value)
-                          }
-                          className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900"
-                        />
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={splitTime(p.debut).hour}
+                            onChange={(e) =>
+                              updateTimePart(
+                                jour,
+                                idx,
+                                "debut",
+                                "hour",
+                                e.target.value,
+                              )
+                            }
+                            className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900"
+                          >
+                            <option value="">HH</option>
+                            {HOUR_OPTIONS.map((h) => (
+                              <option key={`start-hour-${h}`} value={h}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-slate-400">:</span>
+                          <select
+                            value={splitTime(p.debut).minute}
+                            onChange={(e) =>
+                              updateTimePart(
+                                jour,
+                                idx,
+                                "debut",
+                                "minute",
+                                e.target.value,
+                              )
+                            }
+                            className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900"
+                          >
+                            <option value="">MM</option>
+                            {MINUTE_OPTIONS.map((m) => (
+                              <option key={`start-minute-${m}`} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <span className="text-slate-400">—</span>
-                        <input
-                          type="time"
-                          value={p.fin}
-                          onChange={(e) =>
-                            updatePlage(jour, idx, "fin", e.target.value)
-                          }
-                          className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900"
-                        />
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={splitTime(p.fin).hour}
+                            onChange={(e) =>
+                              updateTimePart(
+                                jour,
+                                idx,
+                                "fin",
+                                "hour",
+                                e.target.value,
+                              )
+                            }
+                            className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900"
+                          >
+                            <option value="">HH</option>
+                            {HOUR_OPTIONS.map((h) => (
+                              <option key={`end-hour-${h}`} value={h}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-slate-400">:</span>
+                          <select
+                            value={splitTime(p.fin).minute}
+                            onChange={(e) =>
+                              updateTimePart(
+                                jour,
+                                idx,
+                                "fin",
+                                "minute",
+                                e.target.value,
+                              )
+                            }
+                            className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900"
+                          >
+                            <option value="">MM</option>
+                            {MINUTE_OPTIONS.map((m) => (
+                              <option key={`end-minute-${m}`} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <button
                           type="button"
                           onClick={() => removePlage(jour, idx)}
