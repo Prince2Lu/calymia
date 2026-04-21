@@ -27,6 +27,23 @@ export const JOURS_LABELS: Record<string, string> = {
   vendredi: "Vendredi",
   samedi: "Samedi",
   dimanche: "Dimanche",
+  monday: "Lundi",
+  tuesday: "Mardi",
+  wednesday: "Mercredi",
+  thursday: "Jeudi",
+  friday: "Vendredi",
+  saturday: "Samedi",
+  sunday: "Dimanche",
+};
+
+const DAY_ALIASES_TO_FR: Record<string, JourSemaine> = {
+  monday: "lundi",
+  tuesday: "mardi",
+  wednesday: "mercredi",
+  thursday: "jeudi",
+  friday: "vendredi",
+  saturday: "samedi",
+  sunday: "dimanche",
 };
 
 export const emptyHoraires = (): HorairesSophrologue =>
@@ -42,7 +59,16 @@ function isPlageHoraire(v: unknown): v is PlageHoraire {
 export const normalizeHoraires = (raw: unknown): HorairesSophrologue => {
   if (!raw || typeof raw !== "object") return emptyHoraires();
   const result = emptyHoraires();
-  const o = raw as Record<string, unknown>;
+  const original = raw as Record<string, unknown>;
+  const o: Record<string, unknown> = { ...original };
+
+  // Compatibilité: ancien format avec clés en anglais (Monday...Sunday).
+  for (const [en, fr] of Object.entries(DAY_ALIASES_TO_FR)) {
+    if (o[fr] === undefined && o[en] !== undefined) {
+      o[fr] = o[en];
+    }
+  }
+
   for (const jour of JOURS_SEMAINE) {
     const val = o[jour];
     if (Array.isArray(val)) {

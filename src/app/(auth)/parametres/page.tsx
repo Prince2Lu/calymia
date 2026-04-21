@@ -357,33 +357,39 @@ function TabProfil({
       </div>
 
       {publicProfileUrl ? (
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3"
-          style={{ backgroundColor: "#EAF3DE" }}
-        >
-          <a
-            href={publicProfileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-w-0 items-center gap-1 text-sm font-medium underline"
-            style={{ color: "#426F59" }}
-            title="Ouvrir la page publique dans un nouvel onglet"
+        <div>
+          <p className="mb-2 text-sm text-[#6B6860]">
+            Voici le lien de votre page vitrine publique. Partagez-le avec vos clients
+            ou copiez-le pour le diffuser sur vos réseaux.
+          </p>
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3"
+            style={{ backgroundColor: "#EAF3DE" }}
           >
-            <span className="truncate">{publicProfileUrl}</span>
-            <ExternalLink className="h-4 w-4 shrink-0" />
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              void navigator.clipboard.writeText(publicProfileUrl);
-              setCopiedLink(true);
-              setTimeout(() => setCopiedLink(false), 1800);
-            }}
-            className="inline-flex items-center gap-1 rounded-md border border-[#426F59]/30 bg-white px-3 py-1.5 text-xs font-medium text-[#426F59] transition-colors hover:bg-[#f5faee]"
-          >
-            {copiedLink ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copiedLink ? "Lien copié" : "Copier le lien"}
-          </button>
+            <a
+              href={publicProfileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-w-0 items-center gap-1 text-sm font-medium underline"
+              style={{ color: "#426F59" }}
+              title="Ouvrir la page publique dans un nouvel onglet"
+            >
+              <span className="truncate">{publicProfileUrl}</span>
+              <ExternalLink className="h-4 w-4 shrink-0" />
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(publicProfileUrl);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 1800);
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-[#426F59]/30 bg-white px-3 py-1.5 text-xs font-medium text-[#426F59] transition-colors hover:bg-[#f5faee]"
+            >
+              {copiedLink ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiedLink ? "Lien copié" : "Copier le lien"}
+            </button>
+          </div>
         </div>
       ) : null}
 
