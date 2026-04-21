@@ -43,15 +43,40 @@ export async function createStripeCustomerForSophrologue({
     stripeCustomerId: customer.id,
   });
 
-  const trialEndsAtDate = new Date(
-    Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000,
-  );
+  const essentielPriceId = process.env.STRIPE_PRICE_ESSENTIEL;
+  if (!essentielPriceId) {
+    throw new Error("STRIPE_PRICE_ESSENTIEL est manquante côté serveur.");
+  }
+
+  const subscription = await stripe.subscriptions.create({
+    customer: customer.id,
+    items: [{ price: essentielPriceId }],
+    trial_period_days: TRIAL_DURATION_DAYS,
+    payment_settings: { save_default_payment_method: "on_subscription" },
+    trial_settings: { end_behavior: { missing_payment_method: "pause" } },
+    metadata: {
+      sophrologue_id: sophrologueId,
+    },
+  });
+
+  console.log("[Billing] abonnement Stripe créé", {
+    sophrologueId,
+    stripeCustomerId: customer.id,
+    subscriptionId: subscription.id,
+    status: subscription.status,
+  });
+
+  const trialEndsAtIso = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000).toISOString()
+    : new Date(
+        Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString();
 
   const { error: updateError } = await supabaseAdmin
     .from("sophrologues")
     .update({
       stripe_customer_id: customer.id,
-      trial_ends_at: trialEndsAtDate.toISOString(),
+      trial_ends_at: trialEndsAtIso,
     })
     .eq("id", sophrologueId);
 
@@ -69,11 +94,11 @@ export async function createStripeCustomerForSophrologue({
   console.log("[Billing] update sophrologues OK", {
     sophrologueId,
     stripeCustomerId: customer.id,
-    trialEndsAt: trialEndsAtDate.toISOString(),
+    trialEndsAt: trialEndsAtIso,
   });
 
   return {
     stripeCustomerId: customer.id,
-    trialEndsAt: trialEndsAtDate.toISOString(),
+    trialEndsAt: trialEndsAtIso,
   };
 }
