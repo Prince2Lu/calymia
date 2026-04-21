@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_EMAIL_TEMPLATE_ROWS } from "@/lib/email-templates/defaults";
+import { createStripeCustomerForSophrologue } from "@/lib/stripe/billing";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -13,6 +14,7 @@ const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 export async function POST(request: Request) {
   try {
+    console.log("Register API - POST start");
     const body = await request.json();
 
     const {
@@ -75,9 +77,23 @@ export async function POST(request: Request) {
       slug,
     };
 
-    console.log("Register API - insertion sophrologue", payload);
+    console.log("Register API - insertion sophrologue", {
+      userId,
+      email,
+      plan,
+      slug,
+    });
 
-    const { error } = await supabase.from("sophrologues").insert(payload);
+    const { data: sophrologue, error } = await supabase
+      .from("sophrologues")
+      .insert(payload)
+      .select("id")
+      .single<{ id: string }>();
+
+    console.log("Register API - résultat insertion sophrologue", {
+      sophrologueId: sophrologue?.id ?? null,
+      hasError: Boolean(error),
+    });
 
     if (error) {
       console.error("Register API - erreur Supabase lors de l’insertion", error);
@@ -85,6 +101,54 @@ export async function POST(request: Request) {
         {
           error:
             "Erreur lors de l’enregistrement du profil sophrologue. Merci de réessayer.",
+        },
+        { status: 500 },
+      );
+    }
+
+    if (!sophrologue?.id) {
+      console.error(
+        "Register API - insertion réussie mais id sophrologue introuvable",
+      );
+      return NextResponse.json(
+        {
+          error:
+            "Le profil sophrologue a été créé mais l’identifiant est introuvable pour finaliser la facturation.",
+        },
+        { status: 500 },
+      );
+    }
+
+    try {
+      console.log(
+        "Register API - appel createStripeCustomerForSophrologue (before)",
+        {
+          sophrologueId: sophrologue.id,
+          email,
+        },
+      );
+      await createStripeCustomerForSophrologue({
+        supabaseAdmin: supabase,
+        sophrologueId: sophrologue.id,
+        email,
+        prenom,
+        nom,
+      });
+      console.log(
+        "Register API - appel createStripeCustomerForSophrologue (after)",
+        {
+          sophrologueId: sophrologue.id,
+        },
+      );
+    } catch (stripeSetupError) {
+      console.error(
+        "Register API - erreur création customer Stripe",
+        stripeSetupError,
+      );
+      return NextResponse.json(
+        {
+          error:
+            "Le profil a été créé mais la configuration de l’abonnement Stripe a échoué. Merci de contacter le support.",
         },
         { status: 500 },
       );
@@ -123,6 +187,10 @@ export async function POST(request: Request) {
       }
     }
 
+    console.log("Register API - POST success", {
+      userId,
+      sophrologueId: sophrologue.id,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Register API - exception inattendue", error);

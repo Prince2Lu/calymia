@@ -113,6 +113,12 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
     }
 
     const slug = slugify(`${prenom}-${nom}-${ville}`);
+    console.log("[Inscription] Appel /api/auth/register", {
+      userId: user.id,
+      email,
+      plan,
+      slug,
+    });
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
