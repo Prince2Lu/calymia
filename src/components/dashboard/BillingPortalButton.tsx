@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 
-export default function BillingPortalButton() {
+type BillingPortalButtonProps = {
+  label?: string;
+  loadingLabel?: string;
+  className?: string;
+};
+
+export default function BillingPortalButton({
+  label = "Gérer mon abonnement",
+  loadingLabel = "Ouverture...",
+  className,
+}: BillingPortalButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,9 +51,12 @@ export default function BillingPortalButton() {
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="inline-flex items-center justify-center rounded-full bg-[#426F59] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#355748] disabled:cursor-not-allowed disabled:opacity-70"
+        className={
+          className ??
+          "inline-flex items-center justify-center rounded-full bg-[#426F59] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#355748] disabled:cursor-not-allowed disabled:opacity-70"
+        }
       >
-        {loading ? "Ouverture..." : "Gérer mon abonnement"}
+        {loading ? loadingLabel : label}
       </button>
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>

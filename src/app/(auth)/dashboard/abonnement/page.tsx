@@ -154,7 +154,9 @@ export default async function AbonnementPage() {
                 {plans.map((tier) => (
                   <th
                     key={tier.id}
-                    className="px-4 py-3 text-left font-semibold text-[#1E3A5F]"
+                    className={`px-4 py-3 text-left font-semibold text-[#1E3A5F] ${
+                      tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
+                    }`}
                   >
                     {tier.label} — {tier.price}
                   </th>
@@ -165,7 +167,12 @@ export default async function AbonnementPage() {
               <tr className="border-b border-slate-100">
                 <td className="px-4 py-3 font-medium text-slate-600">Clients</td>
                 {plans.map((tier) => (
-                  <td key={`${tier.id}-clients`} className="px-4 py-3 text-slate-700">
+                  <td
+                    key={`${tier.id}-clients`}
+                    className={`px-4 py-3 text-slate-700 ${
+                      tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
                     {tier.clients}
                   </td>
                 ))}
@@ -175,7 +182,12 @@ export default async function AbonnementPage() {
                   Notes de séance
                 </td>
                 {plans.map((tier) => (
-                  <td key={`${tier.id}-notes`} className="px-4 py-3 text-slate-700">
+                  <td
+                    key={`${tier.id}-notes`}
+                    className={`px-4 py-3 text-slate-700 ${
+                      tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
                     {tier.notes}
                   </td>
                 ))}
@@ -185,7 +197,12 @@ export default async function AbonnementPage() {
                   Modèles d&apos;emails
                 </td>
                 {plans.map((tier) => (
-                  <td key={`${tier.id}-emails`} className="px-4 py-3 text-slate-700">
+                  <td
+                    key={`${tier.id}-emails`}
+                    className={`px-4 py-3 text-slate-700 ${
+                      tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
                     {tier.emails}
                   </td>
                 ))}
@@ -195,7 +212,12 @@ export default async function AbonnementPage() {
                   Photos vitrine
                 </td>
                 {plans.map((tier) => (
-                  <td key={`${tier.id}-photos`} className="px-4 py-3 text-slate-700">
+                  <td
+                    key={`${tier.id}-photos`}
+                    className={`px-4 py-3 text-slate-700 ${
+                      tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
                     {tier.photos}
                   </td>
                 ))}
@@ -203,16 +225,37 @@ export default async function AbonnementPage() {
               <tr>
                 <td className="px-4 py-4 font-medium text-slate-600">Statut</td>
                 {plans.map((tier) => (
-                  <td key={`${tier.id}-status`} className="px-4 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        plan === tier.id
-                          ? "bg-[#F0F7F4] text-[#426F59]"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {plan === tier.id ? "Plan actuel" : "Disponible"}
-                    </span>
+                  <td
+                    key={`${tier.id}-status`}
+                    className={`px-4 py-4 ${
+                      tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
+                    {tier.id === "professionnel" && plan === "essentiel" ? (
+                      <BillingPortalButton
+                        label="Passer en Professionnel →"
+                        loadingLabel="Ouverture..."
+                        className="inline-flex items-center justify-center rounded-md bg-[#426F59] px-[20px] py-[10px] text-sm font-medium text-white transition-colors hover:bg-[#355748] disabled:cursor-not-allowed disabled:opacity-70"
+                      />
+                    ) : tier.id === "professionnel" && plan === "professionnel" ? (
+                      <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-xs font-semibold text-[#426F59]">
+                        Plan actuel
+                      </span>
+                    ) : tier.id === "cabinet" ? (
+                      <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                        Bientôt disponible
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          plan === tier.id
+                            ? "bg-[#F0F7F4] text-[#426F59]"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {plan === tier.id ? "Plan actuel" : "Disponible"}
+                      </span>
+                    )}
                   </td>
                 ))}
               </tr>
