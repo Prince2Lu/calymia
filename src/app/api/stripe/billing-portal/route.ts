@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
   const session = await stripe.billingPortal.sessions.create({
     customer: sophrologue.stripe_customer_id,
     return_url: `${request.nextUrl.origin}/dashboard/abonnement`,
+    locale: "fr",
   });
 
   return NextResponse.json({ url: session.url });
