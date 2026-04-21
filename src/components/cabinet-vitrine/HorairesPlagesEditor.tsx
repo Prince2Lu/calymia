@@ -63,7 +63,11 @@ export function HorairesPlagesEditor({ horaires, onChange }: Props) {
   const splitTime = (value: string): { hour: string; minute: string } => {
     if (!value || !value.includes(":")) return { hour: "", minute: "" };
     const [hour, minute] = value.split(":");
-    return { hour: hour ?? "", minute: minute ?? "" };
+    const safeHour = HOUR_OPTIONS.includes(hour ?? "") ? (hour ?? "") : "";
+    const safeMinute = MINUTE_OPTIONS.includes((minute ?? "") as (typeof MINUTE_OPTIONS)[number])
+      ? (minute ?? "")
+      : "";
+    return { hour: safeHour, minute: safeMinute };
   };
 
   const updateTimePart = (
@@ -75,10 +79,11 @@ export function HorairesPlagesEditor({ horaires, onChange }: Props) {
   ) => {
     const current = horaires[jour]?.[index]?.[field] ?? "";
     const parsed = splitTime(current);
-    const nextHour = part === "hour" ? value : parsed.hour;
-    const nextMinute = part === "minute" ? value : parsed.minute;
-    const nextTime =
-      nextHour !== "" && nextMinute !== "" ? `${nextHour}:${nextMinute}` : "";
+    const nextHour =
+      part === "hour" ? value : parsed.hour || "00";
+    const nextMinute =
+      part === "minute" ? value : parsed.minute || "00";
+    const nextTime = nextHour !== "" && nextMinute !== "" ? `${nextHour}:${nextMinute}` : "";
     updatePlage(jour, index, field, nextTime);
   };
 
