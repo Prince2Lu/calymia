@@ -48,6 +48,7 @@ type OnboardingState = {
   // Étape 2
   address: string;
   city: string;
+  department: string;
   postalCode: string;
   phone: string;
   // Étape 3 — chaque jour peut avoir plusieurs plages horaires
@@ -72,6 +73,7 @@ const INITIAL_STATE: OnboardingState = {
   teleconsultationUrl: "",
   address: "",
   city: "",
+  department: "",
   postalCode: "",
   phone: "",
   availability: {
@@ -188,6 +190,11 @@ export default function OnboardingPage() {
         setSlug(data.slug ?? "");
         setVilleSlug(data.ville ?? "");
         setDepartement(data.departement ?? "");
+        setState((prev) => ({
+          ...prev,
+          city: prev.city || data.ville || "",
+          department: prev.department || data.departement || "",
+        }));
       }
     })();
     return () => {
@@ -430,6 +437,7 @@ export default function OnboardingPage() {
         teleconsultationUrl: state.teleconsultationUrl,
         address: state.address,
         city: state.city,
+        departement: state.department,
         postalCode: state.postalCode,
         phone: state.phone,
         ...(state.photoUrl ? { photo_url: state.photoUrl } : {}),
@@ -654,6 +662,33 @@ export default function OnboardingPage() {
                   Ces informations proviennent de votre inscription. Vous pourrez les modifier
                   dans les paramètres.
                 </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-800">
+                      Ville (inscription)
+                    </label>
+                    <Input
+                      value={state.city}
+                      onChange={(e) =>
+                        setState((prev) => ({ ...prev, city: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-800">
+                      Département (inscription)
+                    </label>
+                    <Input
+                      value={state.department}
+                      onChange={(e) =>
+                        setState((prev) => ({
+                          ...prev,
+                          department: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-800">
@@ -795,6 +830,46 @@ export default function OnboardingPage() {
                     placeholder="Numéro, rue, complément..."
                   />
                 </div>
+                {state.city.trim() !== "" || state.department.trim() !== "" ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium text-slate-700">
+                        Ville et département déjà renseignés à l&apos;étape 1
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="text-xs font-medium text-[#426F59] hover:underline"
+                      >
+                        Modifier
+                      </button>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-slate-800">
+                          Ville
+                        </label>
+                        <Input
+                          value={state.city}
+                          readOnly
+                          disabled
+                          className="cursor-default bg-white text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium text-slate-800">
+                          Département
+                        </label>
+                        <Input
+                          value={state.department}
+                          readOnly
+                          disabled
+                          className="cursor-default bg-white text-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-sm font-medium text-slate-800">
@@ -822,6 +897,7 @@ export default function OnboardingPage() {
                     />
                   </div>
                 </div>
+                )}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-800">
                     Téléphone

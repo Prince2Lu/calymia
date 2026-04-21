@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       teleconsultationUrl,
       address,
       city,
+      departement,
       postalCode,
       phone,
       photo_url,
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       teleconsultationUrl?: string;
       address?: string;
       city?: string;
+      departement?: string;
       postalCode?: string;
       phone?: string;
       photo_url?: string | null;
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
     console.log("[sophrologue/update] userId reçu :", userId);
     console.log("[sophrologue/update] payload complet :", {
       prenom, nom, bio, specialties, rpps,
-      teleconsultationUrl, address, city, postalCode, phone, photo_url,
+      teleconsultationUrl, address, city, departement, postalCode, phone, photo_url,
     });
 
     if (!userId) {
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
       ...(teleconsultationUrl !== undefined && { lien_teleconsultation: teleconsultationUrl }),
       ...(address !== undefined && { adresse: address }),
       ...(city !== undefined && { ville: city }),
+      ...(departement !== undefined && { departement }),
       ...(postalCode !== undefined && { code_postal: postalCode }),
       ...(phone !== undefined && { telephone: phone }),
       ...(photo_url !== undefined && { photo_url }),

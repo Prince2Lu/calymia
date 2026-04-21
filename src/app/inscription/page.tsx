@@ -236,13 +236,17 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
         <p className="text-sm font-medium text-slate-800">Choisissez votre plan</p>
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            { value: "essentiel", label: "Essentiel", price: "29€ / mois" },
-            { value: "professionnel", label: "Professionnel", price: "59€ / mois" },
-            { value: "cabinet", label: "Cabinet", price: "139€ / mois" },
+            { value: "essentiel", label: "Essentiel", price: "29€ / mois", enabled: true },
+            { value: "professionnel", label: "Professionnel", price: "59€ / mois", enabled: true },
+            { value: "cabinet", label: "Cabinet", price: "139€ / mois", enabled: false },
           ].map((p, i) => (
             <label
               key={p.value}
-              className="flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm hover:border-[#426F59]/60 transition-colors"
+              className={`flex flex-col rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm transition-colors ${
+                p.enabled
+                  ? "cursor-pointer hover:border-[#426F59]/60"
+                  : "pointer-events-none opacity-50"
+              }`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-slate-900">{p.label}</span>
@@ -251,10 +255,16 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
                   name="plan"
                   value={p.value}
                   defaultChecked={i === 0}
+                  disabled={!p.enabled}
                   className="h-4 w-4"
                 />
               </div>
               <span className="mt-1 text-lg font-semibold text-[#426F59]">{p.price}</span>
+              {!p.enabled ? (
+                <span className="mt-2 inline-flex w-fit rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                  Bientôt disponible
+                </span>
+              ) : null}
             </label>
           ))}
         </div>
