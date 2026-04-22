@@ -100,13 +100,20 @@ export function confirmationReservation({
     : "";
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
-    <p style="margin:0 0 16px;">Votre réservation est confirmée !</p>
-    <p style="margin:0 0 16px;"><strong>Avec :</strong> ${prenom_sophrologue} ${nom_sophrologue}</p>
-    <p style="margin:0 0 16px;"><strong>Date :</strong> ${date_seance} à ${heure_seance}</p>
-    <p style="margin:0 0 16px;"><strong>Type :</strong> ${type_seance}</p>
-    <p style="margin:0 0 16px;"><strong>Montant :</strong> ${montant.toFixed(2)} €</p>
+    <p style="margin:0 0 16px;">Votre séance est confirmée 🎉 Nous sommes ravis de vous accompagner dans votre parcours de bien-être.</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 8px;">📅 <strong>${date_seance} à ${heure_seance}</strong></p>
+          <p style="margin:0 0 8px;">🧘 <strong>${type_seance}</strong></p>
+          <p style="margin:0 0 8px;">👤 Avec <strong>${prenom_sophrologue} ${nom_sophrologue}</strong></p>
+          <p style="margin:0;">💶 <strong>${montant} €</strong></p>
+        </td>
+      </tr>
+    </table>
     ${factureBlock}
-    <p style="margin:24px 0 0;">À très bientôt,<br><strong>L'équipe Calymia</strong></p>
+    <p style="margin:16px 0;">En cas d'imprévu, vous pouvez annuler votre réservation depuis votre espace client jusqu'à 24h avant la séance.</p>
+    <p style="margin:24px 0 0;">À très bientôt,<br><strong>${prenom_sophrologue} ${nom_sophrologue}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
   `;
   return baseLayout(content);
 }
@@ -202,11 +209,18 @@ export function rappelJ1({
 }): string {
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
-    <p style="margin:0 0 16px;">Ceci est un rappel : vous avez une séance de sophrologie demain.</p>
-    <p style="margin:0 0 16px;"><strong>Avec :</strong> ${prenom_sophrologue} ${nom_sophrologue}</p>
-    <p style="margin:0 0 16px;"><strong>Date :</strong> ${date_seance} à ${heure_seance}</p>
-    <p style="margin:0 0 16px;"><strong>Type :</strong> ${type_seance}</p>
-    <p style="margin:24px 0 0;">À demain,<br><strong>L'équipe Calymia</strong></p>
+    <p style="margin:0 0 16px;">Votre séance de sophrologie est <strong>demain</strong>. Voici un petit rappel pour que vous soyez prêt(e) ✨</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 8px;">📅 <strong>${date_seance} à ${heure_seance}</strong></p>
+          <p style="margin:0 0 8px;">🧘 <strong>${type_seance}</strong></p>
+          <p style="margin:0;">👤 Avec <strong>${prenom_sophrologue} ${nom_sophrologue}</strong></p>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:16px 0;">Conseil : prenez quelques minutes ce soir pour vous détendre et préparer votre esprit à la séance de demain. Une bonne nuit de sommeil fait toute la différence 🌙</p>
+    <p style="margin:24px 0 0;">À demain,<br><strong>${prenom_sophrologue} ${nom_sophrologue}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
   `;
   return baseLayout(content);
 }
@@ -217,22 +231,30 @@ export function postSeance({
   nom_sophrologue,
   type_seance,
   date_seance,
+  heure_seance,
 }: {
   prenom_client: string;
   prenom_sophrologue: string;
   nom_sophrologue: string;
   type_seance: string;
   date_seance: string;
+  heure_seance: string;
 }): string {
-  const sophroLabel = `${prenom_sophrologue} ${nom_sophrologue}`.trim() || "votre sophrologue";
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
-    <p style="margin:0 0 16px;">Nous espérons que votre séance de <strong>${type_seance}</strong> du <strong>${date_seance}</strong> avec ${sophroLabel} s'est bien passée.</p>
-    <p style="margin:0 0 16px;">Un grand merci pour votre confiance.</p>
-    <p style="margin:0 0 16px;">N'hésitez pas à réserver un nouveau créneau quand vous le souhaitez — tout se fait simplement depuis Calymia.</p>
-    <p style="margin:0 0 16px;">Vous pouvez aussi accéder à tout moment à <strong>votre espace personnel</strong> sur <a href="https://calymia.com" style="color:${BRAND};font-weight:600;">calymia.com</a> pour suivre vos rendez-vous et votre historique.</p>
-    <p style="margin:16px 0 0;"><a href="https://calymia.com" style="display:inline-block;background:${BRAND};color:#ffffff!important;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;">Accéder à mon espace</a></p>
-    <p style="margin:24px 0 0;">À très bientôt,<br><strong>L'équipe Calymia</strong></p>
+    <p style="margin:0 0 16px;">Merci d'avoir pris soin de vous aujourd'hui 🌿 Nous espérons que cette séance vous a apporté détente et sérénité.</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 8px;">📅 <strong>${date_seance} à ${heure_seance}</strong></p>
+          <p style="margin:0 0 8px;">🧘 <strong>${type_seance}</strong></p>
+          <p style="margin:0;">👤 Avec <strong>${prenom_sophrologue} ${nom_sophrologue}</strong></p>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:16px 0;">Pour prolonger les bienfaits de la séance, prenez le temps de vous hydrater, de vous reposer et d'observer ce que vous ressentez dans les prochaines heures.</p>
+    <p style="margin:16px 0;">Votre prochain rendez-vous se réserve directement en ligne, à tout moment 🗓️</p>
+    <p style="margin:24px 0 0;">Prenez soin de vous,<br><strong>${prenom_sophrologue} ${nom_sophrologue}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
   `;
   return baseLayout(content);
 }
