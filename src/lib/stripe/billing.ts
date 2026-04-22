@@ -43,14 +43,14 @@ export async function createStripeCustomerForSophrologue({
     stripeCustomerId: customer.id,
   });
 
-  const essentielPriceId = process.env.STRIPE_PRICE_ESSENTIEL;
-  if (!essentielPriceId) {
-    throw new Error("STRIPE_PRICE_ESSENTIEL est manquante côté serveur.");
+  const professionnelPriceId = process.env.STRIPE_PRICE_PROFESSIONNEL;
+  if (!professionnelPriceId) {
+    throw new Error("STRIPE_PRICE_PROFESSIONNEL est manquante côté serveur.");
   }
 
   const subscription = await stripe.subscriptions.create({
     customer: customer.id,
-    items: [{ price: essentielPriceId }],
+    items: [{ price: professionnelPriceId }],
     trial_period_days: TRIAL_DURATION_DAYS,
     payment_settings: { save_default_payment_method: "on_subscription" },
     trial_settings: { end_behavior: { missing_payment_method: "pause" } },
@@ -77,6 +77,7 @@ export async function createStripeCustomerForSophrologue({
     .update({
       stripe_customer_id: customer.id,
       trial_ends_at: trialEndsAtIso,
+      plan: "professionnel",
     })
     .eq("id", sophrologueId);
 

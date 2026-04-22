@@ -73,14 +73,14 @@ export async function POST(request: Request) {
       nom,
       ville,
       departement,
-      plan,
+      plan: "professionnel",
       slug,
     };
 
     console.log("Register API - insertion sophrologue", {
       userId,
       email,
-      plan,
+      plan: "professionnel",
       slug,
     });
 

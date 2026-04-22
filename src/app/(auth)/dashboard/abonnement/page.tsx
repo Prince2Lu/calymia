@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import BillingPortalButton from "@/components/dashboard/BillingPortalButton";
+import PlanCheckoutButtons from "@/components/dashboard/PlanCheckoutButtons";
 
 type Plan = "essentiel" | "professionnel" | "cabinet";
 
@@ -29,6 +30,17 @@ function computeTrialDaysRemaining(trialEndsAt: string | null): number {
   const remainingMs = trialEnd - Date.now();
   if (remainingMs <= 0) return 0;
   return Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+}
+
+function formatTrialEndDate(trialEndsAt: string | null): string {
+  if (!trialEndsAt) return "";
+  const d = new Date(trialEndsAt);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export default async function AbonnementPage() {
@@ -76,6 +88,15 @@ export default async function AbonnementPage() {
 
   const plan = normalizePlan(data?.plan);
   const trialDaysRemaining = computeTrialDaysRemaining(data?.trial_ends_at ?? null);
+  const trialEndDate = formatTrialEndDate(data?.trial_ends_at ?? null);
+  const trialEndTs = data?.trial_ends_at ? new Date(data.trial_ends_at).getTime() : null;
+  const nowTs = Date.now();
+  const isTrialActive = trialEndTs !== null && trialEndTs > nowTs;
+  const isTrialExpired = trialEndTs !== null && trialEndTs <= nowTs;
+  const isTrialExpiredEssentiel = isTrialExpired && plan === "essentiel";
+  const isPaidState = !isTrialActive && !isTrialExpiredEssentiel;
+  const essentielPriceId = process.env.STRIPE_PRICE_ESSENTIEL ?? null;
+  const professionnelPriceId = process.env.STRIPE_PRICE_PROFESSIONNEL ?? null;
 
   const plans: Array<{
     id: Plan;
@@ -125,24 +146,49 @@ export default async function AbonnementPage() {
           </p>
         </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-[#1E3A5F]">Mon abonnement</h2>
-          <div className="mt-4 space-y-2 text-sm text-slate-700">
-            <p>
-              Plan actuel :{" "}
-              <span className="font-semibold text-[#426F59]">{formatPlanLabel(plan)}</span>
+        {isTrialExpiredEssentiel ? (
+          <section className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+            <p className="text-sm font-medium text-orange-800">
+              Votre essai gratuit est terminé. Choisissez votre plan pour continuer
+              à utiliser Calymia.
             </p>
-            <p>
-              Jours d&apos;essai restants :{" "}
-              <span className="font-semibold text-[#426F59]">
-                {trialDaysRemaining}
+          </section>
+        ) : null}
+
+        {isTrialActive ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#1E3A5F]">Mon abonnement</h2>
+            <div className="mt-4">
+              <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-xs font-semibold text-[#426F59]">
+                Essai gratuit — {trialDaysRemaining} jours restants — Accès Professionnel complet
               </span>
+            </div>
+            <p className="mt-3 text-sm text-slate-700">
+              Profitez de toutes les fonctionnalités pendant votre essai. Choisissez
+              votre plan avant le {trialEndDate || "la fin de l'essai"} pour continuer
+              sans interruption.
             </p>
-          </div>
-          <div className="mt-5">
-            <BillingPortalButton />
-          </div>
-        </section>
+          </section>
+        ) : isPaidState ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#1E3A5F]">Mon abonnement</h2>
+            <div className="mt-4 space-y-3 text-sm text-slate-700">
+              <p>
+                Plan actuel :{" "}
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    plan === "professionnel"
+                      ? "bg-[#F0F7F4] text-[#426F59]"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {formatPlanLabel(plan)}
+                </span>
+              </p>
+              <BillingPortalButton />
+            </div>
+          </section>
+        ) : null}
 
         <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[560px] border-collapse text-sm">
@@ -231,17 +277,7 @@ export default async function AbonnementPage() {
                       tier.id === "cabinet" ? "pointer-events-none opacity-50" : ""
                     }`}
                   >
-                    {tier.id === "professionnel" && plan === "essentiel" ? (
-                      <BillingPortalButton
-                        label="Passer en Professionnel →"
-                        loadingLabel="Ouverture..."
-                        className="inline-flex items-center justify-center rounded-md bg-[#426F59] px-[20px] py-[10px] text-sm font-medium text-white transition-colors hover:bg-[#355748] disabled:cursor-not-allowed disabled:opacity-70"
-                      />
-                    ) : tier.id === "professionnel" && plan === "professionnel" ? (
-                      <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-xs font-semibold text-[#426F59]">
-                        Plan actuel
-                      </span>
-                    ) : tier.id === "cabinet" ? (
+                    {tier.id === "cabinet" ? (
                       <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
                         Bientôt disponible
                       </span>
@@ -262,6 +298,16 @@ export default async function AbonnementPage() {
             </tbody>
           </table>
         </section>
+
+        {isTrialActive || isTrialExpiredEssentiel ? (
+          <section>
+            <PlanCheckoutButtons
+              essentielPriceId={essentielPriceId}
+              professionnelPriceId={professionnelPriceId}
+              emphasized={isTrialExpiredEssentiel}
+            />
+          </section>
+        ) : null}
       </div>
     </main>
   );
