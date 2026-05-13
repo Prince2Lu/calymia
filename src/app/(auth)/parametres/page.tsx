@@ -179,7 +179,7 @@ function TabProfil({
 
   const publicProfileUrl =
     sophrologue.departement && sophrologue.ville && sophrologue.slug
-      ? `https://app.calymia.com/sophrologues/${toPathSegment(
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/sophrologues/${toPathSegment(
           sophrologue.departement,
         )}/${toPathSegment(sophrologue.ville)}/${toPathSegment(sophrologue.slug)}`
       : null;
