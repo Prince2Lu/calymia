@@ -17,6 +17,9 @@ import {
   Clock,
   CalendarDays,
   Images,
+  ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,6 +39,8 @@ type Sophrologue = {
   lien_teleconsultation: string | null;
   adresse: string | null;
   ville: string | null;
+  departement: string | null;
+  slug: string | null;
   code_postal: string | null;
   photo_url: string | null;
   photos_cabinet: string[] | null;
@@ -49,7 +54,7 @@ type Sophrologue = {
 };
 
 const SOPHROLOGUE_SELECT =
-  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
+  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
 
 type TypeSeance = {
   id: string;
@@ -146,6 +151,7 @@ function TabProfil({
   );
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const [form, setForm] = useState({
     prenom: sophrologue.prenom ?? "",
@@ -161,6 +167,22 @@ function TabProfil({
     code_postal: sophrologue.code_postal ?? "",
   });
   const [saving, setSaving] = useState(false);
+
+  const toPathSegment = (value: string | null | undefined) =>
+    (value ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  const publicProfileUrl =
+    sophrologue.departement && sophrologue.ville && sophrologue.slug
+      ? `https://app.calymia.com/sophrologues/${toPathSegment(
+          sophrologue.departement,
+        )}/${toPathSegment(sophrologue.ville)}/${toPathSegment(sophrologue.slug)}`
+      : null;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -304,6 +326,13 @@ function TabProfil({
         </button>
         <div className="space-y-1">
           <p className="text-sm font-medium text-slate-800">Photo de profil</p>
+          <p className="text-sm font-semibold text-[#1E3A5F]">
+            {[sophrologue.prenom, sophrologue.nom].filter(Boolean).join(" ").trim() ||
+              "Votre profil"}
+          </p>
+          {sophrologue.slug ? (
+            <p className="text-xs text-slate-500">Slug : {sophrologue.slug}</p>
+          ) : null}
           <p className="text-xs text-slate-500">
             Visible sur votre page publique. JPG, PNG ou WebP — max. 5 Mo.
           </p>
@@ -326,6 +355,43 @@ function TabProfil({
           </Button>
         </div>
       </div>
+
+      {publicProfileUrl ? (
+        <div>
+          <p className="mb-2 text-sm text-[#6B6860]">
+            Voici le lien de votre page vitrine publique. Partagez-le avec vos clients
+            ou copiez-le pour le diffuser sur vos réseaux.
+          </p>
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3"
+            style={{ backgroundColor: "#EAF3DE" }}
+          >
+            <a
+              href={publicProfileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-w-0 items-center gap-1 text-sm font-medium underline"
+              style={{ color: "#426F59" }}
+              title="Ouvrir la page publique dans un nouvel onglet"
+            >
+              <span className="truncate">{publicProfileUrl}</span>
+              <ExternalLink className="h-4 w-4 shrink-0" />
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(publicProfileUrl);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 1800);
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-[#426F59]/30 bg-white px-3 py-1.5 text-xs font-medium text-[#426F59] transition-colors hover:bg-[#f5faee]"
+            >
+              {copiedLink ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiedLink ? "Lien copié" : "Copier le lien"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {field("Prénom", "prenom", { placeholder: "Marie" })}

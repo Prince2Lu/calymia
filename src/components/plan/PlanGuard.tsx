@@ -46,24 +46,29 @@ export function PlanGuard({
         <span className="font-medium capitalize">{requiredPlan}</span>
       </p>
 
-      <a
-        href="/dashboard/abonnement"
-        className="inline-flex items-center gap-2 rounded-full bg-[#426F59] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#355748]"
-      >
-        Passer au plan{" "}
-        {requiredPlan === "professionnel" ? "Professionnel" : "Cabinet"}
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden
+      {requiredPlan === "cabinet" ? (
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-4 py-2 text-xs font-medium text-slate-600 opacity-50">
+          Bientôt disponible
+        </span>
+      ) : (
+        <a
+          href="/dashboard/abonnement"
+          className="inline-flex items-center gap-2 rounded-full bg-[#426F59] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#355748]"
         >
-          <path d="M5 12h14M12 5l7 7-7 7" />
-        </svg>
-      </a>
+          Passer au plan Professionnel
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </a>
+      )}
     </div>
   );
 }

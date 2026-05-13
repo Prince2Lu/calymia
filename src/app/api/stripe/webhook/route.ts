@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { generateAndStoreFacture } from '@/lib/factures/generate'
+import { PRICE_ID_TO_PLAN } from '@/lib/stripe/billing'
+import { stripe } from '@/lib/stripe'
 import {
   confirmationReservation,
   confirmationReservationSophrologue,
 } from '@/lib/emails/templates'
 import { sendEmail } from '@/lib/emails/send'
 import { formatParisTime } from '@/lib/timezone'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -184,6 +184,79 @@ export async function POST(request: NextRequest) {
         console.error('[Webhook] Erreur envoi emails confirmation:', emailErr)
       }
     }
+  }
+  else if (
+    event.type === 'customer.subscription.updated'
+  ) {
+    const subscription = event.data.object as Stripe.Subscription
+    const customerId =
+      typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer.id
+    const priceId = subscription.items.data[0]?.price?.id
+
+    if (!customerId || !priceId) {
+      console.warn(
+        '[Webhook] customer.subscription.updated ignoré: customer ou price manquant',
+        { customerId, priceId }
+      )
+    } else {
+      const mappedPlan = PRICE_ID_TO_PLAN[priceId]
+
+      if (!mappedPlan) {
+        console.warn(
+          '[Webhook] customer.subscription.updated ignoré: price_id non mappé',
+          { priceId }
+        )
+      } else {
+        const { error: planError } = await supabase
+          .from('sophrologues')
+          .update({ plan: mappedPlan })
+          .eq('stripe_customer_id', customerId)
+
+        if (planError) {
+          console.error(
+            '[Webhook] erreur mise à jour plan depuis customer.subscription.updated:',
+            planError
+          )
+        } else {
+          console.log(
+            '[Webhook] plan mis à jour depuis subscription.updated:',
+            mappedPlan
+          )
+        }
+      }
+    }
+  } else if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object as Stripe.Subscription
+    const customerId =
+      typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer.id
+
+    if (!customerId) {
+      console.warn(
+        '[Webhook] customer.subscription.deleted ignoré: customer manquant'
+      )
+    } else {
+      const { error: resetPlanError } = await supabase
+        .from('sophrologues')
+        .update({ plan: 'essentiel' })
+        .eq('stripe_customer_id', customerId)
+
+      if (resetPlanError) {
+        console.error(
+          '[Webhook] erreur reset plan depuis customer.subscription.deleted:',
+          resetPlanError
+        )
+      } else {
+        console.log(
+          "[Webhook] plan réinitialisé à 'essentiel' après suppression d'abonnement"
+        )
+      }
+    }
+  } else if (event.type === 'customer.subscription.trial_will_end') {
+    console.log('[Webhook] Subscription trial will end event received')
   }
 
   return NextResponse.json({ received: true })

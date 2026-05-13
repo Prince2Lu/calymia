@@ -118,6 +118,7 @@ export async function buildCronPostSeanceEmail(
         nom_sophrologue: args.nomSophro,
         type_seance: args.typeSeance,
         date_seance: args.dateParis,
+        heure_seance: args.heureParis,
       }),
     };
   }

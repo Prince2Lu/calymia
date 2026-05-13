@@ -4,32 +4,29 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-
-  const response = NextResponse.redirect(new URL("/dashboard", request.url));
+  const type = requestUrl.searchParams.get("type");
 
   if (!code) {
     const errorUrl = new URL("/connexion", request.url);
-    errorUrl.searchParams.set(
-      "error",
-      "Le fournisseur d’authentification n’a pas renvoyé de code valide.",
-    );
+    errorUrl.searchParams.set("error", "Le fournisseur d'authentification n'a pas renvoyé de code valide.");
     return NextResponse.redirect(errorUrl);
   }
+
+  // Déterminer la redirection selon le type AVANT d'échanger le code
+  const redirectTo = type === "recovery"
+    ? new URL("/reinitialiser-mot-de-passe", request.url)
+    : new URL("/dashboard", request.url);
+
+  const response = NextResponse.redirect(redirectTo);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: "", ...options });
-        },
+        get(name: string) { return request.cookies.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) { response.cookies.set({ name, value, ...options }); },
+        remove(name: string, options: CookieOptions) { response.cookies.set({ name, value: "", ...options }); },
       },
     },
   );
@@ -38,13 +35,9 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     const errorUrl = new URL("/connexion", request.url);
-    errorUrl.searchParams.set(
-      "error",
-      "La connexion avec le fournisseur d’authentification a échoué.",
-    );
+    errorUrl.searchParams.set("error", "La connexion avec le fournisseur d'authentification a échoué.");
     return NextResponse.redirect(errorUrl);
   }
 
   return response;
 }
-

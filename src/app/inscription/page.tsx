@@ -77,7 +77,7 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
     const deptObj = DEPARTEMENTS.find((d) => d.code === selectedDeptCode);
     const departement = deptObj?.slug ?? "";
     const ville = villeInput.trim();
-    const plan = fd.get("plan")?.toString() ?? "essentiel";
+    const plan = "professionnel";
 
     if (!email || !password || !prenom || !nom) {
       setError("Merci de remplir tous les champs obligatoires.");
@@ -113,6 +113,12 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
     }
 
     const slug = slugify(`${prenom}-${nom}-${ville}`);
+    console.log("[Inscription] Appel /api/auth/register", {
+      userId: user.id,
+      email,
+      plan,
+      slug,
+    });
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -226,34 +232,9 @@ function SophrologueForm({ onBack }: { onBack: () => void }) {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-800">Choisissez votre plan</p>
-        <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { value: "essentiel", label: "Essentiel", price: "29€ / mois" },
-            { value: "professionnel", label: "Professionnel", price: "59€ / mois" },
-            { value: "cabinet", label: "Cabinet", price: "139€ / mois" },
-          ].map((p, i) => (
-            <label
-              key={p.value}
-              className="flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm hover:border-[#426F59]/60 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-900">{p.label}</span>
-                <input
-                  type="radio"
-                  name="plan"
-                  value={p.value}
-                  defaultChecked={i === 0}
-                  className="h-4 w-4"
-                />
-              </div>
-              <span className="mt-1 text-lg font-semibold text-[#426F59]">{p.price}</span>
-            </label>
-          ))}
-        </div>
-        <p className="text-xs font-medium text-emerald-600">
-          14 jours gratuits, sans carte bancaire.
+      <div className="rounded-lg border border-[#426F59]/20 bg-[#F0F7F4] p-3">
+        <p className="text-sm font-medium text-[#426F59]">
+          Essai gratuit 14 jours — accès Professionnel complet, sans carte bancaire.
         </p>
       </div>
 
