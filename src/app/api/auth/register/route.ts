@@ -165,7 +165,7 @@ export async function POST(request: Request) {
 
     const { error: tplError } = await supabase
       .from("email_templates")
-      .insert(templateRows);
+      .upsert(templateRows, { onConflict: "sophrologue_id,type" });
 
     if (tplError) {
       if (tplError.code === "23505") {
