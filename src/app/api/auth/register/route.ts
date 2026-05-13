@@ -155,7 +155,7 @@ export async function POST(request: Request) {
     }
 
     const templateRows = DEFAULT_EMAIL_TEMPLATE_ROWS.map((row) => ({
-      sophrologue_id: sophrologue.id,
+      sophrologue_id: userId,
       type: row.type,
       nom: row.nom,
       sujet: row.sujet,
