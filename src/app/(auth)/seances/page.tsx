@@ -15,6 +15,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BoutonFacture } from "@/components/factures/BoutonFacture";
 import NoteSeance from "@/components/dashboard/NoteSeance";
 import { PlanGuard } from "@/components/plan/PlanGuard";
 import { normalizePlan } from "@/hooks/usePlan";
@@ -37,8 +38,19 @@ type Seance = {
   statut: string;
   patient: { prenom: string | null; nom: string | null; email: string | null; telephone: string | null } | null;
   type_seance: { nom: string | null } | null;
-  paiement: { montant_total: number | null } | null;
+  paiement:
+    | { montant_total: number | null; facture_url: string | null }
+    | { montant_total: number | null; facture_url: string | null }[]
+    | null;
 };
+
+function resolvePaiement(
+  paiement: Seance["paiement"],
+): { montant_total: number | null; facture_url: string | null } | null {
+  if (!paiement) return null;
+  const row = Array.isArray(paiement) ? paiement[0] : paiement;
+  return row ?? null;
+}
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -124,9 +136,9 @@ function SeanceDrawer({
   const nomPatient =
     `${seance.patient?.prenom ?? ""} ${seance.patient?.nom ?? ""}`.trim() || "Client inconnu";
 
-  const montant = Array.isArray(seance.paiement)
-    ? (seance.paiement[0]?.montant_total ?? null)
-    : (seance.paiement?.montant_total ?? null);
+  const paiementRow = resolvePaiement(seance.paiement);
+  const montant = paiementRow?.montant_total ?? null;
+  const factureUrl = paiementRow?.facture_url ?? null;
 
   const typeNom = Array.isArray(seance.type_seance)
     ? (seance.type_seance[0]?.nom ?? "Séance")
@@ -208,6 +220,11 @@ function SeanceDrawer({
             />
             {montant !== null && (
               <DrawerRow label="Montant" value={`${montant.toFixed(2)} €`} />
+            )}
+            {(seance.statut === "confirmee" || seance.statut === "terminee") && (
+              <div className="pt-2">
+                <BoutonFacture seanceId={seance.id} factureUrl={factureUrl} />
+              </div>
             )}
           </section>
 
@@ -318,7 +335,7 @@ export default function SeancesPage() {
       const { data } = await supabase
         .from("seances")
         .select(
-          "id, patient_id, debut_at, fin_at, statut, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom), paiement:paiements(montant_total)",
+          "id, patient_id, debut_at, fin_at, statut, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom), paiement:paiements(montant_total, facture_url)",
         )
         .eq("sophrologue_id", sid)
         .gte("debut_at", from.toISOString())

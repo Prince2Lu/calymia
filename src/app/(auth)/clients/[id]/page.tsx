@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { formatParisTime } from "@/lib/timezone";
 import { planAllowsSeanceNotes } from "@/lib/email-templates/placeholders";
 import { seanceNoteHtmlIsNonEmpty } from "@/lib/seance-notes";
+import { BoutonFacture } from "@/components/factures/BoutonFacture";
 import NoteSeance from "@/components/dashboard/NoteSeance";
 import { PlanGuard } from "@/components/plan/PlanGuard";
 import { normalizePlan } from "@/hooks/usePlan";
@@ -40,8 +41,19 @@ type Seance = {
   debut_at: string;
   statut: string;
   type_seance: { nom: string | null } | null;
-  paiement: { montant_total: number | null } | null;
+  paiement:
+    | { montant_total: number | null; facture_url: string | null }
+    | { montant_total: number | null; facture_url: string | null }[]
+    | null;
 };
+
+function resolvePaiement(
+  paiement: Seance["paiement"],
+): { montant_total: number | null; facture_url: string | null } | null {
+  if (!paiement) return null;
+  const row = Array.isArray(paiement) ? paiement[0] : paiement;
+  return row ?? null;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -204,7 +216,7 @@ export default function FichePatientPage() {
       const { data: seancesData } = await supabase
         .from("seances")
         .select(
-          "id, debut_at, statut, type_seance:types_seances(nom), paiement:paiements(montant_total)",
+          "id, debut_at, statut, type_seance:types_seances(nom), paiement:paiements(montant_total, facture_url)",
         )
         .eq("patient_id", params.id)
         .order("debut_at", { ascending: false })
@@ -360,10 +372,9 @@ export default function FichePatientPage() {
               ) : (
                 <div className="divide-y divide-slate-100">
                   {seances.map((s) => {
-                    const montant =
-                      Array.isArray(s.paiement)
-                        ? (s.paiement[0]?.montant_total ?? null)
-                        : (s.paiement?.montant_total ?? null);
+                    const paiementRow = resolvePaiement(s.paiement);
+                    const montant = paiementRow?.montant_total ?? null;
+                    const factureUrl = paiementRow?.facture_url ?? null;
                     const typeNom = Array.isArray(s.type_seance)
                       ? (s.type_seance[0]?.nom ?? "Séance")
                       : (s.type_seance?.nom ?? "Séance");
@@ -389,6 +400,9 @@ export default function FichePatientPage() {
                             <span className="text-sm font-medium text-slate-700">
                               {montant.toFixed(2)} €
                             </span>
+                          )}
+                          {montant !== null && (
+                            <BoutonFacture seanceId={s.id} factureUrl={factureUrl} />
                           )}
                           {sophrologue && (
                             <button

@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
               heure_seance: heureSeance,
               type_seance: typeSeance?.nom ?? 'Séance',
               montant,
+              facture_url: factureUrl,
             })
             await sendEmail({
               to: sophrologue.email,

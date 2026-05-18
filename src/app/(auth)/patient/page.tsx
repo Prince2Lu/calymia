@@ -156,6 +156,20 @@ function RdvCard({ seance, onCancel }: { seance: Seance; onCancel: (id: string) 
         </div>
       </div>
 
+      {paiement?.facture_url && (
+        <div className="mt-3">
+          <a
+            href={paiement.facture_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2E75B6] hover:text-[#1E3A5F]"
+          >
+            <Download className="h-4 w-4" />
+            Télécharger mon reçu
+          </a>
+        </div>
+      )}
+
       {/* Bouton annulation */}
       <div className="mt-4 border-t border-slate-100 pt-4">
         <button
@@ -744,8 +758,8 @@ export default function PatientSpacePage() {
                           : "—"}
                       </span>
 
-                      {/* Facture */}
-                      {paiement?.facture_url ? (
+                      {/* Reçu */}
+                      {paiement?.montant_total != null && paiement?.facture_url ? (
                         <a
                           href={paiement.facture_url}
                           target="_blank"
@@ -753,8 +767,10 @@ export default function PatientSpacePage() {
                           className="flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:text-[#1E3A5F]"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          Facture
+                          Télécharger mon reçu
                         </a>
+                      ) : paiement?.montant_total != null ? (
+                        <span className="text-xs text-slate-400">Reçu en cours</span>
                       ) : (
                         <span className="text-xs text-slate-300">—</span>
                       )}
