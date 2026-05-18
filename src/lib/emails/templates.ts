@@ -126,6 +126,7 @@ export function confirmationReservationSophrologue({
   heure_seance,
   type_seance,
   montant,
+  facture_url,
 }: {
   prenom_sophrologue: string;
   prenom_client: string;
@@ -134,7 +135,11 @@ export function confirmationReservationSophrologue({
   heure_seance: string;
   type_seance: string;
   montant: number;
+  facture_url?: string | null;
 }): string {
+  const factureBlock = facture_url
+    ? `<p style="margin:16px 0 0;">Le reçu de paiement est disponible ici : <a href="${facture_url}" style="color:${BRAND};font-weight:600;">Télécharger le reçu</a></p>`
+    : "";
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_sophrologue},</p>
     <p style="margin:0 0 16px;">Une nouvelle réservation a été confirmée.</p>
@@ -142,6 +147,7 @@ export function confirmationReservationSophrologue({
     <p style="margin:0 0 16px;"><strong>Date :</strong> ${date_seance} à ${heure_seance}</p>
     <p style="margin:0 0 16px;"><strong>Type :</strong> ${type_seance}</p>
     <p style="margin:0 0 16px;"><strong>Montant :</strong> ${montant.toFixed(2)} €</p>
+    ${factureBlock}
     <p style="margin:24px 0 0;">À bientôt,<br><strong>L'équipe Calymia</strong></p>
   `;
   return baseLayout(content);
