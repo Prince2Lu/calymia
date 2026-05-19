@@ -68,6 +68,7 @@ src/
 │       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
 ├── components/
 │   ├── factures/            # BoutonFacture.tsx
+│   ├── public/              # SophrologueRppsLine.tsx (infobulle RPPS, "use client")
 │   ├── ui/                  # Composants partagés
 │   └── ...
 ├── hooks/
@@ -79,6 +80,7 @@ src/
     │   └── generate.tsx     # Génération PDF reçu de paiement
     ├── emails/
     │   └── templates.ts     # Templates emails Resend
+    ├── horaires.ts          # normalizeHoraires(), resolvePublicHoraires(), horairesFromDisponibilites()
     ├── supabase/            # Clients Supabase (browser + server)
     └── timezone.ts          # formatParisTime()
 ```
@@ -184,6 +186,37 @@ import { createClient } from "@supabase/supabase-js"
 - Déclenchée par le webhook `payment_intent.succeeded`
 - Stockée dans bucket `factures`, URL sauvegardée dans `paiements.facture_url`
 - Accessible au sophrologue via `<BoutonFacture seanceId={...} />` ou `factureUrl` passé directement
+- Accessible dans l'espace client (`/patient`) sur prochains RDV et historique
+- Email sophrologue inclut le lien facture après chaque paiement réussi
+- Email client inclut les coordonnées du sophrologue (tél, email, adresse) dans un encadré vert
+
+### Horaires — deux sources, une logique de résolution
+- `sophrologues.horaires` (JSONB) : horaires affichés sur la page publique, configurables dans Paramètres → Cabinet/vitrine
+- `disponibilites` : créneaux réservables en ligne, configurables dans Paramètres → Disponibilités et onboarding étape 3
+- Sur la page publique SSR : `resolvePublicHoraires(sophrologue.horaires, disponibilites)` depuis `src/lib/horaires.ts` — priorité au JSONB, sinon dérivé des disponibilités
+- **Ne jamais afficher les horaires dans l'onboarding étape 4 (vitrine)** — supprimé car redondant avec étape 3
+
+### Composants SSR avec interaction client
+- Les pages publiques restent en SSR (`(public)/`)
+- Si un bloc nécessite un état client (ex: infobulle toggle sur mobile), l'isoler dans un petit composant `"use client"` dédié
+- Exemple : `src/components/public/SophrologueRppsLine.tsx` (infobulle RPPS)
+
+### Page publique — champs affichés
+- `numero_rpps` : affiché au-dessus de la section photos cabinet, uniquement si renseigné, avec infobulle définition
+- Tél, email, adresse : **non affichés** sur la page publique (force la réservation en ligne, protège la commission 3%)
+- Ces coordonnées sont transmises uniquement dans l'email de confirmation client
+
+### Suppression d'un compte sophrologue en base (ordre FK)
+```sql
+DELETE FROM paiements WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
+DELETE FROM communications WHERE seance_id IN (SELECT id FROM seances WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...'));
+DELETE FROM seances WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
+DELETE FROM disponibilites WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
+DELETE FROM types_seances WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
+DELETE FROM patients WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
+DELETE FROM sophrologues WHERE user_id = '...';
+-- Puis supprimer l'user dans Supabase → Authentication → Users
+```
 
 ### n8n — workflows déployés sur Hetzner (`automation.kls3-dev.com`)
 | Workflow | Déclencheur | Action |
