@@ -76,6 +76,8 @@ src/
 │   ├── usePlan.ts           # Restrictions selon plan sophrologue
 │   └── ...
 └── lib/
+    ├── billing/
+    │   └── trial-status.ts  # computeTrialDaysRemaining(), getSidebarPlanBadge()
     ├── factures/
     │   └── generate.tsx     # Génération PDF reçu de paiement
     ├── emails/
@@ -205,6 +207,16 @@ import { createClient } from "@supabase/supabase-js"
 - `numero_rpps` : affiché au-dessus de la section photos cabinet, uniquement si renseigné, avec infobulle définition
 - Tél, email, adresse : **non affichés** sur la page publique (force la réservation en ligne, protège la commission 3%)
 - Ces coordonnées sont transmises uniquement dans l'email de confirmation client
+
+### Statut trial Stripe
+- Colonne utilisée : `trial_ends_at` (timestamp) sur la table `sophrologues` — pas de `stripe_status` en base
+- Module centralisé : `src/lib/billing/trial-status.ts` avec `computeTrialDaysRemaining()` et `getSidebarPlanBadge()`
+- Logique :
+  - `trial_ends_at > now` → trial actif → badge vert "Essai gratuit — Xj"
+  - Trial terminé + `plan === 'essentiel'` → "Essai expiré" badge rouge
+  - Sinon → nom du plan (Essentiel / Professionnel / Cabinet)
+- `usePlan()` ne gère que les feature flags — ne pas y ajouter la logique trial
+- La sidebar charge `trial_ends_at` dans sa propre requête Supabase
 
 ### Suppression d'un compte sophrologue en base (ordre FK)
 ```sql
