@@ -6,12 +6,7 @@ import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VitrineTagListBlock } from "@/components/cabinet-vitrine/VitrineTagListBlock";
-import { HorairesPlagesEditor } from "@/components/cabinet-vitrine/HorairesPlagesEditor";
-import {
-  emptyHoraires,
-  normalizeHoraires,
-  type HorairesSophrologue,
-} from "@/types/horaires";
+import { emptyHoraires, type HorairesSophrologue } from "@/types/horaires";
 import {
   CABINET_ACCEPT_TYPES,
   CABINET_MAX_FILE_BYTES,
@@ -66,12 +61,6 @@ export function OnboardingVitrineStep({
   const [ns, setNs] = useState("");
 
   const urls = data.photos_cabinet;
-
-  const horairesNorm = normalizeHoraires(data.horaires);
-
-  const setHoraires = (next: HorairesSophrologue) => {
-    onChange("horaires", next);
-  };
 
   const togglePaiement = (id: string) => {
     const set = new Set(data.modes_paiement);
@@ -228,25 +217,7 @@ export function OnboardingVitrineStep({
 
       <hr className="border-slate-200" />
 
-      {/* B — Horaires */}
-      <section className="space-y-4">
-        <h3 className="text-base font-semibold text-slate-800">Horaires d&apos;ouverture</h3>
-        <HorairesPlagesEditor horaires={horairesNorm} onChange={setHoraires} />
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700">Précisions (optionnel)</label>
-          <textarea
-            value={data.horaires_texte}
-            onChange={(e) => onChange("horaires_texte", e.target.value)}
-            rows={3}
-            placeholder="Ex : Sur rendez-vous uniquement, disponible le soir sur demande..."
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#426F59]/30"
-          />
-        </div>
-      </section>
-
-      <hr className="border-slate-200" />
-
-      {/* C — Infos pratiques */}
+      {/* B — Infos pratiques */}
       <section className="space-y-2">
         <h3 className="text-base font-semibold text-slate-800">Informations pratiques</h3>
         <textarea

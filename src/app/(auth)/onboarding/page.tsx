@@ -624,7 +624,7 @@ export default function OnboardingPage() {
             {step === 3 &&
               "Définissez vos créneaux d’ouverture et vos types de séances."}
             {step === 4 &&
-              "Enrichissez votre page publique : photos, horaires affichés, infos pratiques… Tout est optionnel."}
+              "Enrichissez votre page publique : photos, infos pratiques… Tout est optionnel."}
             {step === 5 &&
               "Vérifiez les informations avant d’accéder à votre tableau de bord."}
           </CardDescription>
@@ -1278,11 +1278,6 @@ export default function OnboardingPage() {
                       ? `${state.vitrine.photos_cabinet.length} photo(s) du cabinet`
                       : "Aucune photo du cabinet"}
                   </p>
-                  {state.vitrine.horaires_texte.trim() !== "" && (
-                    <p className="mt-1 text-xs text-slate-600">
-                      Précisions horaires : {state.vitrine.horaires_texte}
-                    </p>
-                  )}
                   {state.vitrine.infos_pratiques.trim() !== "" && (
                     <p className="mt-1 whitespace-pre-line text-xs text-slate-700">
                       {state.vitrine.infos_pratiques}

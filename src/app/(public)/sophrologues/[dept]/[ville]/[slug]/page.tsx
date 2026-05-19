@@ -6,16 +6,18 @@ import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { CreditCard, Info, MapPin, Star } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
+import { SophrologueRppsLine } from "@/components/public/SophrologueRppsLine";
 import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
 import { computeNextAvailableSlotIso } from "@/lib/booking/compute-next-slot";
 import { getParisJsDayOfWeek } from "@/lib/timezone";
 import {
+  hasHorairesContenu,
   JOURS_LABELS,
   JOURS_SEMAINE,
-  normalizeHoraires,
+  resolvePublicHoraires,
   type HorairesSophrologue,
   type JourSemaine,
-} from "@/types/horaires";
+} from "@/lib/horaires";
 
 const getSupabase = () =>
   createClient(
@@ -53,6 +55,7 @@ type SophrologuePublicRow = {
   certifications: string[] | null;
   syndicats: string[] | null;
   specialites: string[] | null;
+  numero_rpps: string | null;
   types_seances: TypeSeanceRow[] | null;
 };
 
@@ -78,6 +81,7 @@ const PUBLIC_SELECT = `
   certifications,
   syndicats,
   specialites,
+  numero_rpps,
   types_seances ( id, nom, duree_minutes, tarif, actif )
 `;
 
@@ -198,10 +202,6 @@ function initials(prenom?: string | null, nom?: string | null) {
   return `${a}${b}`.toUpperCase() || "S";
 }
 
-function hasHorairesContenu(h: HorairesSophrologue): boolean {
-  return JOURS_SEMAINE.some((j) => (h[j] ?? []).length > 0);
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -257,12 +257,17 @@ export default async function SophrologueProfilPage({
   if (!sophrologue) notFound();
 
   const supabase = getSupabase();
-  const prochainIso = await computeNextAvailableSlotIso(
-    supabase,
-    String(sophrologue.id),
-  );
 
-  const horaires = normalizeHoraires(sophrologue.horaires);
+  const [{ data: disponibilites }, prochainIso] = await Promise.all([
+    supabase
+      .from("disponibilites")
+      .select("jour_semaine, heure_debut, heure_fin, actif")
+      .eq("sophrologue_id", sophrologue.id)
+      .eq("actif", true),
+    computeNextAvailableSlotIso(supabase, String(sophrologue.id)),
+  ]);
+
+  const horaires = resolvePublicHoraires(sophrologue.horaires, disponibilites ?? []);
   const prenom = sophrologue.prenom ?? "";
   const nom = sophrologue.nom ?? "";
   const fullName = `${prenom} ${nom}`.trim() || "Sophrologue";
@@ -286,8 +291,9 @@ export default async function SophrologueProfilPage({
 
   const hasAdresse = Boolean(sophrologue.adresse?.trim());
   const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
-  const showInfos =
-    hasAdresse || hasInfosPratiques || modes.length > 0;
+  const numeroRpps = sophrologue.numero_rpps?.trim() ?? "";
+  const hasRpps = numeroRpps.length > 0;
+  const showInfos = hasAdresse || hasInfosPratiques || modes.length > 0;
 
   const showHorairesBloc =
     hasHorairesContenu(horaires) ||
@@ -340,6 +346,7 @@ export default async function SophrologueProfilPage({
   };
 
   const sectionMeta = [
+    { id: "rpps", show: hasRpps },
     { id: "gallery", show: showGallery },
     { id: "seances", show: showSeances },
     { id: "infos", show: showInfos },
@@ -415,6 +422,13 @@ export default async function SophrologueProfilPage({
             )}
 
             {sepBefore(0) && <hr className="my-10 border-slate-200" />}
+            {hasRpps && (
+              <div className={showGallery ? "mb-6" : ""}>
+                <SophrologueRppsLine numero={numeroRpps} />
+              </div>
+            )}
+
+            {sepBefore(1) && <hr className="my-10 border-slate-200" />}
             {showGallery && (
               <section className="space-y-3">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -424,7 +438,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(1) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(2) && <hr className="my-10 border-slate-200" />}
             {showSeances && (
               <section className="space-y-3">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -452,7 +466,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(2) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(3) && <hr className="my-10 border-slate-200" />}
             {showInfos && (
               <section className="space-y-4">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -506,7 +520,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(3) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(4) && <hr className="my-10 border-slate-200" />}
             {showHorairesBloc && (
               <section className="space-y-3">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -550,7 +564,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(4) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(5) && <hr className="my-10 border-slate-200" />}
             {showTags && (
               <section className="space-y-6">
                 {formations.length > 0 && (
@@ -607,7 +621,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(5) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(6) && <hr className="my-10 border-slate-200" />}
             <section>
               <h2 className="mb-3 text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
                 Avis clients

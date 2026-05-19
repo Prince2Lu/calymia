@@ -113,7 +113,13 @@ export async function POST(request: NextRequest) {
         if (seance) {
           const [{ data: patient }, { data: sophrologue }, { data: typeSeance }] = await Promise.all([
             supabase.from('patients').select('prenom, nom, email').eq('id', seance.patient_id).single(),
-            supabase.from('sophrologues').select('prenom, nom, email').eq('id', seance.sophrologue_id).single(),
+            supabase
+              .from('sophrologues')
+              .select(
+                'prenom, nom, email, telephone, adresse, ville, code_postal',
+              )
+              .eq('id', seance.sophrologue_id)
+              .single(),
             supabase.from('types_seances').select('nom').eq('id', seance.type_seance_id).single(),
           ])
 
@@ -131,6 +137,11 @@ export async function POST(request: NextRequest) {
               type_seance: typeSeance?.nom ?? 'Séance',
               montant,
               facture_url: factureUrl,
+              sophrologue_telephone: sophrologue?.telephone ?? null,
+              sophrologue_email: sophrologue?.email ?? null,
+              sophrologue_adresse: sophrologue?.adresse ?? null,
+              sophrologue_ville: sophrologue?.ville ?? null,
+              sophrologue_code_postal: sophrologue?.code_postal ?? null,
             })
             await sendEmail({
               to: patient.email,
