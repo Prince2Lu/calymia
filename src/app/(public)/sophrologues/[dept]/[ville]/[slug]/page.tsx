@@ -10,12 +10,13 @@ import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
 import { computeNextAvailableSlotIso } from "@/lib/booking/compute-next-slot";
 import { getParisJsDayOfWeek } from "@/lib/timezone";
 import {
+  hasHorairesContenu,
   JOURS_LABELS,
   JOURS_SEMAINE,
-  normalizeHoraires,
+  resolvePublicHoraires,
   type HorairesSophrologue,
   type JourSemaine,
-} from "@/types/horaires";
+} from "@/lib/horaires";
 
 const getSupabase = () =>
   createClient(
@@ -53,6 +54,7 @@ type SophrologuePublicRow = {
   certifications: string[] | null;
   syndicats: string[] | null;
   specialites: string[] | null;
+  numero_rpps: string | null;
   types_seances: TypeSeanceRow[] | null;
 };
 
@@ -78,6 +80,7 @@ const PUBLIC_SELECT = `
   certifications,
   syndicats,
   specialites,
+  numero_rpps,
   types_seances ( id, nom, duree_minutes, tarif, actif )
 `;
 
@@ -198,10 +201,6 @@ function initials(prenom?: string | null, nom?: string | null) {
   return `${a}${b}`.toUpperCase() || "S";
 }
 
-function hasHorairesContenu(h: HorairesSophrologue): boolean {
-  return JOURS_SEMAINE.some((j) => (h[j] ?? []).length > 0);
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -257,12 +256,17 @@ export default async function SophrologueProfilPage({
   if (!sophrologue) notFound();
 
   const supabase = getSupabase();
-  const prochainIso = await computeNextAvailableSlotIso(
-    supabase,
-    String(sophrologue.id),
-  );
 
-  const horaires = normalizeHoraires(sophrologue.horaires);
+  const [{ data: disponibilites }, prochainIso] = await Promise.all([
+    supabase
+      .from("disponibilites")
+      .select("jour_semaine, heure_debut, heure_fin, actif")
+      .eq("sophrologue_id", sophrologue.id)
+      .eq("actif", true),
+    computeNextAvailableSlotIso(supabase, String(sophrologue.id)),
+  ]);
+
+  const horaires = resolvePublicHoraires(sophrologue.horaires, disponibilites ?? []);
   const prenom = sophrologue.prenom ?? "";
   const nom = sophrologue.nom ?? "";
   const fullName = `${prenom} ${nom}`.trim() || "Sophrologue";
@@ -286,8 +290,10 @@ export default async function SophrologueProfilPage({
 
   const hasAdresse = Boolean(sophrologue.adresse?.trim());
   const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
+  const numeroRpps = sophrologue.numero_rpps?.trim() ?? "";
+  const hasRpps = numeroRpps.length > 0;
   const showInfos =
-    hasAdresse || hasInfosPratiques || modes.length > 0;
+    hasAdresse || hasInfosPratiques || modes.length > 0 || hasRpps;
 
   const showHorairesBloc =
     hasHorairesContenu(horaires) ||
@@ -473,6 +479,12 @@ export default async function SophrologueProfilPage({
                       {city}
                     </p>
                   </div>
+                )}
+                {hasRpps && (
+                  <p className="text-sm text-slate-700">
+                    <span className="font-medium text-slate-800">N° RPPS :</span>{" "}
+                    {numeroRpps}
+                  </p>
                 )}
                 {hasInfosPratiques && (
                   <div className="flex gap-3 text-sm text-slate-700">
