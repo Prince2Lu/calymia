@@ -159,7 +159,7 @@ export default async function AbonnementPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[#1E3A5F]">Mon abonnement</h2>
             <div className="mt-4">
-              <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-xs font-semibold text-[#426F59]">
+              <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-sm font-semibold text-[#426F59]">
                 Essai gratuit — {trialDaysRemaining} jours restants — Accès Professionnel complet
               </span>
             </div>
