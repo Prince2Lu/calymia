@@ -14,6 +14,7 @@ import {
   CreditCard,
   LogOut,
 } from "lucide-react";
+import { getSidebarPlanBadge } from "@/lib/billing/trial-status";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ type SophrologueInfo = {
   prenom: string | null;
   nom: string | null;
   plan: string | null;
+  trial_ends_at: string | null;
 };
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ export default function Sidebar() {
 
       const { data } = await supabase
         .from("sophrologues")
-        .select("prenom, nom, plan")
+        .select("prenom, nom, plan, trial_ends_at")
         .eq("user_id", user.id)
         .maybeSingle<SophrologueInfo>();
 
@@ -118,6 +120,13 @@ export default function Sidebar() {
   const fullName =
     `${sophrologue?.prenom ?? ""} ${sophrologue?.nom ?? ""}`.trim() ||
     "Mon compte";
+
+  const planBadge = sophrologue
+    ? getSidebarPlanBadge(sophrologue.plan, sophrologue.trial_ends_at)
+    : {
+        label: "—",
+        className: "bg-gray-100 text-gray-600 text-xs font-medium",
+      };
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-[#E5E7EB] bg-white">
@@ -171,17 +180,9 @@ export default function Sidebar() {
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500">Plan actuel</span>
             <span
-              className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${
-                (sophrologue?.plan ?? "").toLowerCase() === "essentiel"
-                  ? "bg-gray-100 text-gray-600"
-                  : (sophrologue?.plan ?? "").toLowerCase() === "professionnel"
-                    ? "bg-[#EAF3DE] text-[#3B6D11]"
-                    : (sophrologue?.plan ?? "").toLowerCase() === "cabinet"
-                      ? "bg-[#EEF2FF] text-[#4338CA]"
-                      : "bg-gray-100 text-gray-600"
-              }`}
+              className={`inline-flex max-w-[9.5rem] items-center justify-end rounded-full px-2 py-1 text-right leading-tight ${planBadge.className}`}
             >
-              {sophrologue?.plan ?? "—"}
+              {planBadge.label}
             </span>
           </div>
         </div>
