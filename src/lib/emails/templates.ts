@@ -76,6 +76,59 @@ export function welcomeClient({ prenom }: { prenom: string }): string {
   return baseLayout(content);
 }
 
+function buildCoordonneesSophrologueBlock({
+  telephone,
+  email,
+  adresse,
+  ville,
+  code_postal,
+}: {
+  telephone?: string | null;
+  email?: string | null;
+  adresse?: string | null;
+  ville?: string | null;
+  code_postal?: string | null;
+}): string {
+  const tel = telephone?.trim() ?? "";
+  const em = email?.trim() ?? "";
+  const adr = adresse?.trim() ?? "";
+  const city = ville?.trim() ?? "";
+  const cp = code_postal?.trim() ?? "";
+  const villeCp = [cp, city].filter(Boolean).join(" ");
+  const adresseComplete = [adr, villeCp].filter(Boolean).join(", ");
+
+  const lines: string[] = [];
+  if (tel) {
+    const telHref = tel.replace(/\s/g, "");
+    lines.push(
+      `<p style="margin:0 0 8px;">📞 <strong>Téléphone :</strong> <a href="tel:${telHref}" style="color:${BRAND};text-decoration:none;">${tel}</a></p>`,
+    );
+  }
+  if (em) {
+    lines.push(
+      `<p style="margin:0 0 8px;">✉️ <strong>Email :</strong> <a href="mailto:${em}" style="color:${BRAND};text-decoration:none;">${em}</a></p>`,
+    );
+  }
+  if (adresseComplete) {
+    lines.push(
+      `<p style="margin:0;">📍 <strong>Adresse :</strong> ${adresseComplete}</p>`,
+    );
+  }
+
+  if (lines.length === 0) return "";
+
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:${BRAND};">Coordonnées du sophrologue</p>
+          ${lines.join("")}
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
 export function confirmationReservation({
   prenom_client,
   prenom_sophrologue,
@@ -85,6 +138,11 @@ export function confirmationReservation({
   type_seance,
   montant,
   facture_url,
+  sophrologue_telephone,
+  sophrologue_email,
+  sophrologue_adresse,
+  sophrologue_ville,
+  sophrologue_code_postal,
 }: {
   prenom_client: string;
   prenom_sophrologue: string;
@@ -94,10 +152,22 @@ export function confirmationReservation({
   type_seance: string;
   montant: number;
   facture_url?: string | null;
+  sophrologue_telephone?: string | null;
+  sophrologue_email?: string | null;
+  sophrologue_adresse?: string | null;
+  sophrologue_ville?: string | null;
+  sophrologue_code_postal?: string | null;
 }): string {
   const factureBlock = facture_url
     ? `<p style="margin:16px 0 0;"><a href="${facture_url}" style="display:inline-block;background:${BRAND};color:#ffffff!important;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;">Télécharger ma facture</a></p>`
     : "";
+  const coordonneesBlock = buildCoordonneesSophrologueBlock({
+    telephone: sophrologue_telephone,
+    email: sophrologue_email,
+    adresse: sophrologue_adresse,
+    ville: sophrologue_ville,
+    code_postal: sophrologue_code_postal,
+  });
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
     <p style="margin:0 0 16px;">Votre séance est confirmée 🎉 Nous sommes ravis de vous accompagner dans votre parcours de bien-être.</p>
@@ -111,6 +181,7 @@ export function confirmationReservation({
         </td>
       </tr>
     </table>
+    ${coordonneesBlock}
     ${factureBlock}
     <p style="margin:16px 0;">En cas d'imprévu, vous pouvez annuler votre réservation depuis votre espace client jusqu'à 24h avant la séance.</p>
     <p style="margin:24px 0 0;">À très bientôt,<br><strong>${prenom_sophrologue} ${nom_sophrologue}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
