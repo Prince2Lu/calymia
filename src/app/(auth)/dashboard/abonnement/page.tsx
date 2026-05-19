@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import BillingPortalButton from "@/components/dashboard/BillingPortalButton";
 import PlanCheckoutButtons from "@/components/dashboard/PlanCheckoutButtons";
+import { computeTrialDaysRemaining } from "@/lib/billing/trial-status";
 
 type Plan = "essentiel" | "professionnel" | "cabinet";
 
@@ -22,14 +23,6 @@ function formatPlanLabel(plan: Plan): string {
   if (plan === "professionnel") return "Professionnel";
   if (plan === "cabinet") return "Cabinet";
   return "Essentiel";
-}
-
-function computeTrialDaysRemaining(trialEndsAt: string | null): number {
-  if (!trialEndsAt) return 0;
-  const trialEnd = new Date(trialEndsAt).getTime();
-  const remainingMs = trialEnd - Date.now();
-  if (remainingMs <= 0) return 0;
-  return Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
 }
 
 function formatTrialEndDate(trialEndsAt: string | null): string {
@@ -159,7 +152,7 @@ export default async function AbonnementPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-[#1E3A5F]">Mon abonnement</h2>
             <div className="mt-4">
-              <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-xs font-semibold text-[#426F59]">
+              <span className="inline-flex rounded-full bg-[#F0F7F4] px-3 py-1 text-sm font-semibold text-[#426F59]">
                 Essai gratuit — {trialDaysRemaining} jours restants — Accès Professionnel complet
               </span>
             </div>
