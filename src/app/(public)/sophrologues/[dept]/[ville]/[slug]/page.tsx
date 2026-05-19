@@ -6,6 +6,7 @@ import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { CreditCard, Info, MapPin, Star } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
+import { SophrologueRppsLine } from "@/components/public/SophrologueRppsLine";
 import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
 import { computeNextAvailableSlotIso } from "@/lib/booking/compute-next-slot";
 import { getParisJsDayOfWeek } from "@/lib/timezone";
@@ -292,8 +293,7 @@ export default async function SophrologueProfilPage({
   const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
   const numeroRpps = sophrologue.numero_rpps?.trim() ?? "";
   const hasRpps = numeroRpps.length > 0;
-  const showInfos =
-    hasAdresse || hasInfosPratiques || modes.length > 0 || hasRpps;
+  const showInfos = hasAdresse || hasInfosPratiques || modes.length > 0;
 
   const showHorairesBloc =
     hasHorairesContenu(horaires) ||
@@ -346,6 +346,7 @@ export default async function SophrologueProfilPage({
   };
 
   const sectionMeta = [
+    { id: "rpps", show: hasRpps },
     { id: "gallery", show: showGallery },
     { id: "seances", show: showSeances },
     { id: "infos", show: showInfos },
@@ -421,6 +422,13 @@ export default async function SophrologueProfilPage({
             )}
 
             {sepBefore(0) && <hr className="my-10 border-slate-200" />}
+            {hasRpps && (
+              <div className={showGallery ? "mb-6" : ""}>
+                <SophrologueRppsLine numero={numeroRpps} />
+              </div>
+            )}
+
+            {sepBefore(1) && <hr className="my-10 border-slate-200" />}
             {showGallery && (
               <section className="space-y-3">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -430,7 +438,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(1) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(2) && <hr className="my-10 border-slate-200" />}
             {showSeances && (
               <section className="space-y-3">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -458,7 +466,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(2) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(3) && <hr className="my-10 border-slate-200" />}
             {showInfos && (
               <section className="space-y-4">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -479,12 +487,6 @@ export default async function SophrologueProfilPage({
                       {city}
                     </p>
                   </div>
-                )}
-                {hasRpps && (
-                  <p className="text-sm text-slate-700">
-                    <span className="font-medium text-slate-800">N° RPPS :</span>{" "}
-                    {numeroRpps}
-                  </p>
                 )}
                 {hasInfosPratiques && (
                   <div className="flex gap-3 text-sm text-slate-700">
@@ -518,7 +520,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(3) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(4) && <hr className="my-10 border-slate-200" />}
             {showHorairesBloc && (
               <section className="space-y-3">
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
@@ -562,7 +564,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(4) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(5) && <hr className="my-10 border-slate-200" />}
             {showTags && (
               <section className="space-y-6">
                 {formations.length > 0 && (
@@ -619,7 +621,7 @@ export default async function SophrologueProfilPage({
               </section>
             )}
 
-            {sepBefore(5) && <hr className="my-10 border-slate-200" />}
+            {sepBefore(6) && <hr className="my-10 border-slate-200" />}
             <section>
               <h2 className="mb-3 text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
                 Avis clients
