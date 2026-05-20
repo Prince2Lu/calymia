@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.vercel.app') + '/api/cron/rappels-j1' }}",
+        "url": "=https://app.calymia.com/api/cron/rappels-j1",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -59,12 +59,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "0cb6e44d-9267-4bca-8b8d-31d6eb2ec1c3",
+  "versionId": "7d8f3511-41cc-41f5-8d43-ddec2ec7b05a",
   "meta": {
     "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
   },

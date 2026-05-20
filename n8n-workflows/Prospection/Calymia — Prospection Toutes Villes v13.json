@@ -1,0 +1,3675 @@
+{
+  "name": "Calymia — Prospection Toutes Villes v13",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "0589f25d-75b0-4978-9210-55bb0b60b943",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "🎯 Prospection",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "bbf7cb4e-3a95-4e14-b4e9-a7738fe0e9e7",
+      "name": "Lire Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1104,
+        800
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst ids = items.map(r => parseInt(r.json['ID']) || 0).filter(n => n > 0);\nconst dernierID = ids.length > 0 ? Math.max(...ids) : 0;\nconst tels = items\n  .map(r => (r.json['Téléphone'] || '').replace(/\\s/g, ''))\n  .filter(t => t.length > 0);\nreturn [{ json: { lastID: dernierID, telsExistants: tels } }];"
+      },
+      "id": "a716b946-c3e6-4c2c-90d3-730e86fabd34",
+      "name": "Calculer dernier ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75001\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "9a160dbd-c86f-4628-b0cd-f6f51ba93a72",
+      "name": "Places — sophrologue Paris 75001",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75002\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "fe5b5921-6dc5-4996-bcb5-fd6d39785496",
+      "name": "Places — sophrologue Paris 75002",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75003\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "55455e2b-fb16-4791-8fb1-ff24a6e7f836",
+      "name": "Places — sophrologue Paris 75003",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75004\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "97ae159c-d813-4d71-9c7b-4d164fc952cc",
+      "name": "Places — sophrologue Paris 75004",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75005\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "e6df343f-8cc5-4ca2-849b-1bd5137a09c3",
+      "name": "Places — sophrologue Paris 75005",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75006\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "d5a98124-7e25-46ce-875e-c3983efb68f4",
+      "name": "Places — sophrologue Paris 75006",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75007\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "6de08c93-0b4b-4ed4-a3e1-de9f9d9569d3",
+      "name": "Places — sophrologue Paris 75007",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75008\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "de38865a-cf82-411a-958d-d57b97d8892b",
+      "name": "Places — sophrologue Paris 75008",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75009\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "b96b9ffb-0aaf-4e46-a7e3-a949448b4904",
+      "name": "Places — sophrologue Paris 75009",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75010\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "fe2f420f-bf9a-45a0-9458-5d71736edffb",
+      "name": "Places — sophrologue Paris 75010",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75011\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "3e86bd84-cd00-4a77-b624-eb2818fc3854",
+      "name": "Places — sophrologue Paris 75011",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75012\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "5ee8951e-95c6-439d-a89f-e2968c503ffc",
+      "name": "Places — sophrologue Paris 75012",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75013\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "085797b4-944a-4fda-bc26-0243761d7cd7",
+      "name": "Places — sophrologue Paris 75013",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75014\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "9fb992ca-3df6-428f-91b3-9ecc4b6d9ee2",
+      "name": "Places — sophrologue Paris 75014",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75015\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "0749a183-2a17-4ae6-95dc-8793369f4a8f",
+      "name": "Places — sophrologue Paris 75015",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75016\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "32553b1d-f251-4353-8091-af5cb94ef49c",
+      "name": "Places — sophrologue Paris 75016",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75017\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "84a31036-ec8c-42c0-93e5-b98062a556cb",
+      "name": "Places — sophrologue Paris 75017",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75018\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "566ee631-38a7-42f7-a9ca-b2cacde0452a",
+      "name": "Places — sophrologue Paris 75018",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75019\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "8aa47fab-f6b6-4c98-948a-8c2aab373e62",
+      "name": "Places — sophrologue Paris 75019",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75020\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "2c618f4e-49fb-4448-b750-8542c5ce0ce5",
+      "name": "Places — sophrologue Paris 75020",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69001\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f66e1b2f-2324-4a2b-986a-a8f24f9160dd",
+      "name": "Places — sophrologue Lyon 69001",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69002\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "3eb391ec-01ba-488c-bf47-88cc96acc94c",
+      "name": "Places — sophrologue Lyon 69002",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69003\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "c142eaf5-6d70-4428-83d0-29795f8cc513",
+      "name": "Places — sophrologue Lyon 69003",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69004\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "5cd1d050-4705-45f0-bb86-f56576b474c0",
+      "name": "Places — sophrologue Lyon 69004",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69005\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "a6092b3a-b1e7-4d60-979f-8a0ebf6140ef",
+      "name": "Places — sophrologue Lyon 69005",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69006\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "fbc32943-1656-43ee-be4c-a8529dd7850b",
+      "name": "Places — sophrologue Lyon 69006",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69007\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f9f8a161-e5c7-4509-a021-aa3397b5531b",
+      "name": "Places — sophrologue Lyon 69007",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69008\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f043bada-9e7e-4698-b21c-a3d0e0150f4e",
+      "name": "Places — sophrologue Lyon 69008",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69009\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "1b3badee-c807-490f-ada3-dd63962bdc49",
+      "name": "Places — sophrologue Lyon 69009",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13001\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "62bd3e29-9945-467a-a323-43e8bdbb04be",
+      "name": "Places — sophrologue Marseille 13001",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13002\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "fad09273-16e5-4cb9-b472-64ed83534e7c",
+      "name": "Places — sophrologue Marseille 13002",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13003\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "0241464a-6d16-43ae-ace9-5d54b0871f20",
+      "name": "Places — sophrologue Marseille 13003",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13004\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "518b0d14-7c14-4002-8111-345bc72f81d3",
+      "name": "Places — sophrologue Marseille 13004",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13005\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "393ce6cb-a115-416a-b3c6-cc9dfd5ef5d7",
+      "name": "Places — sophrologue Marseille 13005",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13006\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "b00bb455-21e3-4457-9876-35240e8a2ba4",
+      "name": "Places — sophrologue Marseille 13006",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13007\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "2fa7363a-a196-4bc8-9e39-3f761327812b",
+      "name": "Places — sophrologue Marseille 13007",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13008\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f14d4cc1-48d6-40c7-b036-ae1e3c70e0af",
+      "name": "Places — sophrologue Marseille 13008",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13009\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "4e5c62dd-ac92-4c8f-a630-c5c51cbfe76c",
+      "name": "Places — sophrologue Marseille 13009",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13010\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "ae01caf7-13b0-4801-abcc-d546a857512b",
+      "name": "Places — sophrologue Marseille 13010",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13011\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "9dccdc3b-c5f5-4c4f-80e5-45babfff34ae",
+      "name": "Places — sophrologue Marseille 13011",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13012\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "1c59d74c-d3df-4273-ac9b-cccdeba48f3a",
+      "name": "Places — sophrologue Marseille 13012",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13013\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "ba084b93-3495-4472-89a7-d5ef9e697452",
+      "name": "Places — sophrologue Marseille 13013",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13014\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "ed420302-8e79-4877-8e5b-9410950dade4",
+      "name": "Places — sophrologue Marseille 13014",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13015\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "cd7802fd-afc4-44bd-8de0-c93d6b652baa",
+      "name": "Places — sophrologue Marseille 13015",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Marseille 13016\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "83034a90-f52a-4ab9-a0c5-c1504e0ae184",
+      "name": "Places — sophrologue Marseille 13016",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Bordeaux centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f12d8f9b-1e50-49ac-b361-bd22de69e6bb",
+      "name": "Places — sophrologue Bordeaux centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Bordeaux nord sud\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "61cceec9-1f8c-41be-89e5-ec3ecbad3479",
+      "name": "Places — sophrologue Bordeaux nord sud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Bordeaux rive droite\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "7d7ce7ef-b905-4a3c-9461-0bdc005ad81f",
+      "name": "Places — sophrologue Bordeaux rive droite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Toulouse centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "2ee37d89-2650-46d3-a6eb-963aa7c5d385",
+      "name": "Places — sophrologue Toulouse centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Toulouse nord sud\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "60bfb32e-b6e6-471f-9f51-f3a859a6b7fd",
+      "name": "Places — sophrologue Toulouse nord sud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Toulouse est ouest\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "174c0943-d3c8-49dd-8c77-790051ce1c0a",
+      "name": "Places — sophrologue Toulouse est ouest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lille centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "697d95e9-f532-41ae-b453-4895a3e154a6",
+      "name": "Places — sophrologue Lille centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lille Villeneuve Roubaix\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "c3f9f269-d1c1-4eb4-8709-2f889d379748",
+      "name": "Places — sophrologue Lille Villeneuve Roubaix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Nantes centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "17600594-139b-4b60-80e1-8a34d2925dd9",
+      "name": "Places — sophrologue Nantes centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Nantes nord sud\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "1088ec24-b2e0-40d1-aebd-d74f5dfad778",
+      "name": "Places — sophrologue Nantes nord sud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Strasbourg centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "743a53fe-6284-45fc-8811-2189b5672696",
+      "name": "Places — sophrologue Strasbourg centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Strasbourg Neudorf Hautepierre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "d3b2ea4f-3aa4-4c88-a1cb-9dbf4fff51a1",
+      "name": "Places — sophrologue Strasbourg Neudorf Hautepier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Nice centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "331a8176-737f-4b09-ad92-3c8dcab8cf3a",
+      "name": "Places — sophrologue Nice centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        288,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Nice est ouest\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "77223dc7-7268-490a-80c6-a134a7106a80",
+      "name": "Places — sophrologue Nice est ouest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        560,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Montpellier centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "c6022eba-71fe-437c-a14d-d20f3cc952fc",
+      "name": "Places — sophrologue Montpellier centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        848,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Montpellier nord sud\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "c20b30f0-4594-44dd-9f26-d6fc5155905f",
+      "name": "Places — sophrologue Montpellier nord sud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1120,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Rennes centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "0ce5b8d8-1e66-4319-b80d-46f1c09adfea",
+      "name": "Places — sophrologue Rennes centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Rennes nord sud\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "33ef7b98-542d-4f21-bfce-92b84dea6749",
+      "name": "Places — sophrologue Rennes nord sud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1680,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Grenoble centre\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "566e062d-a81f-4d12-a943-70de979e5ed8",
+      "name": "Places — sophrologue Grenoble centre",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1968,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Grenoble nord sud\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "c0a004e5-5f30-4f0f-9038-b9e3146d40ca",
+      "name": "Places — sophrologue Grenoble nord sud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fusionner toutes les requêtes Places\nconst allPlaces = [];\nconst villeMap = {};\n\nfor (const item of $input.all()) {\n  const places = item.json.places || [];\n  allPlaces.push(...places);\n}\n\n// Dédoublonner par téléphone entre toutes les requêtes\nconst seen = new Set();\nconst unique = [];\nfor (const p of allPlaces) {\n  const tel = (p.nationalPhoneNumber || '').replace(/\\s/g, '');\n  const key = tel || (p.displayName && p.displayName.text) || Math.random().toString();\n  if (!seen.has(key)) {\n    seen.add(key);\n    unique.push(p);\n  }\n}\n\nreturn [{ json: { places: unique, total_brut: allPlaces.length, total_unique: unique.length } }];"
+      },
+      "id": "baac2358-1b1f-4ce0-9cb1-0b077bc8dc31",
+      "name": "Fusionner toutes requêtes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dernierID = $('Calculer dernier ID').first().json.lastID || 0;\nconst telsExistants = $('Calculer dernier ID').first().json.telsExistants || [];\nconst places = $input.first().json.places || [];\n\nconst motsCles = [\n  'sophrologue','sophrologie','cabinet','therapie','therapeute','therapies',\n  'hypnotherapeute','hypnose','naturopathe','coach','coaching','bien-etre',\n  'bien etre','sante','certifie','certifiee','rncp','visio','stress',\n  'anxiete','sommeil','doula','numerologue','perinatale','perinatalite',\n  'specialise','specialisee','relaxation','mindfulness','pleine','conscience',\n  'stop','emotions','debordantes','paris','lyon','marseille','bordeaux',\n  'toulouse','nantes','lille','strasbourg','rennes','grenoble','nice',\n  'montpellier','metz','nancy','centre','nord','sud','est','ouest',\n  'rive','droite','gauche','villeneuve','roubaix','neudorf','hautepierre'\n];\n\nconst cap = s => s.toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase());\n\nconst results = [];\nlet idCounter = dernierID;\n\nfor (const place of places) {\n  const tel = (place.nationalPhoneNumber || '').replace(/\\s/g, '');\n  if (tel && telsExistants.includes(tel)) continue;\n\n  const raw = (place.displayName && place.displayName.text) ? place.displayName.text : '';\n  const nomCabinet = raw;\n\n  let nomNettoye = raw.split(/[-|·•,]/)[0].trim();\n  const regex = new RegExp('\\\\b(' + motsCles.join('|') + ')\\\\b', 'gi');\n  nomNettoye = nomNettoye.replace(regex, '').replace(/\\s+/g, ' ').trim();\n  nomNettoye = cap(nomNettoye);\n\n  const parts = nomNettoye.split(' ').filter(p => p.length > 1);\n  const prenom = parts[0] || raw;\n  const nom = parts.slice(1).join(' ') || '';\n\n  const adresse = place.formattedAddress || '';\n  const cpMatch = adresse.match(/(\\d{5})/);\n  const dept = cpMatch ? cpMatch[1].substring(0, 2) : '';\n\n  // Détecter la ville depuis l'adresse\n  let ville = '';\n  const villeMatch = adresse.match(/\\d{5}\\s+(.+?)(?:,|$)/);\n  if (villeMatch) ville = villeMatch[1].trim();\n\n  idCounter++;\n\n  results.push({\n    json: {\n      'ID': idCounter,\n      'Prénom': prenom,\n      'Nom': nom,\n      'Nom Cabinet': nomCabinet,\n      'Ville': ville || '',\n      'Dép.': dept,\n      'Téléphone': place.nationalPhoneNumber || '',\n      'Email': '',\n      'Note Google ★': place.rating ? place.rating.toString() : '',\n      'Nb Avis': place.userRatingCount ? place.userRatingCount.toString() : '',\n      'Site Web': place.websiteUri || '',\n      'Bouton Résa ?': 'Non',\n      'Source': 'Google Maps',\n      'Statut': 'À appeler',\n      'Canal Gagnant': '',\n      'Date Contact': '',\n      'Notes': 'Extrait le ' + new Date().toLocaleDateString('fr-FR')\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "fcd6181a-2671-4bea-8352-2d92b05e9c13",
+      "name": "Extraire et dédoublonner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "🎯 Prospection",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json['ID'] }}",
+            "Prénom": "={{ $json['Prénom'] }}",
+            "Nom": "={{ $json['Nom'] }}",
+            "Nom Cabinet": "={{ $json['Nom Cabinet'] }}",
+            "Ville": "={{ $json['Ville'] }}",
+            "Dép.": "={{ $json['Dép.'] }}",
+            "Téléphone": "={{ $json['Téléphone'] }}",
+            "Email": "={{ $json['Email'] }}",
+            "Note Google ★": "={{ $json['Note Google ★'] }}",
+            "Nb Avis": "={{ $json['Nb Avis'] }}",
+            "Site Web": "={{ $json['Site Web'] }}",
+            "Bouton Résa ?": "={{ $json['Bouton Résa ?'] }}",
+            "Source": "={{ $json['Source'] }}",
+            "Statut": "={{ $json['Statut'] }}",
+            "Canal Gagnant": "={{ $json['Canal Gagnant'] }}",
+            "Date Contact": "={{ $json['Date Contact'] }}",
+            "Notes": "={{ $json['Notes'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Prénom",
+              "displayName": "Prénom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom",
+              "displayName": "Nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom Cabinet",
+              "displayName": "Nom Cabinet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ville",
+              "displayName": "Ville",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Dép.",
+              "displayName": "Dép.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone",
+              "displayName": "Téléphone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note Google ★",
+              "displayName": "Note Google ★",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nb Avis",
+              "displayName": "Nb Avis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Site Web",
+              "displayName": "Site Web",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Bouton Résa ?",
+              "displayName": "Bouton Résa ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut",
+              "displayName": "Statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Canal Gagnant",
+              "displayName": "Canal Gagnant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Contact",
+              "displayName": "Date Contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "d0d4dcec-1fe5-4e59-bccf-599449535934",
+      "name": "Ecrire dans Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3008,
+        800
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire Sheet": {
+      "main": [
+        [
+          {
+            "node": "Calculer dernier ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer dernier ID": {
+      "main": [
+        [
+          {
+            "node": "Places — sophrologue Paris 75001",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75002",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75003",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75004",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75005",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75006",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75007",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75008",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75009",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75010",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75011",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75012",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75013",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75014",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75015",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75016",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75017",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75018",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75019",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Paris 75020",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69001",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69002",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69003",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69004",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69005",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69006",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69007",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69008",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lyon 69009",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13001",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13002",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13003",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13004",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13005",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13006",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13007",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13008",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13009",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13010",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13011",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13012",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13013",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13014",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13015",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Marseille 13016",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Bordeaux centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Bordeaux nord sud",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Bordeaux rive droite",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Toulouse centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Toulouse nord sud",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Toulouse est ouest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lille centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Lille Villeneuve Roubaix",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Nantes centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Nantes nord sud",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Strasbourg centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Strasbourg Neudorf Hautepier",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Nice centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Nice est ouest",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Montpellier centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Montpellier nord sud",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Rennes centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Rennes nord sud",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Grenoble centre",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — sophrologue Grenoble nord sud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75001": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75002": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75003": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75004": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75005": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75006": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75007": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75008": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75009": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75010": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75011": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75012": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75013": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75014": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75015": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75016": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75017": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75018": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75019": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Paris 75020": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69001": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69002": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69003": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69004": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69005": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69006": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69007": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69008": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lyon 69009": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13001": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13002": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13003": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13004": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13005": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13006": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13007": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13008": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13009": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13010": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13011": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13012": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13013": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13014": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13015": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Marseille 13016": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Bordeaux centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Bordeaux nord sud": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Bordeaux rive droite": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Toulouse centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Toulouse nord sud": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Toulouse est ouest": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lille centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Lille Villeneuve Roubaix": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Nantes centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Nantes nord sud": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Strasbourg centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Strasbourg Neudorf Hautepier": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Nice centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Nice est ouest": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Montpellier centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Montpellier nord sud": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Rennes centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Rennes nord sud": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Grenoble centre": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — sophrologue Grenoble nord sud": {
+      "main": [
+        [
+          {
+            "node": "Fusionner toutes requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusionner toutes requêtes": {
+      "main": [
+        [
+          {
+            "node": "Extraire et dédoublonner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire et dédoublonner": {
+      "main": [
+        [
+          {
+            "node": "Ecrire dans Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "82169118-c368-48c9-9019-b29377adba07",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "GoE2P7aHg5gAkzhH",
+  "tags": []
+}

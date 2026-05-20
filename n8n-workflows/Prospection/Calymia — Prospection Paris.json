@@ -1,0 +1,1243 @@
+{
+  "name": "Calymia — Prospection Paris",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f4d591b1-91a5-4b84-bbdc-6f710771a557",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        4848
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1884665636,
+          "mode": "list",
+          "cachedResultName": "🎯 Prospection",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk/edit#gid=1884665636"
+        },
+        "options": {}
+      },
+      "id": "2d0348cc-d630-487e-95e7-21c3633c7803",
+      "name": "Lire Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2576,
+        4848
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all ? $input.all() : [];\nif (!items || items.length === 0) {\n  return [{ json: { lastID: 0, telsExistants: [] } }];\n}\nconst ids = items.map(r => parseInt(r.json['ID']) || 0).filter(n => n > 0);\nconst dernierID = ids.length > 0 ? Math.max(...ids) : 0;\nconst tels = items.map(r => (r.json['Telephone'] || r.json['T\\u00e9l\\u00e9phone'] || '').replace(/\\s/g, '')).filter(t => t.length > 0);\nreturn [{ json: { lastID: dernierID, telsExistants: tels } }];"
+      },
+      "id": "dd291ad7-ac38-4e05-a6e9-294467938780",
+      "name": "Calculer dernier ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        4848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75001\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "52dedd3f-9a24-497e-ac78-384ad14989ce",
+      "name": "Places — Paris 1er",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        3024
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75002\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "9be48bcc-0d78-4326-933a-6314a431dec4",
+      "name": "Places — Paris 2ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75003\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "48d724d4-57eb-4596-b3a1-faa5daf44c7e",
+      "name": "Places — Paris 3ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75004\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "3f2bfd05-f489-4302-bb27-fdf766a4d49a",
+      "name": "Places — Paris 4ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        3600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75005\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "47318286-9a2a-40a0-8cc8-ecde4204f9c1",
+      "name": "Places — Paris 5ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        3792
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75006\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "ca0532a1-6c88-4253-b367-eb3b5ad68384",
+      "name": "Places — Paris 6ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        3984
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75007\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "b4e6023a-fac2-44d1-a3a3-318cc4038d99",
+      "name": "Places — Paris 7ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        4176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75008\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "d0fed1d4-28e6-45de-b980-bf6c243c2f27",
+      "name": "Places — Paris 8ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        4368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75009\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "6c970df2-2123-4418-9470-518ff0427179",
+      "name": "Places — Paris 9ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        4560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75010\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f2783beb-6b2f-48c8-9b3f-5e7a50ac3120",
+      "name": "Places — Paris 10ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        4752
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75011\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f7455705-5722-4505-a27e-e5ac601c8599",
+      "name": "Places — Paris 11ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        4944
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75012\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "cc0c3eef-1b92-405d-b959-9722ba17e87e",
+      "name": "Places — Paris 12ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        5136
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75013\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f5075900-39ce-4081-9d35-68a4258b954b",
+      "name": "Places — Paris 13ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        5328
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75014\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "6b58e6e1-9281-4c56-a23c-22605ee6275d",
+      "name": "Places — Paris 14ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        5520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75015\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "07b0b656-fb9b-4604-92f0-ae843bcbdea4",
+      "name": "Places — Paris 15ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        5712
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75016\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "d16d40a5-4a2a-4dc8-a7ee-46bab91db4cd",
+      "name": "Places — Paris 16ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        5904
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75017\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "f04c03af-25d3-4976-bcb7-8209c6ae994c",
+      "name": "Places — Paris 17ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        6096
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75018\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "99be7e50-8ebc-4db0-9c58-f4b1ee7c4e2e",
+      "name": "Places — Paris 18ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        6288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75019\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "c47d06bc-32c2-4cca-ba21-ef599f7febf4",
+      "name": "Places — Paris 19ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        6480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Paris 75020\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "fe0b4e67-13b2-4663-90f7-58aec029463e",
+      "name": "Places — Paris 20ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3024,
+        6672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fusionner les 20 requêtes Places\nconst allPlaces = [];\nfor (const item of $input.all()) {\n  const places = item.json.places || [];\n  allPlaces.push(...places);\n}\n// Dédoublonner par téléphone entre les requêtes\nconst seen = new Set();\nconst unique = [];\nfor (const p of allPlaces) {\n  const tel = (p.nationalPhoneNumber || '').replace(/\\s/g, '');\n  const key = tel || (p.displayName && p.displayName.text) || Math.random().toString();\n  if (!seen.has(key)) {\n    seen.add(key);\n    unique.push(p);\n  }\n}\nreturn [{ json: { places: unique, total_brut: allPlaces.length, total_unique: unique.length } }];"
+      },
+      "id": "4324d60e-fcc9-4180-bb87-c9fdb42b69a7",
+      "name": "Fusionner 20 requêtes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3248,
+        4848
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dernierID = $('Calculer dernier ID').first().json.lastID || 0;\nconst telsExistants = $('Calculer dernier ID').first().json.telsExistants || [];\nconst places = $input.first().json.places || [];\n\nconst motsCles = ['sophrologue','sophrologie','cabinet','therapie','therapeute','therapies','hypnotherapeute','hypnose','naturopathe','coach','coaching','bien-etre','bien etre','sante','certifie','certifiee','rncp','visio','stress','anxiete','sommeil','doula','numerologue','perinatale','perinatalite','specialise','specialisee','relaxation','mindfulness','pleine','conscience','stop','emotions','debordantes','paris','lyon','marseille','bordeaux','toulouse','nantes','lille','strasbourg','rennes','grenoble','nice','montpellier','metz','nancy'];\n\nconst cap = s => s.toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase());\nconst values = [];\nlet idCounter = dernierID;\n\nfor (const place of places) {\n  const tel = (place.nationalPhoneNumber || '').replace(/\\s/g, '');\n  if (tel && telsExistants.includes(tel)) continue;\n\n  const raw = (place.displayName && place.displayName.text) ? place.displayName.text : '';\n  let nomNettoye = raw.split(/[-|\\u00b7\\u2022,]/)[0].trim();\n  const regex = new RegExp('\\\\b(' + motsCles.join('|') + ')\\\\b', 'gi');\n  nomNettoye = nomNettoye.replace(regex, '').replace(/\\s+/g, ' ').trim();\n  nomNettoye = cap(nomNettoye);\n  const parts = nomNettoye.split(' ').filter(p => p.length > 1);\n  const prenom = parts[0] || raw;\n  const nom = parts.slice(1).join(' ') || '';\n\n  const adresse = place.formattedAddress || '';\n  const cpMatch = adresse.match(/(\\d{5})/);\n  const dept = cpMatch ? cpMatch[1].substring(0, 2) : '75';\n\n  idCounter++;\n  values.push([\n    String(idCounter), prenom, nom, raw, 'Paris', dept,\n    place.nationalPhoneNumber || '', '',\n    place.rating ? String(place.rating) : '',\n    place.userRatingCount ? String(place.userRatingCount) : '',\n    place.websiteUri || '', 'Non', 'Google Maps', 'A appeler', '', '',\n    'Extrait le ' + new Date().toLocaleDateString('fr-FR')\n  ]);\n}\n\nif (values.length === 0) {\n  return [{ json: { skipped: true, count: 0 } }];\n}\n\nreturn [{ json: { values: values, majorDimension: 'ROWS', count: values.length } }];"
+      },
+      "id": "66379f60-58d1-47ef-8ecd-62dee644cf12",
+      "name": "Extraire et dédoublonner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3472,
+        4848
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input.skipped || !input.values || input.values.length === 0) {\n  return [{ json: { skipped: true, body: '' } }];\n}\nconst body = JSON.stringify({\n  values: input.values,\n  majorDimension: 'ROWS'\n});\nreturn [{ json: { body: body, count: input.values.length } }];"
+      },
+      "id": "e2affeb7-eee6-4b95-85da-e6f8b95173ff",
+      "name": "Préparer body batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        4848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk/values/%F0%9F%8E%AF%20Prospection:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "050f5a88-e985-4039-9131-909852f0e3da",
+      "name": "Ecrire dans Google Sheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3792,
+        4848
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire Sheet": {
+      "main": [
+        [
+          {
+            "node": "Calculer dernier ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer dernier ID": {
+      "main": [
+        [
+          {
+            "node": "Places — Paris 1er",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 2ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 3ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 4ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 5ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 6ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 7ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 8ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 9ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 10ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 11ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 12ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 13ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 14ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 15ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 16ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 17ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 18ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 19ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Paris 20ème",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 1er": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 2ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 3ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 4ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 5ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 6ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 7ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 8ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 9ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 10ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 11ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 12ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 13ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 14ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 15ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 16ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 17ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 18ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 19ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Paris 20ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 20 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusionner 20 requêtes": {
+      "main": [
+        [
+          {
+            "node": "Extraire et dédoublonner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire et dédoublonner": {
+      "main": [
+        [
+          {
+            "node": "Préparer body batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer body batch": {
+      "main": [
+        [
+          {
+            "node": "Ecrire dans Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "df979c31-845d-4442-89fe-a691772c5ce4",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "F2x7L5tZGUvg9KLI",
+  "tags": [
+    {
+      "updatedAt": "2026-05-05T12:34:30.685Z",
+      "createdAt": "2026-05-05T12:34:30.685Z",
+      "id": "cJSZ4n5b3lMByM1I",
+      "name": "prospection"
+    },
+    {
+      "updatedAt": "2026-05-05T12:34:30.688Z",
+      "createdAt": "2026-05-05T12:34:30.688Z",
+      "id": "jg23P7S3NTNDO0my",
+      "name": "calymia"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "name": "Calymia — Cleanup séances",
+  "name": "DEV — Calymia — Cleanup séances",
   "nodes": [
     {
       "parameters": {
@@ -12,16 +12,18 @@
           ]
         }
       },
-      "id": "c1010000-0000-4000-8000-000000000001",
+      "id": "db241cd5-3fe3-43de-9fc2-0ad9c3fe02c4",
       "name": "Schedule Cleanup",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        448,
+        -112
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.com') + '/api/reservations/cleanup' }}",
+        "url": "=https://calymia.vercel.app/api/reservations/cleanup",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -33,13 +35,17 @@
         },
         "options": {}
       },
-      "id": "c1010000-0000-4000-8000-000000000002",
+      "id": "6f7f6cea-662b-46d2-a962-62c73b7b2e8c",
       "name": "HTTP Cleanup séances",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [280, 0]
+      "position": [
+        736,
+        -112
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Schedule Cleanup": {
       "main": [
@@ -53,14 +59,15 @@
       ]
     }
   },
-  "pinData": {},
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "staticData": null,
-  "tags": [],
   "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f6a9d7d1-7ba3-40ce-ab47-1a2feea12ac4",
   "meta": {
-    "templateCredsSetupCompleted": false
-  }
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "NQ1GCIComV0oMgDl",
+  "tags": []
 }
