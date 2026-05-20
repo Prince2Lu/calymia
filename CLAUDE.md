@@ -2,6 +2,8 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
+Dernière mise à jour : 20 mai 2026
+
 ---
 
 ## 1. Vue d'ensemble du projet
@@ -22,9 +24,10 @@ Calymia est une plateforme SaaS B2B2C pour les sophrologues en France.
 |---|---|---|
 | **URL app** | `calymia.vercel.app` | `app.calymia.com` |
 | **Supabase projet** | `cdfltpuzlkyoymjgdhcr` | `tsydrlqcshgnblgiacow` |
-| **Stripe** | TEST (clés test) | LIVE (clés live) |
+| **Stripe** | TEST (clés test) | LIVE (clés live) ✅ actif |
 | **Branche Git** | `develop` | `main` |
 | **Projet Vercel** | `calymia` | `calymia-prod` |
+| **n8n CALYMIA_BASE_URL** | `https://calymia.vercel.app` | `https://app.calymia.com` ✅ actif |
 
 ### Règle absolue
 **Toujours travailler sur la branche `develop`.** Ne jamais commiter directement sur `main`.  
@@ -37,6 +40,14 @@ git commit -m "feat/fix: description"
 git push origin develop
 vercel link  # sélectionner le projet "calymia" (pas "calymia-prod")
 vercel --prod
+```
+
+### Déploiement PROD
+```bash
+git checkout main
+git merge develop
+git push origin main
+git checkout develop
 ```
 
 ---
@@ -112,7 +123,9 @@ SELECT * FROM sophrologues WHERE user_id = auth.uid()
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
 | `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif` | |
 | `disponibilites` | `id`, `sophrologue_id`, `date_heure_debut`, `date_heure_fin`, `est_reserve` | |
+| `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut` | ⚠️ Pas `communications_log` |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
+| `seance_notes` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `contenu_html` | Pro+ uniquement |
 
 ### Horaires — format JSONB
 ```typescript
@@ -162,7 +175,12 @@ import { PlanGuard } from "@/components/PlanGuard"
 </PlanGuard>
 ```
 
-Plans : `essentiel` (29€, max 15 clients) / `professionnel` (59€, illimité) / `cabinet` (139€, V2)
+Plans : `essentiel` (29€, max 15 clients) / `professionnel` (59€, illimité) / `cabinet` (139€, V2 — grisé partout)
+
+### Trial Stripe Billing
+- Nouveaux inscrits → `plan = 'professionnel'` + `trial_ends_at = now + 14j`
+- Après 14j sans paiement → downgrade vers `essentiel` via webhook Stripe
+- Ne jamais modifier `plan` manuellement en dehors des webhooks Stripe
 
 ### Stripe — deux secrets distincts
 - `STRIPE_WEBHOOK_SECRET` est différent entre DEV et PROD
@@ -207,12 +225,14 @@ import { createClient } from "@supabase/supabase-js"
 - `numero_rpps` : affiché au-dessus de la section photos cabinet, uniquement si renseigné, avec infobulle définition
 - Tél, email, adresse : **non affichés** sur la page publique (force la réservation en ligne, protège la commission 3%)
 - Ces coordonnées sont transmises uniquement dans l'email de confirmation client
+- URL publique affichée dans l'onboarding étape 5 (confirmation) ET dans l'email de bienvenue
 
 ### Statut trial Stripe
 - Colonne utilisée : `trial_ends_at` (timestamp) sur la table `sophrologues` — pas de `stripe_status` en base
+- Colonne `essai_expire_at` : ancienne colonne, ignorée — utiliser uniquement `trial_ends_at`
 - Module centralisé : `src/lib/billing/trial-status.ts` avec `computeTrialDaysRemaining()` et `getSidebarPlanBadge()`
 - Logique :
-  - `trial_ends_at > now` → trial actif → badge vert "Essai gratuit — Xj"
+  - `trial_ends_at > now` → trial actif → badge `text-sm` vert "Essai gratuit — Xj"
   - Trial terminé + `plan === 'essentiel'` → "Essai expiré" badge rouge
   - Sinon → nom du plan (Essentiel / Professionnel / Cabinet)
 - `usePlan()` ne gère que les feature flags — ne pas y ajouter la logique trial
@@ -220,14 +240,26 @@ import { createClient } from "@supabase/supabase-js"
 
 ### Suppression d'un compte sophrologue en base (ordre FK)
 ```sql
-DELETE FROM paiements WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
-DELETE FROM communications WHERE seance_id IN (SELECT id FROM seances WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...'));
-DELETE FROM seances WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
-DELETE FROM disponibilites WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
-DELETE FROM types_seances WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
-DELETE FROM patients WHERE sophrologue_id = (SELECT id FROM sophrologues WHERE user_id = '...');
-DELETE FROM sophrologues WHERE user_id = '...';
+DO $$
+DECLARE
+  v_sophrologue_id UUID;
+BEGIN
+  SELECT id INTO v_sophrologue_id
+  FROM sophrologues
+  WHERE user_id = '...'; -- remplacer par le user_id
+
+  DELETE FROM seance_notes WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM communications WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM email_templates WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM seances WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM disponibilites WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM types_seances WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM parametres_cabinet WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM patients WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM sophrologues WHERE id = v_sophrologue_id;
+END $$;
 -- Puis supprimer l'user dans Supabase → Authentication → Users
+-- Et supprimer les fichiers Storage : buckets avatars, cabinet-photos, factures
 ```
 
 ### n8n — workflows déployés sur Hetzner (`automation.kls3-dev.com`)
@@ -236,9 +268,12 @@ DELETE FROM sophrologues WHERE user_id = '...';
 | `rappels-j1` | Cron 17h UTC | Emails rappel J-1 aux clients |
 | `post-seance` | Cron 20h UTC | Emails post-séance (Pro+) |
 | `cleanup-seances` | Cron /15min | Supprime séances en_attente expirées |
+| `génération-articles` | Manuel | Génère articles blog via Claude API + WordPress |
+| `génération-sujets-blog` | Cron dimanche | Génère liste sujets hebdomadaire |
 
 Les workflows appellent les endpoints `/api/cron/*` avec un Bearer token (`CRON_SECRET`).  
-**Ne jamais modifier les endpoints cron sans mettre à jour les workflows n8n.**
+**Ne jamais modifier les endpoints cron sans mettre à jour les workflows n8n.**  
+Exports JSON dans `n8n-workflows/` (prod), `n8n-workflows/Dev/` (dev), `n8n-workflows/Prospection/` (prospection).
 
 ### URLs publiques
 ```
@@ -253,26 +288,21 @@ Toujours utiliser `NEXT_PUBLIC_APP_URL` — jamais hardcoder `app.calymia.com` o
 
 **Mot de passe universel : `Test123456!`**
 
-### Sophrologues
+> ⚠️ Les données de test sont à recréer après chaque purge de la base DEV.  
+> Utiliser des emails réels accessibles à Eric pour recevoir les emails de test.
 
-| | Sophie Marchand | Thomas Petit |
-|---|---|---|
-| **Email** | `scarpinoeric@gmail.com` | `eric@calymia.com` |
-| **Plan** | Essentiel (29€) | Professionnel (59€) |
-| **Ville** | Lyon (69) | Paris (75) |
-| **sophrologue_id** | `1375cd38-9a25-4dd6-b876-d41feea6c2b5` | `dd607be9-4aa9-44b7-a7ab-19c4b7e59027` |
-| **URL publique DEV** | `calymia.vercel.app/sophrologues/69-rhone/lyon/sophie-marchand-lyon` | `calymia.vercel.app/sophrologues/75-paris/paris/thomas-petit-sophrologie` |
-| **Cas** | 14/15 clients, limite Essentiel | 3 clients, notes séance Pro |
+### Sophrologues DEV
+| | Compte test principal |
+|---|---|
+| **Email** | `scarpinoeric@gmail.com` |
+| **Slug** | `test-sophrologue-sarreguemines` |
+| **Ville** | Sarreguemines (57) |
+| **URL publique DEV** | `calymia.vercel.app/sophrologues/57-moselle/sarreguemines/test-sophrologue-sarreguemines` |
 
-### Clients
-
-| Prénom & Nom | Email | Sophrologue | Cas testé |
-|---|---|---|---|
-| Marie Dupont | `contact@kls3-dev.com` | Sophie | 6 séances, post-séance hier |
-| Camille Aubert | `scarpinolisa@gmail.com` | Sophie | RDV dans 3 jours |
-| Jean-Paul Renaud | `scarpinolilian@gmail.com` | Sophie | RDV demain → rappel J-1 |
-| Amandine Roux | `scarpinoveronique@gmail.com` | Sophie | Séance annulée |
-| Lucas Bernard | `scarpi.business@gmail.com` | Thomas | Post-séance + notes Pro |
+### Clients DEV
+| Email | Usage |
+|---|---|
+| `patient.test@calymia.com` | Client de test principal (mot de passe : `Test1234!`) |
 
 ### Cartes Stripe TEST
 - `4242 4242 4242 4242` / `12/26` / `123` → paiement réussi
@@ -299,20 +329,27 @@ curl -X POST https://calymia.vercel.app/api/cron/post-seance \
 
 ## 8. Ce qui est en V2 (ne pas implémenter maintenant)
 
-- SMS Twilio rappels J-1
-- Avis clients (table + token + modération)
-- Multi-praticiens plan Cabinet
-- Annuaire sophrologues / recherche
-- Google Agenda sync
-- Articles blog sophrologues (Tiptap déjà en place, URL `/articles/{slug}`)
+- SMS Twilio rappels J-1 (Pro+)
+- Avis clients (table + token unique post-séance + modération sophrologue + affichage page publique)
+- Multi-praticiens plan Cabinet (jusqu'à 5, agenda partagé)
+- Annuaire sophrologues / recherche par ville et spécialité
+- Google Agenda sync (OAuth)
+- Articles blog rédigés par les sophrologues (Tiptap déjà en place, URL `/articles/{slug}`)
+- Score de complétude du profil sophrologue dans le dashboard
+
+## 9. Ce qui est en V3
+
+- Back-office central Calymia (KPIs globaux, gestion sophrologues, monitoring abonnements, suivi revenus)
 
 ---
 
-## 9. Checklist avant chaque PR develop → main
+## 10. Checklist avant chaque PR develop → main
 
 - [ ] `npx tsc --noEmit` passe sans erreur
-- [ ] Testé sur `calymia.vercel.app` (DEV)
+- [ ] `npm run build` passe sans erreur
+- [ ] Testé sur `calymia.vercel.app` (DEV) — parcours complet si feature critique
 - [ ] Aucun `console.log` de debug laissé
 - [ ] `NEXT_PUBLIC_APP_URL` utilisé (jamais d'URL hardcodée)
 - [ ] Resend utilisé pour les emails (jamais SendGrid)
 - [ ] Branche `develop` uniquement (jamais commit direct sur `main`)
+- [ ] Pas de `any` TypeScript non justifié
