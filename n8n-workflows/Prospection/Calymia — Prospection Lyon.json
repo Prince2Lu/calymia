@@ -1,0 +1,824 @@
+{
+  "name": "Calymia — Prospection Lyon",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "16bf4843-2b2e-462d-84ea-08f09c2d4736",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1884665636,
+          "mode": "list",
+          "cachedResultName": "🎯 Prospection",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk/edit#gid=1884665636"
+        },
+        "options": {}
+      },
+      "id": "cf37d61b-b8bd-4701-88d8-f48d839662a8",
+      "name": "Lire Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -896,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst ids = items.map(r => parseInt(r.json['ID']) || 0).filter(n => n > 0);\nconst dernierID = ids.length > 0 ? Math.max(...ids) : 0;\nconst tels = items\n  .map(r => (r.json['Téléphone'] || '').replace(/\\s/g, ''))\n  .filter(t => t.length > 0);\nreturn [{ json: { lastID: dernierID, telsExistants: tels } }];"
+      },
+      "id": "c96e1a5c-14dc-4daa-9535-6d11e234ffeb",
+      "name": "Calculer dernier ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69001\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "d4057b03-bc30-4312-ae98-b0c363fd9d32",
+      "name": "Places — Lyon 1er",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69002\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "69267dca-683f-413b-adfd-c92030aa286b",
+      "name": "Places — Lyon 2ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69003\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "4445e9b5-c88c-490e-ba0c-5802ea741e09",
+      "name": "Places — Lyon 3ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69004\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "2c8bc882-7843-43db-a312-17ebf699a7e0",
+      "name": "Places — Lyon 4ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69005\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "30b321d9-efd9-4ba3-b623-faf357e125d0",
+      "name": "Places — Lyon 5ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69006\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "a0a0caaf-c5c2-41b6-a7cf-7ec3cdb61004",
+      "name": "Places — Lyon 6ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        640,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69007\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "09b9a6b0-aae5-4078-adc0-13ea3da94092",
+      "name": "Places — Lyon 7ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69008\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "a6fdf266-499a-4782-980f-956c2a5e5d76",
+      "name": "Places — Lyon 8ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        320,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Lyon 69009\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "119710f7-a13b-45e0-9888-48d856e1b665",
+      "name": "Places — Lyon 9ème",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        640,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allPlaces = [];\nfor (const item of $input.all()) {\n  const places = item.json.places || [];\n  allPlaces.push(...places);\n}\nconst seen = new Set();\nconst unique = [];\nfor (const p of allPlaces) {\n  const tel = (p.nationalPhoneNumber || '').replace(/\\s/g, '');\n  const key = tel || (p.displayName && p.displayName.text) || Math.random().toString();\n  if (!seen.has(key)) {\n    seen.add(key);\n    unique.push(p);\n  }\n}\nreturn [{ json: { places: unique, total_brut: allPlaces.length, total_unique: unique.length } }];"
+      },
+      "id": "8488339f-9ae6-4fb0-8cbc-8f22af085d1c",
+      "name": "Fusionner 9 requêtes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dernierID = $('Calculer dernier ID').first().json.lastID || 0;\nconst telsExistants = $('Calculer dernier ID').first().json.telsExistants || [];\nconst places = $input.first().json.places || [];\n\nconst motsCles = [\n  'sophrologue','sophrologie','cabinet','therapie','therapeute','therapies',\n  'hypnotherapeute','hypnose','naturopathe','coach','coaching','bien-etre',\n  'bien etre','sante','certifie','certifiee','rncp','visio','stress',\n  'anxiete','sommeil','doula','numerologue','perinatale','perinatalite',\n  'specialise','specialisee','relaxation','mindfulness','pleine','conscience',\n  'stop','emotions','debordantes','paris','lyon','marseille','bordeaux',\n  'toulouse','nantes','lille','strasbourg','rennes','grenoble','nice',\n  'montpellier','metz','nancy'\n];\n\nconst cap = s => s.toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase());\n\nconst results = [];\nlet idCounter = dernierID;\n\nfor (const place of places) {\n  const tel = (place.nationalPhoneNumber || '').replace(/\\s/g, '');\n  if (tel && telsExistants.includes(tel)) continue;\n\n  const raw = (place.displayName && place.displayName.text) ? place.displayName.text : '';\n  const nomCabinet = raw;\n\n  let nomNettoye = raw.split(/[-|·•,]/)[0].trim();\n  const regex = new RegExp('\\\\b(' + motsCles.join('|') + ')\\\\b', 'gi');\n  nomNettoye = nomNettoye.replace(regex, '').replace(/\\s+/g, ' ').trim();\n  nomNettoye = cap(nomNettoye);\n\n  const parts = nomNettoye.split(' ').filter(p => p.length > 1);\n  const prenom = parts[0] || raw;\n  const nom = parts.slice(1).join(' ') || '';\n\n  const adresse = place.formattedAddress || '';\n  const cpMatch = adresse.match(/(\\d{5})/);\n  const dept = cpMatch ? cpMatch[1].substring(0, 2) : '69';\n\n  idCounter++;\n\n  results.push({\n    json: {\n      'ID': idCounter,\n      'Prénom': prenom,\n      'Nom': nom,\n      'Nom Cabinet': nomCabinet,\n      'Ville': 'Lyon',\n      'Dép.': dept,\n      'Téléphone': place.nationalPhoneNumber || '',\n      'Email': '',\n      'Note Google ★': place.rating ? place.rating.toString() : '',\n      'Nb Avis': place.userRatingCount ? place.userRatingCount.toString() : '',\n      'Site Web': place.websiteUri || '',\n      'Bouton Résa ?': 'Non',\n      'Source': 'Google Maps',\n      'Statut': 'À appeler',\n      'Canal Gagnant': '',\n      'Date Contact': '',\n      'Notes': 'Extrait le ' + new Date().toLocaleDateString('fr-FR')\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "1358ac6b-6e49-4bf1-97a0-936c8f21b401",
+      "name": "Extraire et dédoublonner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1884665636,
+          "mode": "list",
+          "cachedResultName": "🎯 Prospection",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk/edit#gid=1884665636"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.ID }}",
+            "Prénom": "={{ $json['Prénom'] }}",
+            "Nom": "={{ $json.Nom }}",
+            "Nom Cabinet": "={{ $json['Nom Cabinet'] }}",
+            "Ville": "={{ $json.Ville }}",
+            "Dép.": "={{ $json['Dép.'] }}",
+            "Téléphone": "={{ $json['Téléphone'] }}",
+            "Email": "={{ $json.Email }}",
+            "Note Google ★": "={{ $json['Note Google ★'] }}",
+            "Nb Avis": "={{ $json['Nb Avis'] }}",
+            "Site Web": "={{ $json['Site Web'] }}",
+            "Bouton Résa ?": "={{ $json['Bouton Résa ?'] }}",
+            "Source": "={{ $json.Source }}",
+            "Statut": "={{ $json.Statut }}",
+            "Canal Gagnant": "={{ $json['Canal Gagnant'] }}",
+            "Date Contact": "={{ $json['Date Contact'] }}",
+            "Notes": "={{ $json.Notes }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Prénom",
+              "displayName": "Prénom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom",
+              "displayName": "Nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom Cabinet",
+              "displayName": "Nom Cabinet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ville",
+              "displayName": "Ville",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Dép.",
+              "displayName": "Dép.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone",
+              "displayName": "Téléphone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note Google ★",
+              "displayName": "Note Google ★",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nb Avis",
+              "displayName": "Nb Avis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Site Web",
+              "displayName": "Site Web",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Bouton Résa ?",
+              "displayName": "Bouton Résa ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut",
+              "displayName": "Statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Canal Gagnant",
+              "displayName": "Canal Gagnant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Contact",
+              "displayName": "Date Contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "06b33e6b-3d66-4039-96e6-6449ec3d05ef",
+      "name": "Ecrire dans Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1712,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire Sheet": {
+      "main": [
+        [
+          {
+            "node": "Calculer dernier ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer dernier ID": {
+      "main": [
+        [
+          {
+            "node": "Places — Lyon 1er",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 2ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 3ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 4ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 5ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 6ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 7ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 8ème",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Lyon 9ème",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 1er": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 2ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 3ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 4ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 5ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 6ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 7ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 8ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Lyon 9ème": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 9 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusionner 9 requêtes": {
+      "main": [
+        [
+          {
+            "node": "Extraire et dédoublonner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire et dédoublonner": {
+      "main": [
+        [
+          {
+            "node": "Ecrire dans Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e72f77e4-f2de-44e1-aa68-771e56c43b5d",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "JOHJKyNCvvJj6Eco",
+  "tags": []
+}

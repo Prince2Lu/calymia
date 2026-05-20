@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.com') + '/api/cron/post-seance' }}",
+        "url": "=https://app.calymia.com/api/cron/post-seance",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -59,12 +59,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "42a79eac-3796-41b5-9c39-5b389bcd7951",
+  "versionId": "e8b67334-61f3-40ed-94b3-efe9088617f9",
   "meta": {
     "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
   },

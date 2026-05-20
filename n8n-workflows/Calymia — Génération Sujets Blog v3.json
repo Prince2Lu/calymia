@@ -1,0 +1,440 @@
+{
+  "name": "Calymia — Génération Sujets Blog v3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "7a1f75f4-b6f2-4dbe-95aa-539c7087d6cc",
+      "name": "Cron Dimanche 20h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q",
+          "mode": "list",
+          "cachedResultName": "calymia-calendrier-editorial",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 765539264,
+          "mode": "list",
+          "cachedResultName": "Calendrier éditorial"
+        },
+        "options": {}
+      },
+      "id": "431fdc40-21eb-4101-88a7-2941de4a8a73",
+      "name": "Lire sujets existants",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\n\nconst existingTitles = rows.map(r => (r.json.titre || '').toLowerCase());\nconst existingKeywords = rows.map(r => (r.json.mot_cle_principal || '').toLowerCase());\nconst lastId = rows.reduce((max, r) => {\n  const num = parseInt((r.json.id || 'art-000').replace('art-', ''));\n  return num > max ? num : max;\n}, 0);\n\nconst system = \"Tu es expert SEO et rédacteur spécialisé bien-être et sophrologie pour le blog Calymia. Génère exactement 10 nouveaux sujets d'articles de blog. Catégories : Thérapies & bien-être (id:10), Stress & anxiété (id:11), Sommeil (id:12), Publics spécifiques (id:13), Pratique & quotidien (id:14), Santé mentale (id:15). Règles : titres 50-70 chars, meta_description exactement 150-160 chars, mots_cles_secondaires en STRING séparée par virgules (JAMAIS un tableau JSON), prompt_image scène calme crème et vert sans visage, angle éditorial précis avec ton format longueur. Varie les catégories max 3 par catégorie. Réponds UNIQUEMENT avec un tableau JSON valide sans backticks ni texte avant ou après.\";\n\nconst userMessage = \"Génère 10 nouveaux sujets pour le blog Calymia. Titres existants à ne pas répéter : \" + existingTitles.join(' | ') + \". Mots-clés déjà couverts : \" + existingKeywords.join(' | ') + \". IMPORTANT : mots_cles_secondaires doit être une STRING séparée par virgules.\";\n\nconst claudeBody = JSON.stringify({\n  model: \"claude-sonnet-4-6\",\n  max_tokens: 8000,\n  system: system,\n  messages: [{ role: \"user\", content: userMessage }]\n});\n\nreturn [{ json: { claudeBody, lastId, existingCount: rows.length } }];"
+      },
+      "id": "13aed43c-236a-4349-b109-88dc382b19cf",
+      "name": "Préparer prompt Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": {}
+      },
+      "id": "f649ed75-84f2-447f-baf5-d44869146e22",
+      "name": "Claude API — Générer sujets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        608,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "HvoZJIsIuzU8eEFp",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rawText = response.content[0].text;\n\nconst categorieMap = {\n  10: 'Thérapies & bien-être',\n  11: 'Stress & anxiété',\n  12: 'Sommeil',\n  13: 'Publics spécifiques',\n  14: 'Pratique & quotidien',\n  15: 'Santé mentale'\n};\n\nlet sujets;\ntry {\n  const cleaned = rawText.replace(/^```json\\s*/i, '').replace(/```\\s*$/i, '').trim();\n  sujets = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Parse error : ' + rawText.substring(0, 300));\n}\n\nif (!Array.isArray(sujets) || sujets.length === 0) {\n  throw new Error('Tableau vide ou invalide');\n}\n\nconst lastId = $('Préparer prompt Claude').first().json.lastId;\n\nconst rows = sujets.map((s, i) => {\n  const num = lastId + i + 1;\n  const id = 'art-' + String(num).padStart(3, '0');\n  const categorieId = parseInt(s.categorie_id || s.categorie);\n  const categorieNom = categorieMap[categorieId] || s.categorie || '';\n  const motsCles = Array.isArray(s.mots_cles_secondaires)\n    ? s.mots_cles_secondaires.join(', ')\n    : (s.mots_cles_secondaires || '');\n\n  return {\n    id, statut: 'pending',\n    titre: s.titre,\n    categorie: categorieNom,\n    categorie_id: categorieId,\n    mot_cle_principal: s.mot_cle_principal,\n    mots_cles_secondaires: motsCles,\n    meta_description: s.meta_description,\n    prompt_image: s.prompt_image,\n    angle: s.angle || '',\n    wp_post_id: '',\n    date_publication: ''\n  };\n});\n\nconst resume = rows.map(r => `• ${r.id} — ${r.titre}`).join('\\n');\nreturn rows.map(r => ({ json: { ...r, resume } }));"
+      },
+      "id": "6fa3409b-8e66-49c4-bb8b-ca0f21aad9bf",
+      "name": "Parser sujets Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q",
+          "mode": "list",
+          "cachedResultName": "calymia-calendrier-editorial",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 765539264,
+          "mode": "list",
+          "cachedResultName": "Calendrier éditorial"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "statut": "={{ $json.statut }}",
+            "titre": "={{ $json.titre }}",
+            "categorie": "={{ $json.categorie}}",
+            "categorie_id": "={{ $json.categorie_id }}",
+            "mot_cle_principal": "={{ $json.mot_cle_principal }}",
+            "mots_cles_secondaires": "={{ $json.mots_cles_secondaires }}",
+            "meta_description": "={{ $json.meta_description }}",
+            "prompt_image": "={{ $json.prompt_image }}",
+            "angle": "={{ $json.angle }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "statut",
+              "displayName": "statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titre",
+              "displayName": "titre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categorie",
+              "displayName": "categorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categorie_id",
+              "displayName": "categorie_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mot_cle_principal",
+              "displayName": "mot_cle_principal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mots_cles_secondaires",
+              "displayName": "mots_cles_secondaires",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "meta_description",
+              "displayName": "meta_description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prompt_image",
+              "displayName": "prompt_image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "angle",
+              "displayName": "angle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "wp_post_id",
+              "displayName": "wp_post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date_publication",
+              "displayName": "date_publication",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c29cb9b1-1489-47f5-a322-ffa27561363f",
+      "name": "Ajouter dans Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1008,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst resume = rows[0]?.json?.resume || 'Résumé non disponible';\nconst count = rows.length;\nconst date = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nreturn [{ json: { count, resume, date } }];"
+      },
+      "id": "38420e36-3332-4b2c-ac1c-0db5fe063685",
+      "name": "Préparer email récap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -224
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Calymia Blog <noreply@calymia.com>\",\n  \"to\": [\"eric@calymia.com\"],\n  \"subject\": \"📝 {{ $json.count }} nouveaux sujets ajoutés au calendrier éditorial\",\n  \"html\": \"<h2>Nouveaux sujets générés — {{ $json.date }}</h2><p><strong>{{ $json.count }} sujets</strong> ont été ajoutés au <a href='https://docs.google.com/spreadsheets/d/1t6PbU7szuHFpJu6zIfL65n8N1Y0CLs7JiecGwLGCn5Q'>calendrier éditorial</a>.</p><pre style='background:#f5f5f5;padding:16px;border-radius:8px;font-size:13px;'>{{ $json.resume }}</pre><p>Lance le workflow <strong>Génération Articles Blog</strong> dans n8n pour publier ces articles sur WordPress.</p>\"\n}",
+        "options": {}
+      },
+      "id": "a0c7b5bf-6eea-47f2-b0e3-44b8b1c9ae4a",
+      "name": "Email récap — Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1280,
+        -224
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Shxm82EahxvOFdRe",
+          "name": "Supabase Bearer Token"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Préparer email récap').first().json;\nreturn [{\n  json: {\n    success: true,\n    message: `${data.count} nouveaux sujets ajoutés au calendrier éditorial et email envoyé.`,\n    count: data.count,\n    date: data.date\n  }\n}];"
+      },
+      "id": "303b1f38-c67a-47de-a6f8-125bc04e39cc",
+      "name": "Résumé final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -224
+      ],
+      "disabled": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron Dimanche 20h": {
+      "main": [
+        [
+          {
+            "node": "Lire sujets existants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire sujets existants": {
+      "main": [
+        [
+          {
+            "node": "Préparer prompt Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer prompt Claude": {
+      "main": [
+        [
+          {
+            "node": "Claude API — Générer sujets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude API — Générer sujets": {
+      "main": [
+        [
+          {
+            "node": "Parser sujets Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser sujets Claude": {
+      "main": [
+        [
+          {
+            "node": "Ajouter dans Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ajouter dans Google Sheets": {
+      "main": [
+        []
+      ]
+    },
+    "Préparer email récap": {
+      "main": [
+        []
+      ]
+    },
+    "Email récap — Resend": {
+      "main": [
+        [
+          {
+            "node": "Résumé final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3260264d-9a23-4225-b10a-c65d939c3f48",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "0LusOL59zxnXIP0G",
+  "tags": []
+}

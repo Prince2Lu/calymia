@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.com') + '/api/reservations/cleanup' }}",
+        "url": "=https://app.calymia.com/api/reservations/cleanup",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -59,12 +59,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "8c958b51-58cd-4f5a-8295-3c74a65dc489",
+  "versionId": "81f0e53a-71b9-4d01-bb4a-a5be01662ed1",
   "meta": {
     "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
   },

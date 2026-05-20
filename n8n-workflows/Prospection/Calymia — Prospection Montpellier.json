@@ -1,0 +1,513 @@
+{
+  "name": "Calymia — Prospection Montpellier",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9c1a4494-8f6b-4b47-a9f6-52b1dc86e920",
+      "name": "Déclencheur manuel",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "🎯 Prospection",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "8f4048a9-4caf-451e-a35a-d4e8156887d3",
+      "name": "Lire Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1184,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst ids = items.map(r => parseInt(r.json['ID']) || 0).filter(n => n > 0);\nconst dernierID = ids.length > 0 ? Math.max(...ids) : 0;\nconst tels = items.map(r => (r.json['Téléphone'] || '').replace(/\\s/g, '')).filter(t => t.length > 0);\nreturn [{ json: { lastID: dernierID, telsExistants: tels } }];"
+      },
+      "id": "c79b1a1b-16cd-45e6-80f9-7d2ebfa22b13",
+      "name": "Calculer dernier ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Montpellier centre \\u00c9cusson\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "4c7e8255-2204-4d01-b85c-11baf09bc8bb",
+      "name": "Places — Req 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -736,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Montpellier nord Aiguelongue Boutonnet\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "6e66cafb-0cb0-4c9c-bec0-fcc59efa5663",
+      "name": "Places — Req 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -736,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyDCMXJGSWMwb4svGl6NjDDeKLr07pMK2QY"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"textQuery\": \"sophrologue Montpellier sud Port Marianne Odysseum\", \"languageCode\": \"fr\", \"maxResultCount\": 20}",
+        "options": {}
+      },
+      "id": "7b885b93-24d7-4491-ab50-49f748ccefaa",
+      "name": "Places — Req 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -736,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allPlaces = [];\nfor (const item of $input.all()) {\n  allPlaces.push(...(item.json.places || []));\n}\nconst seen = new Set();\nconst unique = [];\nfor (const p of allPlaces) {\n  const tel = (p.nationalPhoneNumber || '').replace(/\\s/g, '');\n  const key = tel || (p.displayName && p.displayName.text) || Math.random().toString();\n  if (!seen.has(key)) { seen.add(key); unique.push(p); }\n}\nreturn [{ json: { places: unique, total_brut: allPlaces.length, total_unique: unique.length } }];"
+      },
+      "id": "fc65c3aa-12e9-4935-a6b7-6e928cd13061",
+      "name": "Fusionner 3 requêtes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dernierID = $('Calculer dernier ID').first().json.lastID || 0;\nconst telsExistants = $('Calculer dernier ID').first().json.telsExistants || [];\nconst places = $input.first().json.places || [];\n\nconst motsCles = [\n  'sophrologue','sophrologie','cabinet','therapie','therapeute','therapies',\n  'hypnotherapeute','hypnose','naturopathe','coach','coaching','bien-etre',\n  'bien etre','sante','certifie','certifiee','rncp','visio','stress',\n  'anxiete','sommeil','doula','numerologue','perinatale','perinatalite',\n  'specialise','specialisee','relaxation','mindfulness','pleine','conscience',\n  'stop','emotions','debordantes','paris','lyon','marseille','bordeaux',\n  'toulouse','nantes','lille','strasbourg','rennes','grenoble','nice',\n  'montpellier','metz','nancy','rouen','centre','nord','sud','est','ouest',\n  'vieux','vieille','rive','droite','gauche','plateau','haut'\n];\n\nconst cap = s => s.toLowerCase().replace(/\\b\\w/g, c => c.toUpperCase());\nconst results = [];\nlet idCounter = dernierID;\n\nfor (const place of places) {\n  const tel = (place.nationalPhoneNumber || '').replace(/\\s/g, '');\n  if (tel && telsExistants.includes(tel)) continue;\n\n  const raw = (place.displayName && place.displayName.text) ? place.displayName.text : '';\n  const nomCabinet = raw;\n\n  let nomNettoye = raw.split(/[-|·•,]/)[0].trim();\n  const regex = new RegExp('\\\\b(' + motsCles.join('|') + ')\\\\b', 'gi');\n  nomNettoye = nomNettoye.replace(regex, '').replace(/\\s+/g, ' ').trim();\n  nomNettoye = cap(nomNettoye);\n\n  const parts = nomNettoye.split(' ').filter(p => p.length > 1);\n  const prenom = parts[0] || raw;\n  const nom = parts.slice(1).join(' ') || '';\n\n  const adresse = place.formattedAddress || '';\n  const cpMatch = adresse.match(/(\\d{5})/);\n  const dept = cpMatch ? cpMatch[1].substring(0, 2) : '';\n  const villeMatch = adresse.match(/\\d{5}\\s+(.+?)(?:,|$)/);\n  const ville = villeMatch ? villeMatch[1].trim() : '';\n\n  idCounter++;\n  results.push({\n    json: {\n      'ID': idCounter,\n      'Prénom': prenom,\n      'Nom': nom,\n      'Nom Cabinet': nomCabinet,\n      'Ville': ville,\n      'Dép.': dept,\n      'Téléphone': place.nationalPhoneNumber || '',\n      'Email': '',\n      'Note Google ★': place.rating ? place.rating.toString() : '',\n      'Nb Avis': place.userRatingCount ? place.userRatingCount.toString() : '',\n      'Site Web': place.websiteUri || '',\n      'Bouton Résa ?': 'Non',\n      'Source': 'Google Maps',\n      'Statut': 'À appeler',\n      'Canal Gagnant': '',\n      'Date Contact': '',\n      'Notes': 'Extrait le ' + new Date().toLocaleDateString('fr-FR')\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "d90579ea-eb93-4519-a2ae-c05ce3bcee81",
+      "name": "Extraire et dédoublonner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1LeCLK26cUEdlwiU4zO1gA_hhB6phDwNUzirNVn3uZfk",
+          "mode": "list",
+          "cachedResultName": "calymia-prospection-base"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "🎯 Prospection",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json['ID'] }}",
+            "Prénom": "={{ $json['Prénom'] }}",
+            "Nom": "={{ $json['Nom'] }}",
+            "Nom Cabinet": "={{ $json['Nom Cabinet'] }}",
+            "Ville": "={{ $json['Ville'] }}",
+            "Dép.": "={{ $json['Dép.'] }}",
+            "Téléphone": "={{ $json['Téléphone'] }}",
+            "Email": "={{ $json['Email'] }}",
+            "Note Google ★": "={{ $json['Note Google ★'] }}",
+            "Nb Avis": "={{ $json['Nb Avis'] }}",
+            "Site Web": "={{ $json['Site Web'] }}",
+            "Bouton Résa ?": "={{ $json['Bouton Résa ?'] }}",
+            "Source": "={{ $json['Source'] }}",
+            "Statut": "={{ $json['Statut'] }}",
+            "Canal Gagnant": "={{ $json['Canal Gagnant'] }}",
+            "Date Contact": "={{ $json['Date Contact'] }}",
+            "Notes": "={{ $json['Notes'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Prénom",
+              "displayName": "Prénom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom",
+              "displayName": "Nom",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nom Cabinet",
+              "displayName": "Nom Cabinet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ville",
+              "displayName": "Ville",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Dép.",
+              "displayName": "Dép.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Téléphone",
+              "displayName": "Téléphone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note Google ★",
+              "displayName": "Note Google ★",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nb Avis",
+              "displayName": "Nb Avis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Site Web",
+              "displayName": "Site Web",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Bouton Résa ?",
+              "displayName": "Bouton Résa ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut",
+              "displayName": "Statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Canal Gagnant",
+              "displayName": "Canal Gagnant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Contact",
+              "displayName": "Date Contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "04a4beb3-50a3-40a4-9da1-bfb4639a053c",
+      "name": "Ecrire dans Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -64,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KgnG7a1VK6P3t5of",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Déclencheur manuel": {
+      "main": [
+        [
+          {
+            "node": "Lire Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire Sheet": {
+      "main": [
+        [
+          {
+            "node": "Calculer dernier ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer dernier ID": {
+      "main": [
+        [
+          {
+            "node": "Places — Req 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Req 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Places — Req 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Req 1": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 3 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Req 2": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 3 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places — Req 3": {
+      "main": [
+        [
+          {
+            "node": "Fusionner 3 requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fusionner 3 requêtes": {
+      "main": [
+        [
+          {
+            "node": "Extraire et dédoublonner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire et dédoublonner": {
+      "main": [
+        [
+          {
+            "node": "Ecrire dans Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "532fe409-bec7-416b-999d-28685ba25f26",
+  "meta": {
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "rD1AVDPDAbbqf2iA",
+  "tags": []
+}

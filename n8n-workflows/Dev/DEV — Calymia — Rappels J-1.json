@@ -1,5 +1,5 @@
 {
-  "name": "Calymia — Post-séance",
+  "name": "DEV — Calymia — Rappels J-1",
   "nodes": [
     {
       "parameters": {
@@ -7,21 +7,23 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "*/15 * * * *"
+              "expression": "0 9 * * *"
             }
           ]
         }
       },
-      "id": "c1030000-0000-4000-8000-000000000001",
-      "name": "Schedule Post-séance",
+      "id": "239823ee-4cf8-4696-a65d-9643f1676281",
+      "name": "Schedule Rappels J-1",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{ ($env.CALYMIA_BASE_URL || 'https://calymia.com') + '/api/cron/post-seance' }}",
+        "url": "=https://calymia.vercel.app/api/cron/rappels-j1",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -33,19 +35,23 @@
         },
         "options": {}
       },
-      "id": "c1030000-0000-4000-8000-000000000002",
-      "name": "HTTP Post-séance",
+      "id": "8e65bbce-2074-4e5e-9201-884c8205fb2e",
+      "name": "HTTP Rappels J-1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [280, 0]
+      "position": [
+        288,
+        0
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
-    "Schedule Post-séance": {
+    "Schedule Rappels J-1": {
       "main": [
         [
           {
-            "node": "HTTP Post-séance",
+            "node": "HTTP Rappels J-1",
             "type": "main",
             "index": 0
           }
@@ -53,14 +59,15 @@
       ]
     }
   },
-  "pinData": {},
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "staticData": null,
-  "tags": [],
   "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "70ee56f8-f823-4ace-b8db-0e0d3f820eaa",
   "meta": {
-    "templateCredsSetupCompleted": false
-  }
+    "instanceId": "a32b17b741a642cbf9ed2f8de8f3bb2d317edcba818985f14a0c421da9f1b6ca"
+  },
+  "id": "PjktDOYyVVLdiWLo",
+  "tags": []
 }
