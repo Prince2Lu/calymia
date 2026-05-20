@@ -139,7 +139,13 @@ import { normalizeHoraires } from "@/lib/horaires"
 |---|---|---|
 | `avatars` | Public | Photos de profil |
 | `cabinet-photos` | Public | Photos cabinet (`{user_id}/{filename}`) |
-| `factures` | Public | Reçus PDF (`CAL-{année}-{seq}.pdf`) |
+| `factures` | Privé (URL signée) | Reçus PDF (`CAL-{année}-{seq}.pdf`) |
+
+### RLS — Règles de sécurité établies
+- Les policies `service_insert_*` doivent être restreintes au rôle `service_role` (jamais `public`)
+- Les buckets publics (`avatars`, `cabinet-photos`) : policy SELECT avec `USING (bucket_id = '...' AND name IS NOT NULL)` — pas de listing global
+- Vérifier les warnings Supabase (Performance & Security Lints) avant chaque merge PROD
+- Fonction `handle_updated_at` / `update_updated_at` : doit avoir `SET search_path = public, pg_catalog`
 
 ---
 
@@ -270,6 +276,7 @@ END $$;
 | `cleanup-seances` | Cron /15min | Supprime séances en_attente expirées |
 | `génération-articles` | Manuel | Génère articles blog via Claude API + WordPress |
 | `génération-sujets-blog` | Cron dimanche | Génère liste sujets hebdomadaire |
+| `prospection-google-places` | Manuel | Recherche sophrologues via Google Places API → Google Sheet |
 
 Les workflows appellent les endpoints `/api/cron/*` avec un Bearer token (`CRON_SECRET`).  
 **Ne jamais modifier les endpoints cron sans mettre à jour les workflows n8n.**  
