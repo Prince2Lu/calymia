@@ -19,6 +19,12 @@ import {
   parisCalendarMonthBounds,
   startOfParisCalendarDay,
 } from "@/lib/timezone";
+import ProfileScoreCard from "@/components/dashboard/ProfileScoreCard";
+import {
+  computeProfileScore,
+  type ProfileScoreItem,
+  type SophrologueRow,
+} from "@/lib/profile-score";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,6 +134,10 @@ export default function DashboardPage() {
   });
   const [seancesAujourdhui, setSeancesAujourdhui] = useState<Seance[]>([]);
   const [prochainsRdv, setProchainsRdv] = useState<Seance[]>([]);
+  const [profileScore, setProfileScore] = useState<{
+    score: number;
+    items: ProfileScoreItem[];
+  } | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -148,14 +158,19 @@ export default function DashboardPage() {
       // 2) Récupérer l'ID du sophrologue
       const { data: sophrologue } = await supabase
         .from("sophrologues")
-        .select("id")
+        .select(
+          "id, photo_url, bio, specialites, horaires, photos_cabinet, formations, numero_rpps, syndicats",
+        )
         .eq("user_id", user.id)
-        .maybeSingle<{ id: string }>();
+        .maybeSingle<SophrologueRow>();
 
       if (!sophrologue || cancelled) return;
       setSophrologueId(sophrologue.id);
 
       const sid = sophrologue.id;
+
+      // Score de complétude du profil
+      const scoreResult = await computeProfileScore(sophrologue, supabase);
 
       const now = new Date();
       const { start: debutMois, endExclusive: finMoisExcl } =
@@ -239,6 +254,7 @@ export default function DashboardPage() {
         });
         setSeancesAujourdhui(seancesJour ?? []);
         setProchainsRdv(prochainsData ?? []);
+        setProfileScore(scoreResult);
         setLoading(false);
       }
     };
@@ -304,6 +320,16 @@ export default function DashboardPage() {
                 />
               </div>
             </section>
+
+            {/* ── Score de complétude du profil ────────────────────────────── */}
+            {profileScore ? (
+              <ProfileScoreCard
+                score={profileScore.score}
+                items={profileScore.items}
+              />
+            ) : (
+              <div className="bg-white rounded-xl border border-slate-200 p-6 h-24 animate-pulse" />
+            )}
 
             {/* ── Section 2 : RDV du jour ───────────────────────────────────── */}
             <section>
