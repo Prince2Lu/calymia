@@ -29,19 +29,30 @@ function buildAvisHtml({
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${BG};">
     <tr>
       <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
           <tr>
-            <td style="padding:36px 32px;color:#374151;font-size:15px;line-height:1.6;">
+            <td style="background:${BRAND};padding:24px;text-align:center;">
+              <span style="display:inline-block;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:4px;">CALYMIA</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;color:#374151;font-size:15px;line-height:1.6;">
               <p style="margin:0 0 16px;color:#111827;font-size:16px;">Bonjour ${patientPrenom},</p>
-              <p style="margin:0 0 24px;">Votre séance avec ${sophrologuePrenom} est terminée. Partagez votre avis en 30 secondes.</p>
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 24px;">
+              <p style="margin:0 0 28px;">Votre séance avec ${sophrologuePrenom} est terminée. Partagez votre expérience en 30 secondes.</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 16px;">
                 <tr>
                   <td align="center" style="border-radius:8px;background:${BRAND};">
-                    <a href="${avisUrl}" style="display:inline-block;padding:14px 28px;color:#ffffff!important;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">Donner mon avis</a>
+                    <a href="${avisUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff!important;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">Donner mon avis</a>
                   </td>
                 </tr>
               </table>
               <p style="margin:0;text-align:center;font-size:13px;color:#9CA3AF;">Ce lien est valable 7 jours.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#FAF8F5;padding:20px 32px;text-align:center;border-top:1px solid #EFEAE3;">
+              <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#6B7280;">Calymia — Votre espace bien-être</p>
+              <p style="margin:0;font-size:12px;color:#9CA3AF;">Cet email est envoyé suite à votre séance de sophrologie.</p>
             </td>
           </tr>
         </table>
