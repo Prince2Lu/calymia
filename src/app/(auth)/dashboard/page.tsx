@@ -19,12 +19,8 @@ import {
   parisCalendarMonthBounds,
   startOfParisCalendarDay,
 } from "@/lib/timezone";
-import ProfileScoreCard from "@/components/dashboard/ProfileScoreCard";
-import {
-  computeProfileScore,
-  type ProfileScoreItem,
-  type SophrologueRow,
-} from "@/lib/profile-score";
+import ProfileScoreCardWrapper from "@/components/dashboard/ProfileScoreCardWrapper";
+import { type SophrologueRow } from "@/lib/profile-score";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,8 +130,7 @@ export default function DashboardPage() {
   });
   const [seancesAujourdhui, setSeancesAujourdhui] = useState<Seance[]>([]);
   const [prochainsRdv, setProchainsRdv] = useState<Seance[]>([]);
-  const [profileScore, setProfileScore] = useState<number | null>(null);
-  const [profileItems, setProfileItems] = useState<ProfileScoreItem[] | null>(
+  const [sophrologueRow, setSophrologueRow] = useState<SophrologueRow | null>(
     null,
   );
 
@@ -166,15 +161,9 @@ export default function DashboardPage() {
 
       if (!sophrologue || cancelled) return;
       setSophrologueId(sophrologue.id);
+      setSophrologueRow(sophrologue);
 
       const sid = sophrologue.id;
-
-      // Score de complétude du profil
-      const scoreResult = await computeProfileScore(sophrologue, supabase);
-      if (!cancelled) {
-        setProfileScore(scoreResult.score);
-        setProfileItems(scoreResult.items);
-      }
 
       const now = new Date();
       const { start: debutMois, endExclusive: finMoisExcl } =
@@ -430,10 +419,11 @@ export default function DashboardPage() {
         )}
 
         {/* ── Score de complétude du profil (indépendant du loading) ─────── */}
-        {profileScore !== null && profileItems !== null ? (
-          <ProfileScoreCard score={profileScore} items={profileItems} />
-        ) : (
-          <div className="bg-white rounded-xl border border-slate-200 p-6 h-24 animate-pulse" />
+        {sophrologueRow && (
+          <ProfileScoreCardWrapper
+            sophrologue={sophrologueRow}
+            supabase={supabase}
+          />
         )}
       </div>
     </main>
