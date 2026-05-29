@@ -4,10 +4,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { CreditCard, Info, MapPin, Star } from "lucide-react";
+import { CreditCard, Info, MapPin } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
 import { SophrologueRppsLine } from "@/components/public/SophrologueRppsLine";
 import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
+import { AvisPublicList } from "@/components/avis/AvisPublicList";
+import { AvisStars } from "@/components/avis/AvisStars";
 import { computeNextAvailableSlotIso } from "@/lib/booking/compute-next-slot";
 import { getParisJsDayOfWeek } from "@/lib/timezone";
 import {
@@ -18,6 +20,8 @@ import {
   type HorairesSophrologue,
   type JourSemaine,
 } from "@/lib/horaires";
+
+export const revalidate = 3600;
 
 const getSupabase = () =>
   createClient(
@@ -258,14 +262,32 @@ export default async function SophrologueProfilPage({
 
   const supabase = getSupabase();
 
-  const [{ data: disponibilites }, prochainIso] = await Promise.all([
-    supabase
-      .from("disponibilites")
-      .select("jour_semaine, heure_debut, heure_fin, actif")
-      .eq("sophrologue_id", sophrologue.id)
-      .eq("actif", true),
-    computeNextAvailableSlotIso(supabase, String(sophrologue.id)),
-  ]);
+  const [{ data: disponibilites }, prochainIso, { data: avisNotes }] =
+    await Promise.all([
+      supabase
+        .from("disponibilites")
+        .select("jour_semaine, heure_debut, heure_fin, actif")
+        .eq("sophrologue_id", sophrologue.id)
+        .eq("actif", true),
+      computeNextAvailableSlotIso(supabase, String(sophrologue.id)),
+      supabase
+        .from("avis")
+        .select("note")
+        .eq("sophrologue_id", sophrologue.id)
+        .eq("statut", "approuve")
+        .returns<{ note: number | null }[]>(),
+    ]);
+
+  const notesApprouvees = (avisNotes ?? [])
+    .map((a) => a.note)
+    .filter((n): n is number => typeof n === "number");
+  const avisCount = notesApprouvees.length;
+  const avisMoyenne =
+    avisCount > 0
+      ? Math.round(
+          (notesApprouvees.reduce((sum, n) => sum + n, 0) / avisCount) * 10,
+        ) / 10
+      : 0;
 
   const horaires = resolvePublicHoraires(sophrologue.horaires, disponibilites ?? []);
   const prenom = sophrologue.prenom ?? "";
@@ -352,7 +374,7 @@ export default async function SophrologueProfilPage({
     { id: "infos", show: showInfos },
     { id: "horaires", show: showHorairesBloc },
     { id: "tags", show: showTags },
-    { id: "avis", show: true },
+    { id: "avis", show: avisCount > 0 },
   ];
   const visibleIdx = sectionMeta
     .map((s, i) => (s.show ? i : -1))
@@ -622,14 +644,13 @@ export default async function SophrologueProfilPage({
             )}
 
             {sepBefore(6) && <hr className="my-10 border-slate-200" />}
-            <section>
-              <h2 className="mb-3 text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
-                Avis clients
-              </h2>
-              <div className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm italic text-gray-400">
-                Les avis clients arrivent bientôt.
-              </div>
-            </section>
+            {avisCount > 0 && (
+              <AvisPublicList
+                sophrologueId={sophrologue.id}
+                noteMoyenne={avisMoyenne}
+                avisCount={avisCount}
+              />
+            )}
           </div>
 
           {/* ── Sidebar : enfant direct du grid (pas dans la colonne gauche) ─ */}
@@ -679,14 +700,15 @@ export default async function SophrologueProfilPage({
                 Prendre rendez-vous
               </Link>
 
-              <div className="border-t border-gray-100 pt-4 text-center">
-                <div className="mb-1 flex justify-center gap-0.5 text-slate-300">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-current" aria-hidden />
-                  ))}
+              {avisCount > 0 && (
+                <div className="flex flex-col items-center gap-1 border-t border-gray-100 pt-4 text-center">
+                  <AvisStars
+                    mode="display"
+                    value={avisMoyenne}
+                    count={avisCount}
+                  />
                 </div>
-                <p className="text-[11px] text-slate-500">Bientôt disponible</p>
-              </div>
+              )}
             </div>
           </div>
         </div>
