@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { buildCronPostSeanceEmail } from "@/lib/email-templates/cron-build";
 import { sendEmail } from "@/lib/emails/send";
-import { sendAvisEmail } from "@/lib/emails/avis";
+import { sendAvisEmail, sendAvisNotificationSophrologue } from "@/lib/emails/avis";
 import { formatParisTime } from "@/lib/timezone";
 
 const supabase = createClient(
@@ -149,6 +149,27 @@ async function processAvisEmails(): Promise<number> {
 
     if (updErr) {
       console.error("[post-seance][avis] Erreur maj email_envoye:", inserted.id, updErr.message);
+    }
+
+    const sophrologueEmail = sophrologue?.email_pro?.trim();
+    if (sophrologueEmail) {
+      const notif = await sendAvisNotificationSophrologue({
+        sophrologueEmail,
+        sophrologuePrenom: (sophrologue?.prenom ?? "").trim() || "cher praticien",
+        patientPrenom: (patient?.prenom ?? "").trim() || "Un client",
+      });
+      if (!notif.success) {
+        console.error(
+          "[post-seance][avis] Échec notification sophrologue:",
+          row.id,
+          notif.error,
+        );
+      }
+    } else {
+      console.warn(
+        "[post-seance][avis] Pas d'email sophrologue (email_pro) — séance:",
+        row.id,
+      );
     }
 
     const { error: logErr } = await supabase.from("communications").insert({
