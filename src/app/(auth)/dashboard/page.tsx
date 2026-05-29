@@ -171,6 +171,7 @@ export default function DashboardPage() {
 
       // Score de complétude du profil
       const scoreResult = await computeProfileScore(sophrologue, supabase);
+      console.log('[ProfileScore] result:', scoreResult);
 
       const now = new Date();
       const { start: debutMois, endExclusive: finMoisExcl } =
@@ -264,6 +265,8 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [supabase]);
+
+  console.log('[ProfileScore] render state:', profileScore);
 
   return (
     <main className="min-h-screen bg-slate-50">
