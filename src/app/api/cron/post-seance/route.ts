@@ -92,6 +92,9 @@ async function processAvisEmails(): Promise<number> {
     return 0;
   }
 
+  console.log("[avis-debug] rows:", JSON.stringify(rows, null, 2));
+  console.log("[avis-debug] start:", start, "end:", end);
+
   let avis_sent = 0;
 
   for (const row of rows ?? []) {
