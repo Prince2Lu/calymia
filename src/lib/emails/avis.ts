@@ -15,7 +15,7 @@ function buildAvisHtml({
   sophrologuePrenom,
   token,
 }: Pick<SendAvisEmailParams, "patientPrenom" | "sophrologuePrenom" | "token">): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://calymia.com";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://calymia.com";
   const avisUrl = `${baseUrl}/avis?token=${encodeURIComponent(token)}`;
 
   return `<!DOCTYPE html>

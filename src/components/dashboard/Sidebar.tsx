@@ -12,6 +12,7 @@ import {
   Mail,
   Settings,
   CreditCard,
+  Star,
   LogOut,
 } from "lucide-react";
 import { getSidebarPlanBadge } from "@/lib/billing/trial-status";
@@ -25,11 +26,14 @@ type NavItem = {
 };
 
 type SophrologueInfo = {
+  id: string;
   prenom: string | null;
   nom: string | null;
   plan: string | null;
   trial_ends_at: string | null;
 };
+
+const AVIS_HREF = "/dashboard/avis";
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
@@ -60,6 +64,11 @@ const NAV_ITEMS: NavItem[] = [
     icon: <Mail className="h-4 w-4" />,
   },
   {
+    label: "Avis",
+    href: AVIS_HREF,
+    icon: <Star className="h-4 w-4" />,
+  },
+  {
     label: "Abonnement",
     href: "/dashboard/abonnement",
     icon: <CreditCard className="h-4 w-4" />,
@@ -77,6 +86,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [sophrologue, setSophrologue] = useState<SophrologueInfo | null>(null);
+  const [avisEnAttente, setAvisEnAttente] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
 
   const supabase = createBrowserClient(
@@ -94,11 +104,22 @@ export default function Sidebar() {
 
       const { data } = await supabase
         .from("sophrologues")
-        .select("prenom, nom, plan, trial_ends_at")
+        .select("id, prenom, nom, plan, trial_ends_at")
         .eq("user_id", user.id)
         .maybeSingle<SophrologueInfo>();
 
-      if (!cancelled) setSophrologue(data ?? null);
+      if (cancelled) return;
+      setSophrologue(data ?? null);
+
+      if (data?.id) {
+        const { count } = await supabase
+          .from("avis")
+          .select("id", { count: "exact", head: true })
+          .eq("sophrologue_id", data.id)
+          .eq("statut", "en_attente");
+
+        if (!cancelled) setAvisEnAttente(count ?? 0);
+      }
     };
     load();
     return () => {
@@ -167,6 +188,11 @@ export default function Sidebar() {
                     {item.icon}
                   </span>
                   <span className="flex-1 truncate">{item.label}</span>
+                  {item.href === AVIS_HREF && avisEnAttente > 0 && (
+                    <span className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white">
+                      {avisEnAttente > 9 ? "9+" : avisEnAttente}
+                    </span>
+                  )}
                 </a>
               </li>
             );
