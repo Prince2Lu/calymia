@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 20 mai 2026
+Dernière mise à jour : 29 mai 2026
 
 ---
 
@@ -126,6 +126,7 @@ SELECT * FROM sophrologues WHERE user_id = auth.uid()
 | `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut` | ⚠️ Pas `communications_log` |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
 | `seance_notes` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `contenu_html` | Pro+ uniquement |
+| `avis` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `token`, `token_expire_at`, `token_utilise`, `note`, `commentaire`, `statut`, `email_envoye` | `statut` = 'en_attente' / 'approuve' / 'rejete' — token valable 7j |
 
 ### Horaires — format JSONB
 ```typescript
@@ -254,6 +255,7 @@ BEGIN
   FROM sophrologues
   WHERE user_id = '...'; -- remplacer par le user_id
 
+  DELETE FROM avis WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM seance_notes WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM communications WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM email_templates WHERE sophrologue_id = v_sophrologue_id;
@@ -337,7 +339,6 @@ curl -X POST https://calymia.vercel.app/api/cron/post-seance \
 ## 8. Ce qui est en V2 (ne pas implémenter maintenant)
 
 - SMS Twilio rappels J-1 (Pro+)
-- Avis clients (table + token unique post-séance + modération sophrologue + affichage page publique)
 - Multi-praticiens plan Cabinet (jusqu'à 5, agenda partagé)
 - Annuaire sophrologues / recherche par ville et spécialité
 - Google Agenda sync (OAuth)
