@@ -134,10 +134,10 @@ export default function DashboardPage() {
   });
   const [seancesAujourdhui, setSeancesAujourdhui] = useState<Seance[]>([]);
   const [prochainsRdv, setProchainsRdv] = useState<Seance[]>([]);
-  const [profileScore, setProfileScore] = useState<{
-    score: number;
-    items: ProfileScoreItem[];
-  } | null>(null);
+  const [profileScore, setProfileScore] = useState<number | null>(null);
+  const [profileItems, setProfileItems] = useState<ProfileScoreItem[] | null>(
+    null,
+  );
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -171,7 +171,10 @@ export default function DashboardPage() {
 
       // Score de complétude du profil
       const scoreResult = await computeProfileScore(sophrologue, supabase);
-      console.log('[ProfileScore] result:', scoreResult);
+      if (!cancelled) {
+        setProfileScore(scoreResult.score);
+        setProfileItems(scoreResult.items);
+      }
 
       const now = new Date();
       const { start: debutMois, endExclusive: finMoisExcl } =
@@ -255,7 +258,6 @@ export default function DashboardPage() {
         });
         setSeancesAujourdhui(seancesJour ?? []);
         setProchainsRdv(prochainsData ?? []);
-        setProfileScore(scoreResult);
         setLoading(false);
       }
     };
@@ -265,8 +267,6 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [supabase]);
-
-  console.log('[ProfileScore] render state:', profileScore);
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -323,16 +323,6 @@ export default function DashboardPage() {
                 />
               </div>
             </section>
-
-            {/* ── Score de complétude du profil ────────────────────────────── */}
-            {profileScore ? (
-              <ProfileScoreCard
-                score={profileScore.score}
-                items={profileScore.items}
-              />
-            ) : (
-              <div className="bg-white rounded-xl border border-slate-200 p-6 h-24 animate-pulse" />
-            )}
 
             {/* ── Section 2 : RDV du jour ───────────────────────────────────── */}
             <section>
@@ -437,6 +427,13 @@ export default function DashboardPage() {
               </Card>
             </section>
           </>
+        )}
+
+        {/* ── Score de complétude du profil (indépendant du loading) ─────── */}
+        {profileScore !== null && profileItems !== null ? (
+          <ProfileScoreCard score={profileScore} items={profileItems} />
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 p-6 h-24 animate-pulse" />
         )}
       </div>
     </main>
