@@ -58,14 +58,14 @@ git checkout develop
 src/
 ├── app/
 │   ├── (auth)/              # Dashboard sophrologue (protégé)
-│   │   ├── dashboard/       # KPIs + agenda
+│   │   ├── dashboard/       # KPIs + agenda + score complétude profil
 │   │   ├── seances/         # Agenda semaine + drawer détail
 │   │   ├── clients/         # Liste + fiche client [id]
 │   │   ├── patient/         # Espace client
 │   │   ├── parametres/      # 4 onglets dont Cabinet/Vitrine
 │   │   ├── emails/          # Templates emails (Pro+)
 │   │   ├── communications/  # Journal (Pro+)
-│   │   └── abonnement/      # Plans & abonnement
+│   │   └── abonnement/      # Plans & abonnement ✅ Stripe Billing actif
 │   ├── (public)/
 │   │   └── sophrologues/[dept]/[ville]/[slug]/  # Page publique SSR
 │   │       └── reserver/    # Tunnel réservation 4 étapes
@@ -78,6 +78,9 @@ src/
 │       ├── reservations/    # Gestion réservations
 │       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
 ├── components/
+│   ├── dashboard/
+│   │   ├── ProfileScoreCard.tsx         # Widget score complétude (Server Component)
+│   │   └── ProfileScoreCardWrapper.tsx  # Wrapper client pour ProfileScoreCard
 │   ├── factures/            # BoutonFacture.tsx
 │   ├── public/              # SophrologueRppsLine.tsx (infobulle RPPS, "use client")
 │   ├── ui/                  # Composants partagés
@@ -93,6 +96,7 @@ src/
     │   └── generate.tsx     # Génération PDF reçu de paiement
     ├── emails/
     │   └── templates.ts     # Templates emails Resend
+    ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow
     ├── horaires.ts          # normalizeHoraires(), resolvePublicHoraires(), horairesFromDisponibilites()
     ├── supabase/            # Clients Supabase (browser + server)
     └── timezone.ts          # formatParisTime()
@@ -126,7 +130,6 @@ SELECT * FROM sophrologues WHERE user_id = auth.uid()
 | `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut` | ⚠️ Pas `communications_log` |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
 | `seance_notes` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `contenu_html` | Pro+ uniquement |
-| `avis` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `token`, `token_expire_at`, `token_utilise`, `note`, `commentaire`, `statut`, `email_envoye` | `statut` = 'en_attente' / 'approuve' / 'rejete' — token valable 7j |
 
 ### Horaires — format JSONB
 ```typescript
@@ -208,6 +211,14 @@ import { createClient } from "@supabase/supabase-js"
 
 ## 6. Patterns établis
 
+### Score de complétude du profil
+- Calcul dans `src/lib/profile-score.ts` — fonction `computeProfileScore(sophrologue, supabase)`
+- 10 critères × 10 points = score 0–100
+- Affiché dans le dashboard via `ProfileScoreCardWrapper` (Client Component) → `ProfileScoreCard`
+- Critères : photo_url, bio (>50 chars), specialites, types_seances actifs, disponibilites, horaires JSONB, photos_cabinet, formations, numero_rpps, syndicats
+- Liens directs vers `/dashboard/parametres?tab={profil|seances|disponibilites|vitrine}`
+- `SophrologueRow` : type structurel défini dans `profile-score.ts` (pas de type centralisé pour l'instant)
+
 ### Facture PDF
 - Générée dans `src/lib/factures/generate.tsx` via `@react-pdf/renderer`
 - Déclenchée par le webhook `payment_intent.succeeded`
@@ -255,7 +266,6 @@ BEGIN
   FROM sophrologues
   WHERE user_id = '...'; -- remplacer par le user_id
 
-  DELETE FROM avis WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM seance_notes WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM communications WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM email_templates WHERE sophrologue_id = v_sophrologue_id;
@@ -274,7 +284,7 @@ END $$;
 | Workflow | Déclencheur | Action |
 |---|---|---|
 | `rappels-j1` | Cron 17h UTC | Emails rappel J-1 aux clients |
-| `post-seance` | Cron 20h UTC | Emails post-séance (Pro+) |
+| `post-seance` | Cron 20h UTC | Emails post-séance + lien avis (Pro+) |
 | `cleanup-seances` | Cron /15min | Supprime séances en_attente expirées |
 | `génération-articles` | Manuel | Génère articles blog via Claude API + WordPress |
 | `génération-sujets-blog` | Cron dimanche | Génère liste sujets hebdomadaire |
@@ -300,18 +310,18 @@ Toujours utiliser `NEXT_PUBLIC_APP_URL` — jamais hardcoder `app.calymia.com` o
 > ⚠️ Les données de test sont à recréer après chaque purge de la base DEV.  
 > Utiliser des emails réels accessibles à Eric pour recevoir les emails de test.
 
-### Sophrologues DEV
-| | Compte test principal |
-|---|---|
-| **Email** | `scarpinoeric@gmail.com` |
-| **Slug** | `test-sophrologue-sarreguemines` |
-| **Ville** | Sarreguemines (57) |
-| **URL publique DEV** | `calymia.vercel.app/sophrologues/57-moselle/sarreguemines/test-sophrologue-sarreguemines` |
+### Sophrologues DEV (IDs à jour au 29 mai 2026)
+| | Compte test principal | Compte Thomas Petit |
+|---|---|---|
+| **Email** | `scarpinoeric@gmail.com` | `eric@calymia.com` |
+| **Sophrologue `id`** | `6d7b19df-27a5-46d5-9ade-58216303276b` | `dd607be9-4aa9-44b7-a7ab-19c4b7e59027` |
+| **`user_id`** | `75cf2311-912d-41aa-8450-62e079085ea2` | `eaffea83-8e58-4c88-a58a-eef7aeae4555` |
 
 ### Clients DEV
 | Email | Usage |
 |---|---|
-| `patient.test@calymia.com` | Client de test principal (mot de passe : `Test1234!`) |
+| `scarpi.business@gmail.com` | Client de test principal |
+| `patient.test@calymia.com` | Client de test secondaire (mot de passe : `Test1234!`) |
 
 ### Cartes Stripe TEST
 - `4242 4242 4242 4242` / `12/26` / `123` → paiement réussi
@@ -339,11 +349,11 @@ curl -X POST https://calymia.vercel.app/api/cron/post-seance \
 ## 8. Ce qui est en V2 (ne pas implémenter maintenant)
 
 - SMS Twilio rappels J-1 (Pro+)
+- Avis clients — ⚠️ en cours de debug (mail avis non envoyé par post-seance)
 - Multi-praticiens plan Cabinet (jusqu'à 5, agenda partagé)
 - Annuaire sophrologues / recherche par ville et spécialité
 - Google Agenda sync (OAuth)
 - Articles blog rédigés par les sophrologues (Tiptap déjà en place, URL `/articles/{slug}`)
-- Score de complétude du profil sophrologue dans le dashboard
 
 ## 9. Ce qui est en V3
 
