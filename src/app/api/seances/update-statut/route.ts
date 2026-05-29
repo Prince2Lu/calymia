@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { waitUntil } from "@vercel/functions";
 import { sendAvisEmail, sendAvisNotificationSophrologue } from "@/lib/emails/avis";
 
 const supabase = createClient(
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (statut === "terminee") {
-      void triggerAvisFlow(String(seance_id));
+      waitUntil(triggerAvisFlow(String(seance_id)));
     }
 
     return NextResponse.json({ success: true });
