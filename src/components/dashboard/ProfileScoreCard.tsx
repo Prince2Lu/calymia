@@ -36,7 +36,8 @@ function impactBadgeClass(impact: ProfileImpact): string {
 function progressBarClass(score: number): string {
   if (score < 40) return "bg-red-500";
   if (score < 70) return "bg-amber-500";
-  return "bg-emerald-400";
+  if (score < 100) return "bg-emerald-400";
+  return "bg-emerald-500";
 }
 
 function buildAmberMessage(missing: ProfileScoreItem[]): string {
@@ -52,6 +53,14 @@ function ContextMessage({
   score: number;
   missing: ProfileScoreItem[];
 }) {
+  if (score >= 100) {
+    return (
+      <div className="rounded-r-md border-l-[3px] border-green-500 bg-green-50 px-4 py-3 text-sm text-green-800">
+        Votre profil est complet à 100% — excellent pour votre référencement Google !
+      </div>
+    );
+  }
+
   if (score < 40) {
     return (
       <div className="rounded-r-md border-l-[3px] border-red-400 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -101,9 +110,15 @@ function MissingItem({ item }: { item: ProfileScoreItem }) {
   );
 }
 
-function CompletedItem({ item }: { item: ProfileScoreItem }) {
+function CompletedItem({
+  item,
+  dimmed,
+}: {
+  item: ProfileScoreItem;
+  dimmed: boolean;
+}) {
   return (
-    <li className="flex items-center gap-3 opacity-50">
+    <li className={`flex items-center gap-3 ${dimmed ? "opacity-50" : ""}`}>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
         <Check className="h-4 w-4" aria-hidden />
       </span>
@@ -121,22 +136,9 @@ function CompletedItem({ item }: { item: ProfileScoreItem }) {
 }
 
 export default function ProfileScoreCard({ score, items }: Props) {
-  if (score >= 100) {
-    return (
-      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-6">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
-          <Check className="h-5 w-5" aria-hidden />
-        </span>
-        <p className="flex-1 text-sm font-medium text-slate-800">
-          Votre profil est complet — excellent pour votre référencement !
-        </p>
-        <span className="text-sm font-medium text-[#2D6A4F]">100%</span>
-      </div>
-    );
-  }
-
   const missing = items.filter((item) => !item.completed);
   const completed = items.filter((item) => item.completed);
+  const isComplete = score >= 100;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -178,19 +180,17 @@ export default function ProfileScoreCard({ score, items }: Props) {
       )}
 
       {completed.length > 0 && (
-        <>
-          <hr className="my-6 border-slate-100" />
-          <div>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Déjà complétés
-            </h3>
-            <ul className="space-y-3">
-              {completed.map((item) => (
-                <CompletedItem key={item.key} item={item} />
-              ))}
-            </ul>
-          </div>
-        </>
+        <div className="mt-6">
+          {missing.length > 0 && <hr className="mb-6 border-slate-100" />}
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Déjà complétés
+          </h3>
+          <ul className="space-y-3">
+            {completed.map((item) => (
+              <CompletedItem key={item.key} item={item} dimmed={!isComplete} />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
