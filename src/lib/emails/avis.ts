@@ -1,6 +1,6 @@
 const BRAND = "#2D6A4F";
 const BG = "#FAF8F5";
-const RESEND_FROM = "Calymia <contact@calymia.com>";
+const RESEND_FROM = "Calymia <bonjour@calymia.com>";
 
 export type SendAvisEmailParams = {
   patientEmail: string;
