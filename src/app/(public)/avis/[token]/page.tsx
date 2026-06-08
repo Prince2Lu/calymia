@@ -9,14 +9,13 @@ export const metadata: Metadata = {
   robots: "noindex, nofollow",
 };
 
-export default async function AvisPage({
-  searchParams,
+export default async function AvisTokenPage({
+  params,
 }: {
-  searchParams: Promise<{ token?: string | string[] }>;
+  params: Promise<{ token: string }>;
 }) {
-  const params = await searchParams;
-  const rawToken = params.token;
-  const token = (Array.isArray(rawToken) ? rawToken[0] : rawToken)?.trim();
+  const { token: rawToken } = await params;
+  const token = rawToken?.trim();
 
   if (!token) {
     return (

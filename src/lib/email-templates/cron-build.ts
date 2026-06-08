@@ -83,6 +83,37 @@ export async function buildCronRappelJ1Email(
   };
 }
 
+export function buildAvisEmail(args: {
+  prenomClient: string;
+  prenomSophro: string;
+  nomSophro: string;
+  avisUrl: string;
+}): { subject: string; html: string } {
+  const sophro =
+    `${args.prenomSophro} ${args.nomSophro}`.trim() || "votre sophrologue";
+  const prenomSophro = args.prenomSophro.trim() || "Votre sophrologue";
+
+  const content = `
+    <p style="margin:0 0 16px;">Bonjour ${args.prenomClient},</p>
+    <p style="margin:0 0 16px;">J'espère que votre séance s'est bien passée. Votre retour m'aiderait beaucoup et permettrait à d'autres personnes de me découvrir.</p>
+    <p style="margin:0 0 24px;">Auriez-vous quelques instants pour partager votre avis ?</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 24px;">
+      <tr>
+        <td align="center" style="border-radius:8px;background:#3D6B2F;">
+          <a href="${args.avisUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff!important;text-decoration:none;font-weight:600;font-size:15px;border-radius:8px;">Laisser mon avis</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 24px;text-align:center;font-size:13px;color:#9ca3af;">Ce lien est valable 30 jours.</p>
+    <p style="margin:24px 0 0;">Merci et prenez soin de vous,<br><strong>${prenomSophro}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
+  `;
+
+  return {
+    subject: `${args.prenomClient}, partagez votre avis sur votre séance avec ${sophro} 🌿`,
+    html: wrapSophrologueEmailHtml(content),
+  };
+}
+
 export async function buildCronPostSeanceEmail(
   admin: SupabaseClient,
   args: {

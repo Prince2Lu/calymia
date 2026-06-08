@@ -1,0 +1,114 @@
+import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
+import { AvisForm } from "@/components/avis/AvisForm";
+
+type SophrologueEmbed = {
+  prenom: string | null;
+  nom: string | null;
+  photo_url: string | null;
+} | null;
+
+type AvisRow = {
+  token: string;
+  token_utilise: boolean;
+  token_expire_at: string;
+  sophrologue: SophrologueEmbed | SophrologueEmbed[];
+};
+
+function one<T>(v: T | T[] | null | undefined): T | null {
+  if (v == null) return null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+export function AvisPageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="flex min-h-screen flex-col items-center bg-[#FAF8F5] px-4 py-12">
+      <div className="mb-8">
+        <Image
+          src="/logo.webp"
+          alt="Calymia"
+          width={140}
+          height={46}
+          priority
+          className="object-contain"
+        />
+      </div>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
+        {children}
+      </div>
+    </main>
+  );
+}
+
+export function AvisStateMessage({
+  title,
+  detail,
+}: {
+  title: string;
+  detail?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-6 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F0EDE7] text-2xl text-[#2D6A4F]">
+        ✦
+      </span>
+      <p className="text-lg font-semibold text-slate-800">{title}</p>
+      {detail && <p className="text-sm leading-relaxed text-slate-500">{detail}</p>}
+    </div>
+  );
+}
+
+export async function AvisTokenView({ token }: { token: string }) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("avis")
+    .select(
+      `token, token_utilise, token_expire_at,
+       sophrologue:sophrologues(prenom, nom, photo_url)`,
+    )
+    .eq("token", token)
+    .limit(1)
+    .maybeSingle<AvisRow>();
+
+  if (!data) {
+    return (
+      <AvisPageShell>
+        <AvisStateMessage title="Lien invalide ou expiré." />
+      </AvisPageShell>
+    );
+  }
+
+  if (data.token_utilise) {
+    return (
+      <AvisPageShell>
+        <AvisStateMessage title="Merci ! Votre avis a déjà été enregistré." />
+      </AvisPageShell>
+    );
+  }
+
+  if (new Date(data.token_expire_at) < new Date()) {
+    return (
+      <AvisPageShell>
+        <AvisStateMessage
+          title="Ce lien a expiré."
+          detail="Ce lien d'avis a dépassé sa date de validité."
+        />
+      </AvisPageShell>
+    );
+  }
+
+  const sophrologue = one(data.sophrologue);
+
+  return (
+    <AvisPageShell>
+      <AvisForm
+        token={token}
+        sophrologue={{
+          prenom: sophrologue?.prenom ?? "",
+          nom: sophrologue?.nom ?? "",
+          photo_url: sophrologue?.photo_url ?? null,
+        }}
+      />
+    </AvisPageShell>
+  );
+}
