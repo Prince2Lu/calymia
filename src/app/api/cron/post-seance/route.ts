@@ -175,20 +175,36 @@ async function sendPostSeanceMails(): Promise<number> {
       to: email,
       subject,
       html,
-      log: {
-        sophrologue_id: String(row.sophrologue_id),
-        patient_id: row.patient_id ? String(row.patient_id) : null,
-        seance_id: String(row.id),
-        type: "post_seance",
-        destinataire_nom:
-          [patient?.prenom, patient?.nom].filter(Boolean).join(" ").trim() ||
-          null,
-      },
     });
 
     if (!result.success) {
       console.error("[post-seance] Échec envoi séance", row.id, result.error);
       continue;
+    }
+
+    const { error: logErr } = await supabase
+      .from("communications")
+      .insert({
+        sophrologue_id: String(row.sophrologue_id),
+        patient_id: row.patient_id ? String(row.patient_id) : null,
+        seance_id: String(row.id),
+        type: "post_seance",
+        destinataire_email: email,
+        destinataire_nom:
+          [patient?.prenom, patient?.nom].filter(Boolean).join(" ").trim() ||
+          null,
+        objet: subject,
+        contenu: html,
+        sent_at: new Date().toISOString(),
+        statut: "envoye",
+      });
+
+    if (logErr) {
+      console.error(
+        "[post-seance] Erreur log communications:",
+        row.id,
+        logErr.message,
+      );
     }
 
     const { error: upErr } = await supabase
@@ -299,20 +315,32 @@ async function sendAvisMails(): Promise<number> {
       to: email,
       subject,
       html,
-      log: {
-        sophrologue_id: String(row.sophrologue_id),
-        patient_id: row.patient_id ? String(row.patient_id) : null,
-        seance_id: String(row.id),
-        type: "avis",
-        destinataire_nom:
-          [patient?.prenom, patient?.nom].filter(Boolean).join(" ").trim() ||
-          null,
-      },
     });
 
     if (!result.success) {
       console.error("[post-seance][avis] Échec envoi avis", row.id, result.error);
       continue;
+    }
+
+    const { error: logErr } = await supabase
+      .from("communications")
+      .insert({
+        sophrologue_id: String(row.sophrologue_id),
+        patient_id: row.patient_id ? String(row.patient_id) : null,
+        seance_id: String(row.id),
+        type: "avis",
+        destinataire_email: email,
+        destinataire_nom:
+          [patient?.prenom, patient?.nom].filter(Boolean).join(" ").trim() ||
+          null,
+        objet: subject,
+        contenu: html,
+        sent_at: new Date().toISOString(),
+        statut: "envoye",
+      });
+
+    if (logErr) {
+      console.error("[post-seance][avis] Erreur log communications:", row.id, logErr.message);
     }
 
     sent_count += 1;
