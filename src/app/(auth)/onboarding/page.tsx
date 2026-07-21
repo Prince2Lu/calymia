@@ -15,6 +15,7 @@ import {
   type OnboardingVitrineData,
 } from "@/components/onboarding/OnboardingVitrineStep";
 import { usePlan } from "@/hooks/usePlan";
+import { getSophrologueUrl } from "@/lib/config/site-url";
 
 type Specialty =
   | "stress"
@@ -204,10 +205,9 @@ export default function OnboardingPage() {
 
   const publicUrl = useMemo(() => {
     if (!slug || !villeSlug || !departement) return null;
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://calymia.vercel.app";
     const dept = departement.toLowerCase().replace(/\s+/g, "-");
     const ville = villeSlug.toLowerCase().replace(/\s+/g, "-");
-    return `${base}/sophrologues/${dept}/${ville}/${slug}`;
+    return getSophrologueUrl(dept, ville, slug);
   }, [slug, villeSlug, departement]);
 
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));

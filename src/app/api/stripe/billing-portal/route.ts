@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
+import { getSiteUrl } from "@/lib/config/site-url";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const cookieStore = await cookies();
 
   const supabaseAuth = createServerClient(
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
   const session = await stripe.billingPortal.sessions.create({
     customer: sophrologue.stripe_customer_id,
-    return_url: `${request.nextUrl.origin}/dashboard/abonnement`,
+    return_url: `${getSiteUrl()}/dashboard/abonnement`,
     locale: "fr",
   });
 

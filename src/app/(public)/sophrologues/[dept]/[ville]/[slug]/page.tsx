@@ -20,6 +20,7 @@ import {
   type HorairesSophrologue,
   type JourSemaine,
 } from "@/lib/horaires";
+import { getSophrologueUrl } from "@/lib/config/site-url";
 
 export const revalidate = 3600;
 
@@ -230,7 +231,7 @@ export async function generateMetadata({
       ? bio.slice(0, 155) + (bio.length > 155 ? "…" : "")
       : `Prenez rendez-vous avec ${prenom} ${nom}, sophrologue à ${city}. Séances en cabinet et à distance.`;
 
-  const canonical = `https://calymia.com/sophrologues/${dept}/${ville}/${slug}`;
+  const canonical = getSophrologueUrl(dept, ville, slug);
 
   return {
     title: `${prenom} ${nom} – Sophrologue à ${city} | Calymia`.trim(),
@@ -358,7 +359,7 @@ export default async function SophrologueProfilPage({
           },
         }
       : {}),
-    url: `https://calymia.com/sophrologues/${dept}/${ville}/${slug}`,
+    url: getSophrologueUrl(dept, ville, slug),
     ...(prixMin != null
       ? { priceRange: `À partir de ${formatPrix(prixMin)}` }
       : {}),

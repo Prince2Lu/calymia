@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getSophrologueUrl } from "@/lib/config/site-url";
 import { welcomeSophrologue } from "@/lib/emails/templates";
 import { sendEmail } from "@/lib/emails/send";
 
@@ -35,13 +36,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://calymia.vercel.app";
     const dept = (sophrologue.departement ?? "").toLowerCase().replace(/\s+/g, "-");
     const ville = (sophrologue.ville ?? "").toLowerCase().replace(/\s+/g, "-");
     const profileUrl =
       public_url ??
       (sophrologue.slug
-        ? `${base}/sophrologues/${dept}/${ville}/${sophrologue.slug}`
+        ? getSophrologueUrl(dept, ville, sophrologue.slug)
         : null);
 
     const email = sophrologue.email ?? null;

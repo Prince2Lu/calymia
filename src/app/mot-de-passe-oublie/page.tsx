@@ -6,6 +6,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { getSiteUrl } from "@/lib/config/site-url";
 
 export default function MotDePasseOubliePage() {
   const [email, setEmail] = useState("");
@@ -30,8 +31,7 @@ export default function MotDePasseOubliePage() {
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       trimmed,
       {
-        redirectTo:
-          window.location.origin + "/reinitialiser-mot-de-passe",
+        redirectTo: `${getSiteUrl()}/reinitialiser-mot-de-passe`,
       },
     );
     setLoading(false);

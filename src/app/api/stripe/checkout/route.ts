@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
+import { getSiteUrl } from "@/lib/config/site-url";
 
 type Payload = {
   priceId?: string;
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin;
+  const appUrl = getSiteUrl();
 
   const session = await stripe.checkout.sessions.create({
     customer: sophrologue.stripe_customer_id,

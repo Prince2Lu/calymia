@@ -6,6 +6,7 @@ import {
 } from "@/lib/email-templates/cron-build";
 import { sendEmail } from "@/lib/emails/send";
 import { formatParisTime } from "@/lib/timezone";
+import { getSiteUrl } from "@/lib/config/site-url";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -261,10 +262,7 @@ async function sendAvisMails(): Promise<number> {
     (r) => postSet.has(String(r.id)) && !avisSet.has(String(r.id)),
   );
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://calymia.com").replace(
-    /\/$/,
-    "",
-  );
+  const appUrl = getSiteUrl();
   let sent_count = 0;
 
   for (const row of eligibles) {

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { getSophrologueUrl } from "@/lib/config/site-url";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,9 +180,11 @@ function TabProfil({
 
   const publicProfileUrl =
     sophrologue.departement && sophrologue.ville && sophrologue.slug
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/sophrologues/${toPathSegment(
-          sophrologue.departement,
-        )}/${toPathSegment(sophrologue.ville)}/${toPathSegment(sophrologue.slug)}`
+      ? getSophrologueUrl(
+          toPathSegment(sophrologue.departement),
+          toPathSegment(sophrologue.ville),
+          toPathSegment(sophrologue.slug),
+        )
       : null;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
