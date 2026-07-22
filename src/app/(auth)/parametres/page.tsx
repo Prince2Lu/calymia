@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { getSophrologueUrl } from "@/lib/config/site-url";
+import { getSophrologueProfileUrl } from "@/lib/config/site-url";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,23 +169,7 @@ function TabProfil({
   });
   const [saving, setSaving] = useState(false);
 
-  const toPathSegment = (value: string | null | undefined) =>
-    (value ?? "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-  const publicProfileUrl =
-    sophrologue.departement && sophrologue.ville && sophrologue.slug
-      ? getSophrologueUrl(
-          toPathSegment(sophrologue.departement),
-          toPathSegment(sophrologue.ville),
-          toPathSegment(sophrologue.slug),
-        )
-      : null;
+  const publicProfileUrl = getSophrologueProfileUrl(sophrologue);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

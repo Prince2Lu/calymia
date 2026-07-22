@@ -15,7 +15,7 @@ import {
   type OnboardingVitrineData,
 } from "@/components/onboarding/OnboardingVitrineStep";
 import { usePlan } from "@/hooks/usePlan";
-import { getSophrologueUrl } from "@/lib/config/site-url";
+import { getSophrologueProfileUrl } from "@/lib/config/site-url";
 
 type Specialty =
   | "stress"
@@ -203,12 +203,15 @@ export default function OnboardingPage() {
     };
   }, [supabase]);
 
-  const publicUrl = useMemo(() => {
-    if (!slug || !villeSlug || !departement) return null;
-    const dept = departement.toLowerCase().replace(/\s+/g, "-");
-    const ville = villeSlug.toLowerCase().replace(/\s+/g, "-");
-    return getSophrologueUrl(dept, ville, slug);
-  }, [slug, villeSlug, departement]);
+  const publicUrl = useMemo(
+    () =>
+      getSophrologueProfileUrl({
+        departement,
+        ville: villeSlug,
+        slug,
+      }),
+    [slug, villeSlug, departement],
+  );
 
   const goNext = () => setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   const skipVitrineStep = () => setStep(5);
@@ -541,10 +544,7 @@ export default function OnboardingPage() {
         await fetch("/api/emails/welcome-sophrologue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sophrologue_id: sophrologueId,
-            public_url: publicUrl ?? undefined,
-          }),
+          body: JSON.stringify({ sophrologue_id: sophrologueId }),
         });
       } catch {
         // Ignoré — l'email ne doit pas bloquer la redirection

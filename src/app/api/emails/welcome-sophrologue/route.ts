@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getSophrologueUrl } from "@/lib/config/site-url";
+import { getSophrologueProfileUrl } from "@/lib/config/site-url";
 import { welcomeSophrologue } from "@/lib/emails/templates";
 import { sendEmail } from "@/lib/emails/send";
 
@@ -11,9 +11,8 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { sophrologue_id, public_url } = (await request.json()) as {
+    const { sophrologue_id } = (await request.json()) as {
       sophrologue_id?: string;
-      public_url?: string;
     };
 
     if (!sophrologue_id) {
@@ -36,13 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dept = (sophrologue.departement ?? "").toLowerCase().replace(/\s+/g, "-");
-    const ville = (sophrologue.ville ?? "").toLowerCase().replace(/\s+/g, "-");
-    const profileUrl =
-      public_url ??
-      (sophrologue.slug
-        ? getSophrologueUrl(dept, ville, sophrologue.slug)
-        : null);
+    const profileUrl = getSophrologueProfileUrl(sophrologue);
 
     const email = sophrologue.email ?? null;
     if (!email) {
