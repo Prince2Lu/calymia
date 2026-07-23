@@ -137,20 +137,15 @@ export async function POST(request: Request) {
       .maybeSingle<{ id: string | number; user_id: string | null }>();
 
     if (existing) {
-      const patch: {
-        prenom: string;
-        nom: string;
-        telephone: string;
-        user_id?: string;
-      } = {
-        prenom: patient_prenom,
-        nom: patient_nom,
-        telephone: patient_telephone,
-      };
+      // On ne réécrit jamais prenom/nom/telephone d'une fiche existante :
+      // seule la mise à jour "de complétion" (user_id manquant) reste possible.
+      const patch: { user_id?: string } = {};
       if (!existing.user_id && authUserId) {
         patch.user_id = authUserId;
       }
-      await supabase.from("patients").update(patch).eq("id", existing.id);
+      if (Object.keys(patch).length > 0) {
+        await supabase.from("patients").update(patch).eq("id", existing.id);
+      }
       patient = { id: existing.id };
       console.log(
         "Create PI - client existant (même sophrologue + email) réutilisé:",
