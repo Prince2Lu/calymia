@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
-import { createBrowserClient } from "@supabase/ssr";
 import {
   LayoutDashboard,
   Calendar,
@@ -16,6 +15,8 @@ import {
   LogOut,
 } from "lucide-react";
 import { getSidebarPlanBadge } from "@/lib/billing/trial-status";
+import { useSophrologue } from "@/components/providers/SophrologueProvider";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,16 +26,7 @@ type NavItem = {
   icon: React.ReactNode;
 };
 
-type SophrologueInfo = {
-  id: string;
-  prenom: string | null;
-  nom: string | null;
-  plan: string | null;
-  trial_ends_at: string | null;
-};
-
 const AVIS_HREF = "/dashboard/avis";
-
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS: NavItem[] = [
@@ -85,50 +77,32 @@ const NAV_ITEMS: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [sophrologue, setSophrologue] = useState<SophrologueInfo | null>(null);
+  const sophrologue = useSophrologue();
   const [avisEnAttente, setAvisEnAttente] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-
+  // Badge avis seulement — user/sophrologue viennent du layout (SSR + contexte)
   useEffect(() => {
     let cancelled = false;
+    const supabase = createSupabaseBrowserClient();
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
+      const { count } = await supabase
+        .from("avis")
+        .select("id", { count: "exact", head: true })
+        .eq("sophrologue_id", sophrologue.id)
+        .eq("statut", "en_attente");
 
-      const { data } = await supabase
-        .from("sophrologues")
-        .select("id, prenom, nom, plan, trial_ends_at")
-        .eq("user_id", user.id)
-        .maybeSingle<SophrologueInfo>();
-
-      if (cancelled) return;
-      setSophrologue(data ?? null);
-
-      if (data?.id) {
-        const { count } = await supabase
-          .from("avis")
-          .select("id", { count: "exact", head: true })
-          .eq("sophrologue_id", data.id)
-          .eq("statut", "en_attente");
-
-        if (!cancelled) setAvisEnAttente(count ?? 0);
-      }
+      if (!cancelled) setAvisEnAttente(count ?? 0);
     };
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [sophrologue.id]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
+    const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
     router.push("/connexion");
   };
@@ -139,15 +113,13 @@ export default function Sidebar() {
   };
 
   const fullName =
-    `${sophrologue?.prenom ?? ""} ${sophrologue?.nom ?? ""}`.trim() ||
+    `${sophrologue.prenom ?? ""} ${sophrologue.nom ?? ""}`.trim() ||
     "Mon compte";
 
-  const planBadge = sophrologue
-    ? getSidebarPlanBadge(sophrologue.plan, sophrologue.trial_ends_at)
-    : {
-        label: "—",
-        className: "bg-gray-100 text-gray-600 text-xs font-medium",
-      };
+  const planBadge = getSidebarPlanBadge(
+    sophrologue.plan,
+    sophrologue.trial_ends_at,
+  );
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-[#E5E7EB] bg-white">
@@ -216,7 +188,7 @@ export default function Sidebar() {
         {/* Infos utilisateur */}
         <div className="mb-3 flex items-center gap-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F0F7F4] text-xs font-bold text-[#426F59]">
-            {(sophrologue?.prenom?.[0] ?? "?").toUpperCase()}
+            {(sophrologue.prenom?.[0] ?? "?").toUpperCase()}
           </div>
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="truncate text-sm font-medium text-[#426F59]">
