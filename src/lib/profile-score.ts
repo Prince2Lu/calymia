@@ -64,7 +64,7 @@ export async function computeProfileScore(
       sublabel: "Fort impact SEO et conversion",
       impact: "SEO",
       completed: sophrologue.photo_url != null && sophrologue.photo_url !== "",
-      href: "/dashboard/parametres?tab=profil",
+      href: "/parametres?tab=profil",
     },
     {
       key: "bio",
@@ -73,7 +73,7 @@ export async function computeProfileScore(
       sublabel: "Fort impact sur votre référencement Google",
       impact: "SEO",
       completed: sophrologue.bio != null && sophrologue.bio.trim().length > 50,
-      href: "/dashboard/parametres?tab=profil",
+      href: "/parametres?tab=profil",
     },
     {
       key: "specialites",
@@ -82,7 +82,7 @@ export async function computeProfileScore(
       sublabel: "Améliorent votre indexation Google",
       impact: "SEO",
       completed: isNonEmptyArray(sophrologue.specialites),
-      href: "/dashboard/parametres?tab=profil",
+      href: "/parametres?tab=profil",
     },
     {
       key: "tarifs",
@@ -91,7 +91,7 @@ export async function computeProfileScore(
       sublabel: "Indispensable pour la réservation en ligne",
       impact: "Conversion",
       completed: hasTarifs,
-      href: "/dashboard/parametres?tab=seances",
+      href: "/parametres?tab=seances",
     },
     {
       key: "disponibilites",
@@ -100,7 +100,7 @@ export async function computeProfileScore(
       sublabel: "Permettent aux clients de réserver en ligne",
       impact: "Conversion",
       completed: hasDisponibilites,
-      href: "/dashboard/parametres?tab=disponibilites",
+      href: "/parametres?tab=disponibilites",
     },
     {
       key: "horaires",
@@ -109,7 +109,7 @@ export async function computeProfileScore(
       sublabel: "Apparaissent sur votre page publique",
       impact: "SEO",
       completed: sophrologue.horaires != null,
-      href: "/dashboard/parametres?tab=vitrine",
+      href: "/parametres?tab=vitrine",
     },
     {
       key: "photos_cabinet",
@@ -118,7 +118,7 @@ export async function computeProfileScore(
       sublabel: "Augmentent le taux de réservation",
       impact: "Conversion",
       completed: isNonEmptyArray(sophrologue.photos_cabinet),
-      href: "/dashboard/parametres?tab=vitrine",
+      href: "/parametres?tab=vitrine",
     },
     {
       key: "formations",
@@ -127,7 +127,7 @@ export async function computeProfileScore(
       sublabel: "Renforcent la confiance des clients",
       impact: "Confiance",
       completed: isNonEmptyArray(sophrologue.formations),
-      href: "/dashboard/parametres?tab=vitrine",
+      href: "/parametres?tab=vitrine",
     },
     {
       key: "rpps",
@@ -136,7 +136,7 @@ export async function computeProfileScore(
       sublabel: "Gage de sérieux professionnel",
       impact: "Confiance",
       completed: sophrologue.numero_rpps != null && sophrologue.numero_rpps !== "",
-      href: "/dashboard/parametres?tab=profil",
+      href: "/parametres?tab=profil",
     },
     {
       key: "syndicats",
@@ -145,7 +145,7 @@ export async function computeProfileScore(
       sublabel: "Renforcent la confiance des clients",
       impact: "Confiance",
       completed: isNonEmptyArray(sophrologue.syndicats),
-      href: "/dashboard/parametres?tab=vitrine",
+      href: "/parametres?tab=vitrine",
     },
   ];
 
