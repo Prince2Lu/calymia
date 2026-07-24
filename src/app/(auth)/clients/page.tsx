@@ -468,7 +468,7 @@ export default function ClientsPage() {
                     {/* Action */}
                     <button
                       onClick={() => router.push(`/clients/${p.id}`)}
-                      className="mx-auto flex items-center justify-center gap-1 text-xs font-medium text-[#2E75B6] hover:text-[#1E3A5F]"
+                      className="mx-auto flex items-center justify-center gap-1 text-xs font-medium text-[#2E75B6] transition-colors hover:text-[#1E3A5F] hover:underline"
                     >
                       Voir la fiche
                       <ChevronRight className="h-3.5 w-3.5" />
