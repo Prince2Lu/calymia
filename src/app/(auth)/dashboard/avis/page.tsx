@@ -21,24 +21,33 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 export default async function DashboardAvisPage() {
   const supabase = await createClient();
 
+  console.time("avis-page:TOTAL");
+
+  console.time("avis-page:getUser");
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  console.timeEnd("avis-page:getUser");
 
   if (!user) {
+    console.timeEnd("avis-page:TOTAL");
     redirect("/connexion");
   }
 
+  console.time("avis-page:sophrologues");
   const { data: sophrologue } = await supabase
     .from("sophrologues")
     .select("id")
     .eq("user_id", user.id)
     .maybeSingle<SophrologueRow>();
+  console.timeEnd("avis-page:sophrologues");
 
   if (!sophrologue) {
+    console.timeEnd("avis-page:TOTAL");
     redirect("/connexion");
   }
 
+  console.time("avis-page:avis-query");
   const { data: rows } = await supabase
     .from("avis")
     .select(
@@ -49,6 +58,9 @@ export default async function DashboardAvisPage() {
     .eq("sophrologue_id", sophrologue.id)
     .order("created_at", { ascending: false })
     .returns<AvisJoinRow[]>();
+  console.timeEnd("avis-page:avis-query");
+
+  console.timeEnd("avis-page:TOTAL");
 
   const avis: AvisAvecPatient[] = (rows ?? []).map((row) => {
     const patient = one(row.patient);
