@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
+import { getSophrologueSession } from "@/lib/auth/sophrologue-session";
 import { createClient } from "@/lib/supabase/server";
 import { AvisDashboard, type AvisAvecPatient } from "@/components/avis/AvisDashboard";
-
-type SophrologueRow = { id: string };
 
 type PatientEmbed = {
   prenom: string | null;
@@ -19,33 +18,15 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 }
 
 export default async function DashboardAvisPage() {
-  const supabase = await createClient();
-
   console.time("avis-page:TOTAL");
 
-  console.time("avis-page:getUser");
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  console.timeEnd("avis-page:getUser");
-
-  if (!user) {
+  const session = await getSophrologueSession();
+  if (!session?.sophrologue) {
     console.timeEnd("avis-page:TOTAL");
     redirect("/connexion");
   }
 
-  console.time("avis-page:sophrologues");
-  const { data: sophrologue } = await supabase
-    .from("sophrologues")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle<SophrologueRow>();
-  console.timeEnd("avis-page:sophrologues");
-
-  if (!sophrologue) {
-    console.timeEnd("avis-page:TOTAL");
-    redirect("/connexion");
-  }
+  const supabase = await createClient();
 
   console.time("avis-page:avis-query");
   const { data: rows } = await supabase
@@ -55,7 +36,7 @@ export default async function DashboardAvisPage() {
        token_utilise, token_expire_at, email_envoye, created_at, updated_at,
        patient:patients(prenom, nom)`,
     )
-    .eq("sophrologue_id", sophrologue.id)
+    .eq("sophrologue_id", session.sophrologue.id)
     .order("created_at", { ascending: false })
     .returns<AvisJoinRow[]>();
   console.timeEnd("avis-page:avis-query");
