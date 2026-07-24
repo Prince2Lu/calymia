@@ -279,6 +279,25 @@ async function sendAvisMails(): Promise<number> {
     const prenomSophro = sophrologue?.prenom ?? "";
     const nomSophro = sophrologue?.nom ?? "";
 
+    const { data: sophrologueAccount, error: sophLookupErr } = await supabase
+      .from("sophrologues")
+      .select("user_id, plan")
+      .eq("id", row.sophrologue_id)
+      .maybeSingle();
+
+    if (sophLookupErr) {
+      console.warn(
+        "[post-seance][avis] Lecture sophrologue:",
+        row.sophrologue_id,
+        sophLookupErr.message,
+      );
+    }
+
+    const plan = sophrologueAccount?.plan ?? null;
+    if (plan === "essentiel" || !plan) {
+      continue;
+    }
+
     const token = crypto.randomUUID();
     const tokenExpireAt = new Date(now.getTime() + 30 * DAY_MS).toISOString();
 
