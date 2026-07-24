@@ -408,7 +408,7 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             {/* Header */}
-            <div className="hidden grid-cols-[2fr_2fr_1.2fr_0.8fr_1.2fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
+            <div className="hidden grid-cols-[2fr_2fr_1fr_0.6fr_0.9fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
               {["Nom complet", "Email", "Téléphone", "Séances", "Dernière séance", ""].map(
                 (h) => (
                   <span
@@ -430,7 +430,7 @@ export default function ClientsPage() {
                 return (
                   <div
                     key={p.id}
-                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1.2fr_0.8fr_1.2fr_auto] md:items-center md:gap-4"
+                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.6fr_0.9fr_auto] md:items-center md:gap-4"
                   >
                     {/* Nom */}
                     <div className="flex items-center gap-3">
