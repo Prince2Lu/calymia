@@ -532,7 +532,7 @@ export default function SeancesCalendar({
                     return (
                       <div
                         key={di}
-                        className="min-h-[52px] border-l border-slate-100 p-1"
+                        className="min-h-[52px] min-w-0 border-l border-slate-100 p-1"
                       >
                         {slots.map((s) => {
                           const st = statutStyle(s.statut);
