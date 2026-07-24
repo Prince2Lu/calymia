@@ -417,7 +417,7 @@ export default function ClientsPage() {
                   {h}
                 </span>
               ))}
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-end gap-6">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Séances
                 </span>
@@ -456,7 +456,7 @@ export default function ClientsPage() {
                     </span>
 
                     {/* Séances + Dernière séance */}
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-end gap-6">
                       <span className="text-sm font-medium text-slate-900">
                         {p.nb_seances}
                       </span>
