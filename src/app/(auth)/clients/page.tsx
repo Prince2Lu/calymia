@@ -408,24 +408,24 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             {/* Header */}
-            <div className="hidden grid-cols-[2fr_2fr_1fr_1.5fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
-              {["Nom complet", "Email", "Téléphone"].map((h) => (
+            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
+              {[
+                "Nom complet",
+                "Email",
+                "Téléphone",
+                "Séances",
+                "Dernière séance",
+                "Fiche client",
+              ].map((h) => (
                 <span
                   key={h}
-                  className="text-xs font-semibold uppercase tracking-wide text-slate-400"
+                  className={`text-xs font-semibold uppercase tracking-wide text-slate-400${
+                    h === "Nom complet" || h === "Email" ? "" : " text-center"
+                  }`}
                 >
                   {h}
                 </span>
               ))}
-              <div className="flex items-center justify-end gap-6">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Séances
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Dernière séance
-                </span>
-              </div>
-              <span />
             </div>
 
             {/* Rows */}
@@ -435,7 +435,7 @@ export default function ClientsPage() {
                 return (
                   <div
                     key={p.id}
-                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_1.5fr_auto] md:items-center md:gap-4"
+                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr] md:items-center md:gap-4"
                   >
                     {/* Nom */}
                     <div className="flex items-center gap-3">
@@ -455,20 +455,20 @@ export default function ClientsPage() {
                       {p.telephone ?? "—"}
                     </span>
 
-                    {/* Séances + Dernière séance */}
-                    <div className="flex items-center justify-end gap-6">
-                      <span className="text-sm font-medium text-slate-900">
-                        {p.nb_seances}
-                      </span>
-                      <span className="text-sm text-slate-500">
-                        {formatDate(p.derniere_seance)}
-                      </span>
-                    </div>
+                    {/* Nb séances */}
+                    <span className="text-center text-sm font-medium text-slate-900">
+                      {p.nb_seances}
+                    </span>
+
+                    {/* Dernière séance */}
+                    <span className="text-center text-sm text-slate-500">
+                      {formatDate(p.derniere_seance)}
+                    </span>
 
                     {/* Action */}
                     <button
                       onClick={() => router.push(`/clients/${p.id}`)}
-                      className="flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:text-[#1E3A5F]"
+                      className="mx-auto flex items-center justify-center gap-1 text-xs font-medium text-[#2E75B6] hover:text-[#1E3A5F]"
                     >
                       Voir la fiche
                       <ChevronRight className="h-3.5 w-3.5" />
