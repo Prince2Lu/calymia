@@ -539,11 +539,12 @@ export default function ReserverPage() {
       setLoginLoading(false);
       return;
     }
-    // Pre-fill form if patient data available (requires RLS read on own record)
+    // Pre-fill from canonical patient row (user_id + sophrologue_id IS NULL)
     const { data: patientData } = await supabase
       .from("patients")
       .select("prenom, nom, telephone")
-      .eq("email", patient.email.trim())
+      .eq("user_id", data.user.id)
+      .is("sophrologue_id", null)
       .maybeSingle<{ prenom: string | null; nom: string | null; telephone: string | null }>();
     if (patientData) {
       setPatient((p) => ({
@@ -580,6 +581,9 @@ export default function ReserverPage() {
         email: patient.email.trim(),
         password: accountPassword,
         patient_email: patient.email.trim(),
+        prenom: patient.prenom.trim(),
+        nom: patient.nom.trim(),
+        create_patient_record: true,
       }),
     });
     const data = (await res.json()) as { success?: boolean; error?: string };
@@ -960,6 +964,8 @@ export default function ReserverPage() {
                       onChange={(e) =>
                         setPatient((p) => ({ ...p, prenom: e.target.value }))
                       }
+                      readOnly={isLoggedIn}
+                      className={isLoggedIn ? "bg-slate-100 text-slate-500" : undefined}
                     />
                   </div>
                   <div className="space-y-1">
@@ -971,6 +977,8 @@ export default function ReserverPage() {
                       onChange={(e) =>
                         setPatient((p) => ({ ...p, nom: e.target.value }))
                       }
+                      readOnly={isLoggedIn}
+                      className={isLoggedIn ? "bg-slate-100 text-slate-500" : undefined}
                     />
                   </div>
                 </div>
@@ -1001,6 +1009,8 @@ export default function ReserverPage() {
                       onChange={(e) =>
                         setPatient((p) => ({ ...p, telephone: e.target.value }))
                       }
+                      readOnly={isLoggedIn}
+                      className={isLoggedIn ? "bg-slate-100 text-slate-500" : undefined}
                     />
                   </div>
                 </div>

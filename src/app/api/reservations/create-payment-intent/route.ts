@@ -152,14 +152,39 @@ export async function POST(request: Request) {
         patient.id,
       );
     } else {
+      // Prefer canonical identity (sophrologue_id IS NULL) over form values
+      // when the client already has an auth account + canonical patient row.
+      let canonicalPrenom = patient_prenom;
+      let canonicalNom = patient_nom;
+      let canonicalTelephone = patient_telephone;
+
+      if (authUserId) {
+        const { data: canonical } = await supabase
+          .from("patients")
+          .select("prenom, nom, telephone")
+          .eq("user_id", authUserId)
+          .is("sophrologue_id", null)
+          .maybeSingle<{
+            prenom: string | null;
+            nom: string | null;
+            telephone: string | null;
+          }>();
+
+        if (canonical) {
+          canonicalPrenom = canonical.prenom || patient_prenom;
+          canonicalNom = canonical.nom || patient_nom;
+          canonicalTelephone = canonical.telephone || patient_telephone;
+        }
+      }
+
       const { data: created, error: patientError } = await supabase
         .from("patients")
         .insert({
           sophrologue_id,
-          prenom: patient_prenom,
-          nom: patient_nom,
+          prenom: canonicalPrenom,
+          nom: canonicalNom,
           email: patientEmailNorm,
-          telephone: patient_telephone,
+          telephone: canonicalTelephone,
           ...(authUserId ? { user_id: authUserId } : {}),
         })
         .select("id")
