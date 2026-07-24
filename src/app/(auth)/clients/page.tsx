@@ -241,31 +241,38 @@ export default function ClientsPage() {
 
       if (!rawPatients) return;
 
-      // Pour chaque patient : nb séances + dernière séance
-      const enriched: Patient[] = await Promise.all(
-        rawPatients.map(async (p) => {
-          const { count } = await supabase
+      // Une seule requête groupée pour tous les patients, au lieu d'une boucle N+1
+      const patientIds = rawPatients.map((p) => p.id);
+      type SeanceRow = { patient_id: string; debut_at: string };
+      const { data: allSeances } = patientIds.length
+        ? await supabase
             .from("seances")
-            .select("id", { count: "exact", head: true })
-            .eq("patient_id", p.id)
-            .eq("statut", "confirmee");
-
-          const { data: lastSeance } = await supabase
-            .from("seances")
-            .select("debut_at")
-            .eq("patient_id", p.id)
+            .select("patient_id, debut_at")
+            .in("patient_id", patientIds)
             .eq("statut", "confirmee")
             .order("debut_at", { ascending: false })
-            .limit(1)
-            .maybeSingle<{ debut_at: string }>();
+        : { data: [] as SeanceRow[] };
 
-          return {
-            ...p,
-            nb_seances: count ?? 0,
-            derniere_seance: lastSeance?.debut_at ?? null,
-          };
-        }),
-      );
+      const statsByPatient = new Map<string, { count: number; lastSeance: string }>();
+      for (const s of (allSeances ?? []) as SeanceRow[]) {
+        const existing = statsByPatient.get(s.patient_id);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          // Premier enregistrement rencontré pour ce patient = le plus récent,
+          // car la requête est triée par debut_at décroissant.
+          statsByPatient.set(s.patient_id, { count: 1, lastSeance: s.debut_at });
+        }
+      }
+
+      const enriched: Patient[] = rawPatients.map((p) => {
+        const stats = statsByPatient.get(p.id);
+        return {
+          ...p,
+          nb_seances: stats?.count ?? 0,
+          derniere_seance: stats?.lastSeance ?? null,
+        };
+      });
 
       setPatients(enriched);
       setFiltered(enriched);
