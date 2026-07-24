@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AvisStars } from "./AvisStars";
 
@@ -54,6 +54,10 @@ export function AvisDashboard({ avis }: { avis: AvisAvecPatient[] }) {
   const [items, setItems] = useState<AvisAvecPatient[]>(avis);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setItems(avis);
+  }, [avis]);
 
   const pendingCount = useMemo(
     () => items.filter((a) => a.statut === "en_attente").length,
