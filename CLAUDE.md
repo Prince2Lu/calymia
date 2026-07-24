@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 29 mai 2026
+Dernière mise à jour : 24 juillet 2026
 
 ---
 
@@ -13,7 +13,7 @@ Calymia est une plateforme SaaS B2B2C pour les sophrologues en France.
 - **Client** : trouve un sophrologue via Google, réserve et paie en ligne
 - **Calymia** : prélève 3% de commission sur chaque réservation + abonnement mensuel sophrologue
 
-**Repo GitHub** : `github.com/Prince2Lu/calymia`  
+**Repo GitHub** : `github.com/Prince2Lu/calymia`
 **Stack** : Next.js 14 App Router, Supabase (PostgreSQL + RLS), Stripe Connect + Billing, Resend, n8n
 
 ---
@@ -30,14 +30,20 @@ Calymia est une plateforme SaaS B2B2C pour les sophrologues en France.
 | **n8n CALYMIA_BASE_URL** | `https://calymia.vercel.app` | `https://app.calymia.com` ✅ actif |
 
 ### Règle absolue
-**Toujours travailler sur la branche `develop`.** Ne jamais commiter directement sur `main`.  
+**Toujours travailler sur la branche `develop`.** Ne jamais commiter directement sur `main`.
 Le merge `develop` → `main` est fait manuellement par Eric après validation sur DEV.
 
 ### Déploiement DEV
+Auto-deploy Git natif Vercel↔GitHub (fiable depuis le 24 juillet 2026 — voir section 9).
+Il suffit de pousser sur `develop` :
 ```bash
 git add .
 git commit -m "feat/fix: description"
 git push origin develop
+```
+Vercel déclenche automatiquement le build du projet `calymia` sur ce push. Un déploiement
+manuel reste possible en secours :
+```bash
 vercel link  # sélectionner le projet "calymia" (pas "calymia-prod")
 vercel --prod
 ```
@@ -45,6 +51,7 @@ vercel --prod
 ### Déploiement PROD
 ```bash
 git checkout main
+git pull origin main
 git merge develop
 git push origin main
 git checkout develop
@@ -73,25 +80,32 @@ src/
 │   ├── inscription/         # Création compte
 │   ├── connexion/           # Login
 │   └── api/
+│       ├── auth/            # create-client-account, check-email
 │       ├── stripe/          # Webhooks Stripe
 │       ├── sophrologue/     # CRUD sophrologue
-│       ├── reservations/    # Gestion réservations
+│       ├── reservations/    # create-payment-intent, annuler
 │       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
 ├── components/
 │   ├── dashboard/
 │   │   ├── ProfileScoreCard.tsx         # Widget score complétude (Server Component)
 │   │   └── ProfileScoreCardWrapper.tsx  # Wrapper client pour ProfileScoreCard
 │   ├── factures/            # BoutonFacture.tsx
+│   ├── providers/           # SophrologueProvider.tsx
 │   ├── public/              # SophrologueRppsLine.tsx (infobulle RPPS, "use client")
-│   ├── ui/                  # Composants partagés
+│   ├── seances/             # SeancesCalendar.tsx, types.ts
+│   ├── ui/                  # Composants partagés (attention : cn() sans twMerge, voir section 8)
 │   └── ...
 ├── hooks/
 │   ├── useFacture.ts        # Récupère facture_url depuis paiements
 │   ├── usePlan.ts           # Restrictions selon plan sophrologue
 │   └── ...
 └── lib/
+    ├── auth/
+    │   └── sophrologue-session.ts  # getSophrologueSession() avec cache() React
     ├── billing/
     │   └── trial-status.ts  # computeTrialDaysRemaining(), getSidebarPlanBadge()
+    ├── config/
+    │   └── site-url.ts      # getSiteUrl(), getSophrologueProfileUrl()
     ├── factures/
     │   └── generate.tsx     # Génération PDF reçu de paiement
     ├── emails/
@@ -99,6 +113,7 @@ src/
     ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow
     ├── horaires.ts          # normalizeHoraires(), resolvePublicHoraires(), horairesFromDisponibilites()
     ├── supabase/            # Clients Supabase (browser + server)
+    ├── utils.ts             # cn() — ⚠️ simple join(), pas de twMerge (voir section 8)
     └── timezone.ts          # formatParisTime()
 ```
 
@@ -118,11 +133,23 @@ SELECT * FROM seances WHERE sophrologue_id = sophrologues.id
 SELECT * FROM sophrologues WHERE user_id = auth.uid()
 ```
 
+### Table `patients` — modèle d'identité (mis à jour 24 juillet 2026)
+Un même client (`user_id`) peut avoir **plusieurs fiches `patients`** : une par sophrologue
+chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canonique**
+(`sophrologue_id IS NULL`) qui fait autorité sur son identité (`prenom`/`nom`/`telephone`).
+
+- La fiche canonique alimente l'espace client (`/patient`)
+- Les fiches par sophrologue sont des rattachements "cabinet" ; elles ne doivent plus être
+  une source d'identité concurrente (voir section 8 pour le détail du fix)
+- Toute nouvelle fiche cabinet créée reprend l'identité canonique si elle existe
+- Une fiche cabinet existante n'est plus jamais écrasée sur `prenom`/`nom`/`telephone` par
+  une réservation ultérieure — seul `user_id` peut encore être complété s'il manquait
+
 ### Tables principales
 | Table | Colonnes clés | Notes |
 |---|---|---|
 | `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet` | `plan` = 'essentiel' / 'professionnel' / 'cabinet' |
-| `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients` |
+| `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus |
 | `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut` | `statut` = 'confirmee' / 'terminee' / 'annulee' |
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
 | `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif` | |
@@ -156,7 +183,7 @@ import { normalizeHoraires } from "@/lib/horaires"
 ## 5. Règles techniques — CRITIQUE
 
 ### Emails — Resend uniquement
-**Ne jamais utiliser SendGrid, nodemailer ou SMTP.**  
+**Ne jamais utiliser SendGrid, nodemailer ou SMTP.**
 Toujours utiliser Resend via HTTP POST :
 ```typescript
 await fetch("https://api.resend.com/emails", {
@@ -169,10 +196,22 @@ await fetch("https://api.resend.com/emails", {
 })
 ```
 Les templates sont dans `src/lib/emails/templates.ts`.
+SMTP Supabase (emails d'auth : reset password, etc.) est également configuré via Resend
+depuis le 22 juillet 2026.
 
 ### SSR — obligatoire sur les pages publiques
-Toutes les pages sous `(public)/` doivent être en SSR (Server Side Rendering).  
-Ne jamais ajouter `"use client"` sur les pages publiques sophrologues.
+Toutes les pages sous `(public)/` doivent être en SSR (Server Side Rendering).
+Ne jamais ajouter `"use client"` sur les pages publiques sophrologues. Si un bloc nécessite
+un état client (ex: infobulle toggle sur mobile), l'isoler dans un petit composant
+`"use client"` dédié — exemple : `src/components/public/SophrologueRppsLine.tsx`.
+
+### URLs — toujours centralisées
+**Ne jamais hardcoder** `app.calymia.com` ou `calymia.vercel.app`. Toujours utiliser :
+```typescript
+import { getSiteUrl, getSophrologueProfileUrl } from "@/lib/config/site-url"
+```
+basé sur `NEXT_PUBLIC_APP_URL`. C'était la cause d'un bug critique corrigé le 22 juillet 2026
+(liens publics et emails pointant vers le mauvais environnement).
 
 ### Plans et restrictions
 ```typescript
@@ -184,13 +223,14 @@ import { PlanGuard } from "@/components/PlanGuard"
   <NotesSeance />
 </PlanGuard>
 ```
-
 Plans : `essentiel` (29€, max 15 clients) / `professionnel` (59€, illimité) / `cabinet` (139€, V2 — grisé partout)
 
 ### Trial Stripe Billing
 - Nouveaux inscrits → `plan = 'professionnel'` + `trial_ends_at = now + 14j`
 - Après 14j sans paiement → downgrade vers `essentiel` via webhook Stripe
-- Ne jamais modifier `plan` manuellement en dehors des webhooks Stripe
+- Ne jamais modifier `plan` manuellement en dehors des webhooks Stripe (sauf offre fondateur,
+  voir mémoire commerciale : 3 mois gratuits pour les 10 premiers clients, `trial_ends_at`
+  modifié manuellement dans ce cas précis)
 
 ### Stripe — deux secrets distincts
 - `STRIPE_WEBHOOK_SECRET` est différent entre DEV et PROD
@@ -207,6 +247,16 @@ import { createClient } from "@supabase/supabase-js"
 // avec SUPABASE_SERVICE_ROLE_KEY pour les opérations admin
 ```
 
+### Performance — session partagée (22 juillet 2026)
+Utiliser `getSophrologueSession()` (`src/lib/auth/sophrologue-session.ts`, avec `cache()`
+React) plutôt que d'appeler `getUser()` plusieurs fois dans une même requête. Les pages
+protégées lourdes doivent être des Server Components avec fetch SSR plutôt que des
+`useEffect` côté client — a permis de faire passer la page Agenda de 2,88s à ~1,1s.
+
+⚠️ **Attention Vercel serverless** : le fire-and-forget async (`waitUntil`) ne fonctionne
+que s'il est appelé directement depuis un Request handler, pas depuis une fonction utilitaire.
+Dans les fonctions cron, utiliser des `await` explicites.
+
 ---
 
 ## 6. Patterns établis
@@ -216,7 +266,9 @@ import { createClient } from "@supabase/supabase-js"
 - 10 critères × 10 points = score 0–100
 - Affiché dans le dashboard via `ProfileScoreCardWrapper` (Client Component) → `ProfileScoreCard`
 - Critères : photo_url, bio (>50 chars), specialites, types_seances actifs, disponibilites, horaires JSONB, photos_cabinet, formations, numero_rpps, syndicats
-- Liens directs vers `/dashboard/parametres?tab={profil|seances|disponibilites|vitrine}`
+- Liens directs vers `/parametres?tab={profil|seances|disponibilites|vitrine}` — ⚠️ **pas**
+  `/dashboard/parametres` (bug corrigé le 24 juillet 2026 : `/parametres` est un sibling de
+  `/dashboard`, pas un sous-dossier)
 - `SophrologueRow` : type structurel défini dans `profile-score.ts` (pas de type centralisé pour l'instant)
 
 ### Facture PDF
@@ -234,11 +286,6 @@ import { createClient } from "@supabase/supabase-js"
 - Sur la page publique SSR : `resolvePublicHoraires(sophrologue.horaires, disponibilites)` depuis `src/lib/horaires.ts` — priorité au JSONB, sinon dérivé des disponibilités
 - **Ne jamais afficher les horaires dans l'onboarding étape 4 (vitrine)** — supprimé car redondant avec étape 3
 
-### Composants SSR avec interaction client
-- Les pages publiques restent en SSR (`(public)/`)
-- Si un bloc nécessite un état client (ex: infobulle toggle sur mobile), l'isoler dans un petit composant `"use client"` dédié
-- Exemple : `src/components/public/SophrologueRppsLine.tsx` (infobulle RPPS)
-
 ### Page publique — champs affichés
 - `numero_rpps` : affiché au-dessus de la section photos cabinet, uniquement si renseigné, avec infobulle définition
 - Tél, email, adresse : **non affichés** sur la page publique (force la réservation en ligne, protège la commission 3%)
@@ -250,7 +297,7 @@ import { createClient } from "@supabase/supabase-js"
 - Colonne `essai_expire_at` : ancienne colonne, ignorée — utiliser uniquement `trial_ends_at`
 - Module centralisé : `src/lib/billing/trial-status.ts` avec `computeTrialDaysRemaining()` et `getSidebarPlanBadge()`
 - Logique :
-  - `trial_ends_at > now` → trial actif → badge `text-sm` vert "Essai gratuit — Xj"
+  - `trial_ends_at > now` → trial actif → badge vert "Essai gratuit — Xj"
   - Trial terminé + `plan === 'essentiel'` → "Essai expiré" badge rouge
   - Sinon → nom du plan (Essentiel / Professionnel / Cabinet)
 - `usePlan()` ne gère que les feature flags — ne pas y ajouter la logique trial
@@ -290,9 +337,11 @@ END $$;
 | `génération-sujets-blog` | Cron dimanche | Génère liste sujets hebdomadaire |
 | `prospection-google-places` | Manuel | Recherche sophrologues via Google Places API → Google Sheet |
 
-Les workflows appellent les endpoints `/api/cron/*` avec un Bearer token (`CRON_SECRET`).  
-**Ne jamais modifier les endpoints cron sans mettre à jour les workflows n8n.**  
+Les workflows appellent les endpoints `/api/cron/*` avec un Bearer token (`CRON_SECRET`).
+**Ne jamais modifier les endpoints cron sans mettre à jour les workflows n8n.**
 Exports JSON dans `n8n-workflows/` (prod), `n8n-workflows/Dev/` (dev), `n8n-workflows/Prospection/` (prospection).
+⚠️ En attente (24 juillet 2026) : `Génération Articles Blog v14` et `Génération Sujets Blog v3`
+existent sur n8n mais ne sont pas encore poussés vers ce dossier.
 
 ### URLs publiques
 ```
@@ -307,67 +356,76 @@ Toujours utiliser `NEXT_PUBLIC_APP_URL` — jamais hardcoder `app.calymia.com` o
 
 **Mot de passe universel : `Test123456!`**
 
-> ⚠️ Les données de test sont à recréer après chaque purge de la base DEV.  
+> ⚠️ Les données de test sont à recréer après chaque purge de la base DEV.
 > Utiliser des emails réels accessibles à Eric pour recevoir les emails de test.
 
-### Sophrologues DEV (IDs à jour au 29 mai 2026)
-| | Compte test principal | Compte Thomas Petit |
-|---|---|---|
-| **Email** | `scarpinoeric@gmail.com` | `eric@calymia.com` |
-| **Sophrologue `id`** | `6d7b19df-27a5-46d5-9ade-58216303276b` | `dd607be9-4aa9-44b7-a7ab-19c4b7e59027` |
-| **`user_id`** | `75cf2311-912d-41aa-8450-62e079085ea2` | `eaffea83-8e58-4c88-a58a-eef7aeae4555` |
+---
 
-### Clients DEV
-| Email | Usage |
-|---|---|
-| `scarpi.business@gmail.com` | Client de test principal |
-| `patient.test@calymia.com` | Client de test secondaire (mot de passe : `Test1234!`) |
+## 8. Identité client canonique (24 juillet 2026)
 
-### Cartes Stripe TEST
-- `4242 4242 4242 4242` / `12/26` / `123` → paiement réussi
-- `4000 0025 0000 3155` / `12/26` / `123` → 3D Secure
-- `4000 0000 0000 9995` / `12/26` / `123` → paiement refusé
+Un client peut réserver chez plusieurs sophrologues sous le même compte. Modèle retenu :
+- La fiche `patients` avec `sophrologue_id IS NULL` est la fiche **canonique** — c'est elle
+  qui fait autorité sur `prenom`/`nom`/`telephone`, et c'est elle qu'affiche l'espace client.
+- Les fiches `patients` avec un `sophrologue_id` renseigné sont des rattachements par cabinet.
+  Elles ne doivent plus être une source d'identité concurrente.
+- Dans le tunnel de réservation (`reserver/page.tsx`), un client qui se connecte en inline
+  (email détecté existant + mot de passe, via `handleInlineLogin`) voit ses champs
+  Prénom/Nom/Téléphone pré-remplis depuis la fiche canonique **et verrouillés** (`readOnly`)
+  — il ne peut plus les écraser.
+- Une réservation chez un sophrologue jamais vu par ce client reprend l'identité canonique
+  si elle existe (`create-payment-intent/route.ts`, branche `else`), au lieu des valeurs
+  du formulaire.
+- Une fiche patient **existante** pour un couple (email, sophrologue_id) n'est plus jamais
+  écrasée sur `prenom`/`nom`/`telephone` par une réservation ultérieure — seul `user_id`
+  peut encore être complété s'il manquait.
+- Un client **non connecté** (checkout via "Continuer sans connexion") garde le comportement
+  d'origine : les valeurs saisies dans le formulaire font foi, aucun verrouillage.
 
-### Tests emails manuels (curl)
-```bash
-# Rappel J-1
-curl -X POST https://calymia.vercel.app/api/cron/rappels-j1 \
-  -H "Authorization: Bearer {CRON_SECRET}"
+⚠️ **Bug connu et non corrigé** : `cn()` dans `src/lib/utils.ts` est un simple `join()`, sans
+`tailwind-merge`. Un `className` conditionnel peut ne pas s'appliquer visuellement si Tailwind
+génère les classes par défaut du composant après celles injectées (`bg-white` du composant
+`Input` peut visuellement l'emporter sur un `bg-slate-100` injecté). Contournement actuel :
+classes avec `!important` (`!bg-slate-100`) sur les cas ponctuels déjà touchés
+(`reserver/page.tsx`). **Fix de fond à prévoir** : installer `tailwind-merge` et réécrire
+`cn()` — impact potentiellement large sur toute l'app (tout composant avec `className`
+conditionnel), à faire dans une session dédiée avec vérification visuelle globale, pas en
+urgence.
 
-# Post-séance
-curl -X POST https://calymia.vercel.app/api/cron/post-seance \
-  -H "Authorization: Bearer {CRON_SECRET}"
+---
+
+## 9. Déploiement DEV — historique (24 juillet 2026)
+
+L'auto-deploy Git natif Vercel↔GitHub est fiable et suffisant pour `calymia` (DEV). Un
+Deploy Hook + workflow GitHub Actions (`deploy-dev.yml`) avaient été mis en place en
+parallèle puis retirés : les deux déclencheurs (Git natif + Deploy Hook) se déclenchaient
+simultanément et s'annulaient mutuellement via l'Ignored Build Step du projet.
+
+Le vrai bug, longtemps masqué : un `if` sans `else` dans l'Ignored Build Step du projet
+`calymia` skippait **tous** les builds automatiques (Git natif comme Deploy Hook), quel
+que soit le déclencheur — masqué jusque-là par l'usage de `vercel --prod` en CLI, qui
+contourne ce réglage. Fix : ajouter le `else` manquant.
+
+Conclusion : le Deploy Hook et le workflow GitHub Actions ont été supprimés. Un seul
+mécanisme (auto-deploy Git natif) reste actif sur `calymia`.
+
+### Auth SSH GitHub — rappel
+La clé enregistrée côté GitHub est `~/.ssh/id_ed25519_calymia` (pas la clé par défaut
+`id_ed25519`). Un fichier `~/.ssh/config` force désormais explicitement cette clé pour
+`github.com` :
 ```
-
-### URLs utiles DEV
-- Inscription : `calymia.vercel.app/inscription`
-- Connexion : `calymia.vercel.app/connexion`
-- Page démo (noindex) : `calymia.com/demo`
-
----
-
-## 8. Ce qui est en V2 (ne pas implémenter maintenant)
-
-- SMS Twilio rappels J-1 (Pro+)
-- Avis clients — ⚠️ en cours de debug (mail avis non envoyé par post-seance)
-- Multi-praticiens plan Cabinet (jusqu'à 5, agenda partagé)
-- Annuaire sophrologues / recherche par ville et spécialité
-- Google Agenda sync (OAuth)
-- Articles blog rédigés par les sophrologues (Tiptap déjà en place, URL `/articles/{slug}`)
-
-## 9. Ce qui est en V3
-
-- Back-office central Calymia (KPIs globaux, gestion sophrologues, monitoring abonnements, suivi revenus)
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_calymia
+  IdentitiesOnly yes
+```
+Si le push SSH échoue de nouveau (`Permission denied (publickey)`) sur une nouvelle machine,
+vérifier en premier que ce fichier de config existe et pointe vers la bonne clé, avant de
+suspecter un problème côté GitHub.
 
 ---
 
-## 10. Checklist avant chaque PR develop → main
+## Note finale
 
-- [ ] `npx tsc --noEmit` passe sans erreur
-- [ ] `npm run build` passe sans erreur
-- [ ] Testé sur `calymia.vercel.app` (DEV) — parcours complet si feature critique
-- [ ] Aucun `console.log` de debug laissé
-- [ ] `NEXT_PUBLIC_APP_URL` utilisé (jamais d'URL hardcodée)
-- [ ] Resend utilisé pour les emails (jamais SendGrid)
-- [ ] Branche `develop` uniquement (jamais commit direct sur `main`)
-- [ ] Pas de `any` TypeScript non justifié
+Ce fichier est un document vivant. Il doit être mis à jour à chaque session avec les
+nouvelles décisions techniques, les bugs résolus et les patterns établis.
