@@ -485,6 +485,21 @@ export default function SeancesCalendar({
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+          <span className="text-xs font-medium text-slate-400">Légende :</span>
+          {(["confirmee", "en_attente", "terminee", "annulee"] as const).map((statut) => {
+            const st = statutStyle(statut);
+            return (
+              <span
+                key={statut}
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${st.bg} ${st.ring} ${st.text}`}
+              >
+                {st.label}
+              </span>
+            );
+          })}
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-[#2E75B6]" />
