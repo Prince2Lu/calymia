@@ -7,10 +7,10 @@ import { createClient } from "@supabase/supabase-js";
 import { CreditCard, Info, MapPin } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
 import { SophrologueRppsLine } from "@/components/public/SophrologueRppsLine";
+import { ProchainCreneauBadge } from "@/components/public/ProchainCreneauBadge";
 import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
 import { AvisPublicList } from "@/components/avis/AvisPublicList";
 import { AvisStars } from "@/components/avis/AvisStars";
-import { computeNextAvailableSlotIso } from "@/lib/booking/compute-next-slot";
 import { getParisJsDayOfWeek } from "@/lib/timezone";
 import {
   hasHorairesContenu,
@@ -143,26 +143,6 @@ function buildOpeningHoursSpecification(horaires: HorairesSophrologue) {
   );
 }
 
-function formatProchain(iso: string): string {
-  const d = new Date(iso);
-  const aujourdhui = new Date();
-  const demain = new Date();
-  demain.setDate(aujourdhui.getDate() + 1);
-  if (d.toDateString() === aujourdhui.toDateString()) {
-    return `Aujourd'hui · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
-  }
-  if (d.toDateString() === demain.toDateString()) {
-    return `Demain · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
-  }
-  return d.toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 const formatPrix = (prix: number) =>
   new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 2,
@@ -263,21 +243,19 @@ export default async function SophrologueProfilPage({
 
   const supabase = getSupabase();
 
-  const [{ data: disponibilites }, prochainIso, { data: avisNotes }] =
-    await Promise.all([
-      supabase
-        .from("disponibilites")
-        .select("jour_semaine, heure_debut, heure_fin, actif")
-        .eq("sophrologue_id", sophrologue.id)
-        .eq("actif", true),
-      computeNextAvailableSlotIso(supabase, String(sophrologue.id)),
-      supabase
-        .from("avis")
-        .select("note")
-        .eq("sophrologue_id", sophrologue.id)
-        .eq("statut", "approuve")
-        .returns<{ note: number | null }[]>(),
-    ]);
+  const [{ data: disponibilites }, { data: avisNotes }] = await Promise.all([
+    supabase
+      .from("disponibilites")
+      .select("jour_semaine, heure_debut, heure_fin, actif")
+      .eq("sophrologue_id", sophrologue.id)
+      .eq("actif", true),
+    supabase
+      .from("avis")
+      .select("note")
+      .eq("sophrologue_id", sophrologue.id)
+      .eq("statut", "approuve")
+      .returns<{ note: number | null }[]>(),
+  ]);
 
   const notesApprouvees = (avisNotes ?? [])
     .map((a) => a.note)
@@ -683,16 +661,7 @@ export default async function SophrologueProfilPage({
                 </div>
               )}
 
-              {prochainIso && (
-                <div className="rounded-lg bg-[#EAF3DE] px-3 py-2 text-center">
-                  <p className="text-[10px] font-semibold text-[#3B6D11]">
-                    Prochain disponible
-                  </p>
-                  <p className="text-xs font-bold text-[#426F59]">
-                    {formatProchain(prochainIso)}
-                  </p>
-                </div>
-              )}
+              <ProchainCreneauBadge sophrologueId={String(sophrologue.id)} />
 
               <Link
                 href={reserverHref}
