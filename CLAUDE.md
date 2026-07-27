@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 24 juillet 2026
+Dernière mise à jour : 27 juillet 2026
 
 ---
 
@@ -84,6 +84,7 @@ src/
 │       ├── stripe/          # Webhooks Stripe
 │       ├── sophrologue/     # CRUD sophrologue
 │       ├── reservations/    # create-payment-intent, annuler
+│       ├── public/          # prochain-creneau (badge temps réel, force-dynamic)
 │       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
 ├── components/
 │   ├── dashboard/
@@ -91,9 +92,9 @@ src/
 │   │   └── ProfileScoreCardWrapper.tsx  # Wrapper client pour ProfileScoreCard
 │   ├── factures/            # BoutonFacture.tsx
 │   ├── providers/           # SophrologueProvider.tsx
-│   ├── public/              # SophrologueRppsLine.tsx (infobulle RPPS, "use client")
+│   ├── public/              # SophrologueRppsLine.tsx, ProchainCreneauBadge.tsx (both "use client")
 │   ├── seances/             # SeancesCalendar.tsx, types.ts
-│   ├── ui/                  # Composants partagés (attention : cn() sans twMerge, voir section 8)
+│   ├── ui/                  # Composants partagés (cn() avec twMerge depuis le 27/07, voir section 10)
 │   └── ...
 ├── hooks/
 │   ├── useFacture.ts        # Récupère facture_url depuis paiements
@@ -104,6 +105,8 @@ src/
     │   └── sophrologue-session.ts  # getSophrologueSession() avec cache() React
     ├── billing/
     │   └── trial-status.ts  # computeTrialDaysRemaining(), getSidebarPlanBadge()
+    ├── booking/
+    │   └── compute-next-slot.ts  # computeNextAvailableSlotIso() — lit sophrologues.horaires
     ├── config/
     │   └── site-url.ts      # getSiteUrl(), getSophrologueProfileUrl()
     ├── factures/
@@ -111,9 +114,9 @@ src/
     ├── emails/
     │   └── templates.ts     # Templates emails Resend
     ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow
-    ├── horaires.ts          # normalizeHoraires(), resolvePublicHoraires(), horairesFromDisponibilites()
+    ├── horaires.ts          # normalizeHoraires(), dispoByJsDayFromHoraires() — source unique horaires (voir section 10)
     ├── supabase/            # Clients Supabase (browser + server)
-    ├── utils.ts             # cn() — ⚠️ simple join(), pas de twMerge (voir section 8)
+    ├── utils.ts             # cn() — twMerge (fixé le 27/07, voir section 10)
     └── timezone.ts          # formatParisTime()
 ```
 
@@ -148,12 +151,12 @@ chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canoniqu
 ### Tables principales
 | Table | Colonnes clés | Notes |
 |---|---|---|
-| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet` | `plan` = 'essentiel' / 'professionnel' / 'cabinet' |
+| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10) |
 | `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus |
 | `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut` | `statut` = 'confirmee' / 'terminee' / 'annulee' |
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
 | `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif` | |
-| `disponibilites` | `id`, `sophrologue_id`, `date_heure_debut`, `date_heure_fin`, `est_reserve` | |
+| `disponibilites` | `id`, `sophrologue_id`, `jour_semaine`, `heure_debut`, `heure_fin`, `actif` | ⚠️ **Legacy** — plus lue ni écrite pour le booking depuis le 27/07 (voir section 10). Reste en base, non supprimée |
 | `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut` | ⚠️ Pas `communications_log` |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
 | `seance_notes` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `contenu_html` | Pro+ uniquement |
@@ -202,8 +205,9 @@ depuis le 22 juillet 2026.
 ### SSR — obligatoire sur les pages publiques
 Toutes les pages sous `(public)/` doivent être en SSR (Server Side Rendering).
 Ne jamais ajouter `"use client"` sur les pages publiques sophrologues. Si un bloc nécessite
-un état client (ex: infobulle toggle sur mobile), l'isoler dans un petit composant
-`"use client"` dédié — exemple : `src/components/public/SophrologueRppsLine.tsx`.
+un état client (ex: infobulle toggle sur mobile, ou badge temps réel), l'isoler dans un petit
+composant `"use client"` dédié — exemples : `src/components/public/SophrologueRppsLine.tsx`,
+`src/components/public/ProchainCreneauBadge.tsx`.
 
 ### URLs — toujours centralisées
 **Ne jamais hardcoder** `app.calymia.com` ou `calymia.vercel.app`. Toujours utiliser :
@@ -257,15 +261,29 @@ protégées lourdes doivent être des Server Components avec fetch SSR plutôt q
 que s'il est appelé directement depuis un Request handler, pas depuis une fonction utilitaire.
 Dans les fonctions cron, utiliser des `await` explicites.
 
+### ISR et données temps réel — pattern établi (27 juillet 2026)
+Une page publique en ISR (`export const revalidate = 3600`) peut afficher des données figées
+pendant toute la durée du cache. Si une donnée doit rester temps réel (ex: prochain créneau
+disponible) alors que le reste de la page peut rester en cache, **ne pas** baisser le
+`revalidate` global de la page — isoler la donnée dans un Client Component dédié qui fetch une
+route API `force-dynamic` à chaque affichage. Exemple : `ProchainCreneauBadge.tsx` +
+`/api/public/prochain-creneau/route.ts`. Voir section 10 pour le contexte complet.
+
 ---
 
 ## 6. Patterns établis
 
-### Score de complétude du profil
+### Score de complétude du profil (mis à jour 27 juillet 2026)
 - Calcul dans `src/lib/profile-score.ts` — fonction `computeProfileScore(sophrologue, supabase)`
-- 10 critères × 10 points = score 0–100
+- 9 critères, total toujours /100 : 8 critères × 10 points + 1 critère "Horaires" × 20 points
+  (fusion des anciens critères séparés `disponibilites` + `horaires` — la table `disponibilites`
+  n'étant plus lue nulle part, ce critère unique se base sur `hasHorairesContenu(normalizeHoraires(...))`)
+- Formule : `items.reduce((sum, item) => sum + (item.completed ? (item.points ?? 10) : 0), 0)`
+  — chaque `ProfileScoreItem` peut définir `points` (défaut 10) ; permet d'ajouter/retirer des
+  critères sans casser le total /100
 - Affiché dans le dashboard via `ProfileScoreCardWrapper` (Client Component) → `ProfileScoreCard`
-- Critères : photo_url, bio (>50 chars), specialites, types_seances actifs, disponibilites, horaires JSONB, photos_cabinet, formations, numero_rpps, syndicats
+- Critères : photo_url, bio (>50 chars), specialites, types_seances actifs, horaires JSONB (20 pts),
+  photos_cabinet, formations, numero_rpps, syndicats
 - Liens directs vers `/parametres?tab={profil|seances|disponibilites|vitrine}` — ⚠️ **pas**
   `/dashboard/parametres` (bug corrigé le 24 juillet 2026 : `/parametres` est un sibling de
   `/dashboard`, pas un sous-dossier)
@@ -280,11 +298,37 @@ Dans les fonctions cron, utiliser des `await` explicites.
 - Email sophrologue inclut le lien facture après chaque paiement réussi
 - Email client inclut les coordonnées du sophrologue (tél, email, adresse) dans un encadré vert
 
-### Horaires — deux sources, une logique de résolution
-- `sophrologues.horaires` (JSONB) : horaires affichés sur la page publique, configurables dans Paramètres → Cabinet/vitrine
-- `disponibilites` : créneaux réservables en ligne, configurables dans Paramètres → Disponibilités et onboarding étape 3
-- Sur la page publique SSR : `resolvePublicHoraires(sophrologue.horaires, disponibilites)` depuis `src/lib/horaires.ts` — priorité au JSONB, sinon dérivé des disponibilités
-- **Ne jamais afficher les horaires dans l'onboarding étape 4 (vitrine)** — supprimé car redondant avec étape 3
+### Horaires — source unique `sophrologues.horaires` (27 juillet 2026)
+**Historique du bug** : jusqu'au 27/07, l'onboarding écrivait dans `disponibilites` (créneaux
+bookables) tandis que l'onglet Paramètres → Cabinet/vitrine écrivait dans `horaires` (JSONB,
+affiché sur la page publique). Aucun des deux ne réécrivait l'autre après l'inscription initiale
+→ un sophrologue modifiant ses horaires après l'onboarding voyait son affichage changer sans que
+le tunnel de réservation ni le badge "prochain créneau" ne suivent (créneaux "fantômes" ou horaires
+affichés comme fermés mais réservables quand même).
+
+- **`sophrologues.horaires` (JSONB) est désormais l'unique source de vérité**, à la fois pour
+  l'affichage ET pour le calcul des créneaux réservables.
+- `dispoByJsDayFromHoraires(horaires)` (`src/lib/horaires.ts`) convertit le JSONB en
+  `Map<jsDay, DispoWindow[]>`, réutilisée par `compute-next-slot.ts` (badge) et `reserver/page.tsx`
+  (tunnel).
+- `resolvePublicHoraires()` existe toujours dans `src/lib/horaires.ts` mais n'est plus appelée
+  (code mort, repli legacy sur `disponibilites`) — à nettoyer un jour.
+- La table `disponibilites` n'est plus écrite ni lue nulle part dans l'app. Elle reste en base,
+  non supprimée, en cas de besoin futur.
+- L'onboarding étape 3 écrit désormais `horaires` via `/api/sophrologue/update` (au lieu de
+  `disponibilites` via `/api/sophrologue/disponibilites`) ; le délai minimum de réservation reste
+  géré séparément via ce dernier endpoint avec `{ delaiOnly: true }`.
+- **Le badge "prochain créneau"** sur la page publique est un Client Component dédié
+  (`ProchainCreneauBadge.tsx`, route `/api/public/prochain-creneau`, `force-dynamic`) — la page
+  publique elle-même reste en ISR (`revalidate: 3600`), mais ce badge recalcule en temps réel à
+  chaque affichage pour ne jamais être désynchronisé du cache de la page.
+- **Script de migration disponible** (non exécuté en PROD, aucun compte concerné au 27/07) :
+  `scripts/migrate-horaires-from-disponibilites.ts` — reconstruit `horaires` depuis
+  `disponibilites` pour tout compte où `horaires` est vide, en dry-run par défaut (`--apply`
+  pour écrire). À lancer avant toute mise en prod si de nouveaux comptes historiques apparaissent
+  avec `horaires` vide.
+- **Ne jamais afficher les horaires dans l'onboarding étape 4 (vitrine)** — supprimé car redondant
+  avec étape 3.
 
 ### Page publique — champs affichés
 - `numero_rpps` : affiché au-dessus de la section photos cabinet, uniquement si renseigné, avec infobulle définition
@@ -381,15 +425,8 @@ Un client peut réserver chez plusieurs sophrologues sous le même compte. Modè
 - Un client **non connecté** (checkout via "Continuer sans connexion") garde le comportement
   d'origine : les valeurs saisies dans le formulaire font foi, aucun verrouillage.
 
-⚠️ **Bug connu et non corrigé** : `cn()` dans `src/lib/utils.ts` est un simple `join()`, sans
-`tailwind-merge`. Un `className` conditionnel peut ne pas s'appliquer visuellement si Tailwind
-génère les classes par défaut du composant après celles injectées (`bg-white` du composant
-`Input` peut visuellement l'emporter sur un `bg-slate-100` injecté). Contournement actuel :
-classes avec `!important` (`!bg-slate-100`) sur les cas ponctuels déjà touchés
-(`reserver/page.tsx`). **Fix de fond à prévoir** : installer `tailwind-merge` et réécrire
-`cn()` — impact potentiellement large sur toute l'app (tout composant avec `className`
-conditionnel), à faire dans une session dédiée avec vérification visuelle globale, pas en
-urgence.
+✅ **Résolu le 27 juillet 2026** — voir section 10 pour le détail du fix `cn()`/`tailwind-merge`
+(qui touchait notamment les champs readOnly de ce même tunnel de réservation).
 
 ---
 
@@ -422,6 +459,33 @@ Host github.com
 Si le push SSH échoue de nouveau (`Permission denied (publickey)`) sur une nouvelle machine,
 vérifier en premier que ce fichier de config existe et pointe vers la bonne clé, avant de
 suspecter un problème côté GitHub.
+
+---
+
+## 10. cn() / tailwind-merge (27 juillet 2026)
+
+`cn()` dans `src/lib/utils.ts` utilise désormais `twMerge` :
+```typescript
+import { twMerge } from "tailwind-merge";
+
+export function cn(...classes: Array<string | false | null | undefined>) {
+  return twMerge(classes.filter(Boolean).join(" "));
+}
+```
+
+Contexte : l'ancienne implémentation (`join()` simple) ne résolvait pas les conflits entre
+classes Tailwind touchant la même propriété (ex: `bg-white` par défaut d'`Input` vs
+`bg-slate-100` injecté) — l'ordre de priorité dépendait de l'ordre de génération CSS de
+Tailwind, pas de l'ordre des classes dans la chaîne. Contournement `!important` retiré
+(3 occurrences dans `reserver/page.tsx`, champs readOnly du tunnel de réservation — voir
+section 8).
+
+Surface du bug : seuls 4 composants utilisent `cn()` — `button.tsx`, `badge.tsx`, `input.tsx`,
+`card.tsx` (`src/components/ui/`). Vérifié par grep sur tout `src/` avant le fix.
+
+Point de vigilance identifié pendant l'audit (à surveiller, pas de bug confirmé) :
+`dashboard/page.tsx` utilise `<Card className="... p-0 ...">` pour écraser le `p-6` par
+défaut — confirmé fonctionnel après le fix (`p-0` gagne bien via `twMerge`).
 
 ---
 
