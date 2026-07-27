@@ -946,7 +946,7 @@ export default function ReserverPage() {
                         setPatient((p) => ({ ...p, prenom: e.target.value }))
                       }
                       readOnly={isLoggedIn}
-                      className={isLoggedIn ? "!bg-slate-100 !text-slate-500" : undefined}
+                      className={isLoggedIn ? "bg-slate-100 text-slate-500" : undefined}
                     />
                   </div>
                   <div className="space-y-1">
@@ -959,7 +959,7 @@ export default function ReserverPage() {
                         setPatient((p) => ({ ...p, nom: e.target.value }))
                       }
                       readOnly={isLoggedIn}
-                      className={isLoggedIn ? "!bg-slate-100 !text-slate-500" : undefined}
+                      className={isLoggedIn ? "bg-slate-100 text-slate-500" : undefined}
                     />
                   </div>
                 </div>
@@ -991,7 +991,7 @@ export default function ReserverPage() {
                         setPatient((p) => ({ ...p, telephone: e.target.value }))
                       }
                       readOnly={isLoggedIn}
-                      className={isLoggedIn ? "!bg-slate-100 !text-slate-500" : undefined}
+                      className={isLoggedIn ? "bg-slate-100 text-slate-500" : undefined}
                     />
                   </div>
                 </div>
