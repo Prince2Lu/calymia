@@ -1,8 +1,13 @@
 /**
- * Calcule le prochain créneau réservable (SSR) — aligné sur la logique du tunnel
- * `reserver` (disponibilites par jour + séances réservées + délai min).
+ * Calcule le prochain créneau réservable — aligné sur la logique du tunnel
+ * `reserver` (horaires JSONB + séances réservées + délai min).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  dispoByJsDayFromHoraires,
+  normalizeHoraires,
+  type DispoWindow,
+} from "@/lib/horaires";
 import {
   addParisCalendarDays,
   dispoWindowParisDay,
@@ -10,18 +15,7 @@ import {
   startOfParisCalendarDay,
 } from "@/lib/timezone";
 
-type DispoRow = {
-  jour_semaine: number;
-  heure_debut: string;
-  heure_fin: string;
-};
-
 type BookedInterval = { debut: Date; fin: Date };
-
-/** BDD : même convention que `reserver/page.tsx` */
-function dbJourToJsDay(dbJour: number): number {
-  return (dbJour + 1) % 7;
-}
 
 function isSlotBooked(
   slotStart: Date,
@@ -38,7 +32,7 @@ const SLOT_GRID_STEP_MS = 15 * 60 * 1000;
 
 function buildSlotsFromDispo(
   day: Date,
-  dispos: DispoRow[],
+  dispos: DispoWindow[],
   bookedIntervals: BookedInterval[],
   delaiMinHeures: number,
   slotDurationMs: number,
@@ -87,43 +81,42 @@ export async function computeNextAvailableSlotIso(
   ).toISOString();
   const nowIso = new Date().toISOString();
 
-  const [{ data: dispos }, { data: seances }, { data: params }, { data: typesRows }] =
-    await Promise.all([
-      supabase
-        .from("disponibilites")
-        .select("jour_semaine, heure_debut, heure_fin")
-        .eq("sophrologue_id", sophrologueId)
-        .eq("actif", true)
-        .returns<DispoRow[]>(),
-      supabase
-        .from("seances")
-        .select("debut_at, fin_at")
-        .eq("sophrologue_id", sophrologueId)
-        .in("statut", ["confirmee", "en_attente"])
-        .gt("debut_at", nowIso)
-        .lt("debut_at", horizon)
-        .or(`expire_at.is.null,expire_at.gt.${nowIso}`)
-        .returns<{ debut_at: string; fin_at: string }[]>(),
-      supabase
-        .from("parametres_cabinet")
-        .select("delai_min_reservation_heures")
-        .eq("sophrologue_id", sophrologueId)
-        .maybeSingle<{ delai_min_reservation_heures: number }>(),
-      supabase
-        .from("types_seances")
-        .select("duree_minutes")
-        .eq("sophrologue_id", sophrologueId)
-        .eq("actif", true)
-        .returns<{ duree_minutes: number | null }[]>(),
-    ]);
+  const [
+    { data: sophro },
+    { data: seances },
+    { data: params },
+    { data: typesRows },
+  ] = await Promise.all([
+    supabase
+      .from("sophrologues")
+      .select("horaires")
+      .eq("id", sophrologueId)
+      .maybeSingle<{ horaires: unknown }>(),
+    supabase
+      .from("seances")
+      .select("debut_at, fin_at")
+      .eq("sophrologue_id", sophrologueId)
+      .in("statut", ["confirmee", "en_attente"])
+      .gt("debut_at", nowIso)
+      .lt("debut_at", horizon)
+      .or(`expire_at.is.null,expire_at.gt.${nowIso}`)
+      .returns<{ debut_at: string; fin_at: string }[]>(),
+    supabase
+      .from("parametres_cabinet")
+      .select("delai_min_reservation_heures")
+      .eq("sophrologue_id", sophrologueId)
+      .maybeSingle<{ delai_min_reservation_heures: number }>(),
+    supabase
+      .from("types_seances")
+      .select("duree_minutes")
+      .eq("sophrologue_id", sophrologueId)
+      .eq("actif", true)
+      .returns<{ duree_minutes: number | null }[]>(),
+  ]);
 
-  const dispoByJsDay = new Map<number, DispoRow[]>();
-  for (const d of dispos ?? []) {
-    const jsDay = dbJourToJsDay(d.jour_semaine);
-    const arr = dispoByJsDay.get(jsDay) ?? [];
-    arr.push(d);
-    dispoByJsDay.set(jsDay, arr);
-  }
+  const dispoByJsDay = dispoByJsDayFromHoraires(
+    normalizeHoraires(sophro?.horaires),
+  );
 
   if (dispoByJsDay.size === 0) return null;
 

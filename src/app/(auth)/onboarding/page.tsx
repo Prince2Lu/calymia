@@ -16,6 +16,10 @@ import {
 } from "@/components/onboarding/OnboardingVitrineStep";
 import { usePlan } from "@/hooks/usePlan";
 import { getSophrologueProfileUrl } from "@/lib/config/site-url";
+import {
+  emptyHoraires,
+  type HorairesSophrologue,
+} from "@/lib/horaires";
 
 type Specialty =
   | "stress"
@@ -112,15 +116,20 @@ const DAYS: { key: DayKey; label: string }[] = [
   { key: "samedi", label: "Samedi" },
 ];
 
-// Maps the French day key to the DB jour_semaine value (1=lundi … 6=samedi)
-const DAY_TO_JOUR: Record<DayKey, number> = {
-  lundi: 1,
-  mardi: 2,
-  mercredi: 3,
-  jeudi: 4,
-  vendredi: 5,
-  samedi: 6,
-};
+function horairesFromAvailability(
+  availability: OnboardingState["availability"],
+): HorairesSophrologue {
+  const horaires = emptyHoraires();
+  for (const day of Object.keys(availability) as DayKey[]) {
+    const cfg = availability[day];
+    if (!cfg.enabled) continue;
+    horaires[day] = cfg.slots.map((slot) => ({
+      debut: slot.start,
+      fin: slot.end,
+    }));
+  }
+  return horaires;
+}
 
 const STEP_TITLES = [
   "Profil public",
@@ -426,7 +435,9 @@ export default function OnboardingPage() {
     const prenomPayload = prenom || sophrologueRow.prenom || "";
     const nomPayload = nom || sophrologueRow.nom || "";
 
-    // ── 3) Save profile (bio, address, specialties, etc.) ─────────────────
+    // ── 3) Save profile (bio, address, specialties, horaires étape 3, etc.) ─
+    const horaires = horairesFromAvailability(state.availability);
+
     const profileRes = await fetch("/api/sophrologue/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -445,7 +456,7 @@ export default function OnboardingPage() {
         phone: state.phone,
         ...(state.photoUrl ? { photo_url: state.photoUrl } : {}),
         photos_cabinet: state.vitrine.photos_cabinet,
-        horaires: state.vitrine.horaires,
+        horaires,
         horaires_texte: state.vitrine.horaires_texte,
         infos_pratiques: state.vitrine.infos_pratiques,
         modes_paiement: state.vitrine.modes_paiement,
@@ -462,33 +473,22 @@ export default function OnboardingPage() {
       return;
     }
 
-    // ── 4) Save availability (disponibilites + parametres_cabinet) ─────────
-    const dispos = (Object.entries(state.availability) as [DayKey, { enabled: boolean; slots: { start: string; end: string }[] }][])
-      .filter(([, cfg]) => cfg.enabled)
-      .flatMap(([day, cfg]) =>
-        cfg.slots.map((slot) => ({
-          jour_semaine: DAY_TO_JOUR[day],
-          heure_debut: slot.start,
-          heure_fin: slot.end,
-          actif: true,
-        })),
-      );
-
-    console.log(`[onboarding] Saving disponibilites: ${dispos.length} days`, dispos);
+    // ── 4) Save délai minimum (parametres_cabinet uniquement) ──────────────
+    console.log(`[onboarding] Saving delai_min_reservation_heures: ${state.minBookingDelay}`);
 
     const dispoRes = await fetch("/api/sophrologue/disponibilites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sophrologue_id: sophrologueId,
-        dispos,
         delai: Number(state.minBookingDelay),
+        delaiOnly: true,
       }),
     });
 
     if (!dispoRes.ok) {
       const d = (await dispoRes.json().catch(() => null)) as { error?: string } | null;
-      setError(d?.error ?? "Erreur lors de la sauvegarde des disponibilités. Merci de réessayer.");
+      setError(d?.error ?? "Erreur lors de la sauvegarde du délai de réservation. Merci de réessayer.");
       setLoading(false);
       return;
     }

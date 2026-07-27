@@ -151,7 +151,7 @@ export default function ProfileScoreCard({ score, items }: Props) {
         </div>
         <div className="shrink-0 text-right">
           <p className="text-3xl font-medium text-[#1E3A5F] leading-none">{score}%</p>
-          <p className="text-xs text-slate-400">/ 10 champs</p>
+          <p className="text-xs text-slate-400">/ 100</p>
         </div>
       </div>
 

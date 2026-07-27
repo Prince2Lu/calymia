@@ -18,6 +18,11 @@ import {
   isSameParisCalendarDay,
   startOfParisCalendarDay,
 } from "@/lib/timezone";
+import {
+  dispoByJsDayFromHoraires,
+  normalizeHoraires,
+  type DispoWindow,
+} from "@/lib/horaires";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -33,6 +38,7 @@ type SophrologueLite = {
   id: string | number;
   prenom: string | null;
   nom: string | null;
+  horaires: unknown;
 };
 
 type PatientInfo = {
@@ -43,18 +49,11 @@ type PatientInfo = {
   consent: boolean;
 };
 
-// jour_semaine : 0=Lundi … 6=Dimanche (convention BDD)
-type DispoRow = {
-  jour_semaine: number;
-  heure_debut: string; // "09:00"
-  heure_fin: string;   // "18:00"
-};
-
 type BookedInterval = { debut: Date; fin: Date };
 
 type AvailabilityData = {
-  // JS getDay() → DispoRow[] (multiple slots per day, e.g. 09-12 and 14-18)
-  dispoByJsDay: Map<number, DispoRow[]>;
+  // JS getDay() → DispoWindow[] (multiple slots per day, e.g. 09-12 and 14-18)
+  dispoByJsDay: Map<number, DispoWindow[]>;
   // séances déjà réservées sous forme d'intervalles (dates locales)
   bookedIntervals: BookedInterval[];
   // délai minimum en heures avant réservation
@@ -62,11 +61,6 @@ type AvailabilityData = {
 };
 
 // ─── Date helpers (créneaux & affichage = Europe/Paris ; stockage = UTC) ─────
-
-/** Convertit jour_semaine BDD (0=Lun … 6=Dim) → JS getDay() (0=Dim, 1=Lun … 6=Sam) */
-function dbJourToJsDay(dbJour: number): number {
-  return (dbJour + 1) % 7;
-}
 
 /** Vérifie chevauchement avec une séance existante (durée = type choisi) */
 function isSlotBooked(
@@ -85,7 +79,7 @@ const SLOT_GRID_STEP_MS = 15 * 60 * 1000; // pas de 15 min (30, 45, 60, 90…)
 /** Créneaux disponibles pour un jour, selon la durée du type de séance */
 function buildSlotsFromDispo(
   day: Date,
-  dispos: DispoRow[],
+  dispos: DispoWindow[],
   bookedIntervals: BookedInterval[],
   delaiMinHeures: number,
   slotDurationMs: number,
@@ -190,10 +184,10 @@ export default function ReserverPage() {
       const slug = params.slug;
       if (!slug) return;
 
-      // 1) Sophrologue de base
+      // 1) Sophrologue de base (+ horaires JSONB = source des créneaux)
       const { data: sophroData } = await supabase
         .from("sophrologues")
-        .select("id, prenom, nom")
+        .select("id, prenom, nom, horaires")
         .eq("slug", slug)
         .eq("actif", true)
         .maybeSingle<SophrologueLite>();
@@ -213,15 +207,7 @@ export default function ReserverPage() {
         29,
       ).toISOString();
 
-      // 2) Disponibilités actives
-      const { data: dispos } = await supabase
-        .from("disponibilites")
-        .select("jour_semaine, heure_debut, heure_fin")
-        .eq("sophrologue_id", sid)
-        .eq("actif", true)
-        .returns<DispoRow[]>();
-
-      // 3) Séances déjà réservées dans les 4 prochaines semaines
+      // 2) Séances déjà réservées dans les 4 prochaines semaines
       // Exclude temporary blocks that have already expired
       const nowIso = new Date().toISOString();
       const { data: seances } = await supabase
@@ -236,7 +222,7 @@ export default function ReserverPage() {
 
       console.log(`[reserver] Séances réservées récupérées : ${seances?.length ?? 0}`, seances);
 
-      // 4) Paramètres cabinet (délai minimum)
+      // 3) Paramètres cabinet (délai minimum)
       const { data: params_cabinet } = await supabase
         .from("parametres_cabinet")
         .select("delai_min_reservation_heures")
@@ -245,14 +231,9 @@ export default function ReserverPage() {
 
       if (cancelled) return;
 
-      // Construire la map JS-day → DispoRow[] (plusieurs plages par jour)
-      const dispoByJsDay = new Map<number, DispoRow[]>();
-      for (const d of dispos ?? []) {
-        const jsDay = dbJourToJsDay(d.jour_semaine);
-        const arr = dispoByJsDay.get(jsDay) ?? [];
-        arr.push(d);
-        dispoByJsDay.set(jsDay, arr);
-      }
+      const dispoByJsDay = dispoByJsDayFromHoraires(
+        normalizeHoraires(sophroData.horaires),
+      );
 
       // Construire les intervalles de séances réservées
       const bookedIntervals: BookedInterval[] = (seances ?? []).map((s) => ({

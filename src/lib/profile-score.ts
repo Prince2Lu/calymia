@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasHorairesContenu, normalizeHoraires } from "@/lib/horaires";
 
 /**
  * Le projet n'expose pas (encore) de type partagé pour la table `sophrologues`.
@@ -29,6 +30,8 @@ export type ProfileScoreItem = {
   impact: ProfileImpact;
   completed: boolean;
   href: string;
+  /** Points attribués si complété (défaut 10). Total max = 100. */
+  points?: number;
 };
 
 function isNonEmptyArray(value: unknown): boolean {
@@ -39,22 +42,15 @@ export async function computeProfileScore(
   sophrologue: SophrologueRow,
   supabaseServer: SupabaseServerClient,
 ): Promise<{ score: number; items: ProfileScoreItem[] }> {
-  const [tarifsRes, disponibilitesRes] = await Promise.all([
-    supabaseServer
-      .from("types_seances")
-      .select("id")
-      .eq("sophrologue_id", sophrologue.id)
-      .eq("actif", true)
-      .limit(1),
-    supabaseServer
-      .from("disponibilites")
-      .select("id")
-      .eq("sophrologue_id", sophrologue.id)
-      .limit(1),
-  ]);
+  const { data: tarifsRows } = await supabaseServer
+    .from("types_seances")
+    .select("id")
+    .eq("sophrologue_id", sophrologue.id)
+    .eq("actif", true)
+    .limit(1);
 
-  const hasTarifs = (tarifsRes.data?.length ?? 0) > 0;
-  const hasDisponibilites = (disponibilitesRes.data?.length ?? 0) > 0;
+  const hasTarifs = (tarifsRows?.length ?? 0) > 0;
+  const hasHoraires = hasHorairesContenu(normalizeHoraires(sophrologue.horaires));
 
   const items: ProfileScoreItem[] = [
     {
@@ -94,22 +90,16 @@ export async function computeProfileScore(
       href: "/parametres?tab=seances",
     },
     {
-      key: "disponibilites",
-      label: "Disponibilités",
-      shortLabel: "des créneaux de disponibilité",
-      sublabel: "Permettent aux clients de réserver en ligne",
-      impact: "Conversion",
-      completed: hasDisponibilites,
-      href: "/parametres?tab=disponibilites",
-    },
-    {
       key: "horaires",
-      label: "Horaires vitrine",
-      shortLabel: "vos horaires vitrine",
-      sublabel: "Apparaissent sur votre page publique",
-      impact: "SEO",
-      completed: sophrologue.horaires != null,
+      label: "Horaires",
+      shortLabel: "vos horaires",
+      sublabel:
+        "Apparaissent sur votre page publique et permettent la réservation en ligne",
+      impact: "Conversion",
+      completed: hasHoraires,
       href: "/parametres?tab=vitrine",
+      // Fusion ex-critères « disponibilites » + « horaires » → 20 pts pour rester /100
+      points: 20,
     },
     {
       key: "photos_cabinet",
@@ -149,7 +139,10 @@ export async function computeProfileScore(
     },
   ];
 
-  const score = items.filter((item) => item.completed).length * 10;
+  const score = items.reduce(
+    (sum, item) => sum + (item.completed ? (item.points ?? 10) : 0),
+    0,
+  );
 
   const ordered = [
     ...items.filter((item) => !item.completed),

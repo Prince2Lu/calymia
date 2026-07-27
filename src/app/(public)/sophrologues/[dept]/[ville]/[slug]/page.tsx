@@ -16,7 +16,7 @@ import {
   hasHorairesContenu,
   JOURS_LABELS,
   JOURS_SEMAINE,
-  resolvePublicHoraires,
+  normalizeHoraires,
   type HorairesSophrologue,
   type JourSemaine,
 } from "@/lib/horaires";
@@ -243,19 +243,12 @@ export default async function SophrologueProfilPage({
 
   const supabase = getSupabase();
 
-  const [{ data: disponibilites }, { data: avisNotes }] = await Promise.all([
-    supabase
-      .from("disponibilites")
-      .select("jour_semaine, heure_debut, heure_fin, actif")
-      .eq("sophrologue_id", sophrologue.id)
-      .eq("actif", true),
-    supabase
-      .from("avis")
-      .select("note")
-      .eq("sophrologue_id", sophrologue.id)
-      .eq("statut", "approuve")
-      .returns<{ note: number | null }[]>(),
-  ]);
+  const { data: avisNotes } = await supabase
+    .from("avis")
+    .select("note")
+    .eq("sophrologue_id", sophrologue.id)
+    .eq("statut", "approuve")
+    .returns<{ note: number | null }[]>();
 
   const notesApprouvees = (avisNotes ?? [])
     .map((a) => a.note)
@@ -268,7 +261,7 @@ export default async function SophrologueProfilPage({
         ) / 10
       : 0;
 
-  const horaires = resolvePublicHoraires(sophrologue.horaires, disponibilites ?? []);
+  const horaires = normalizeHoraires(sophrologue.horaires);
   const prenom = sophrologue.prenom ?? "";
   const nom = sophrologue.nom ?? "";
   const fullName = `${prenom} ${nom}`.trim() || "Sophrologue";
