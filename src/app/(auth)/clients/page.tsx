@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import {
@@ -13,6 +13,8 @@ import {
   Users,
   AlertTriangle,
   ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,29 @@ type Patient = {
   derniere_seance?: string | null;
 };
 
+type SortKey =
+  | "nom"
+  | "email"
+  | "telephone"
+  | "nb_seances"
+  | "derniere_seance"
+  | "created_at";
+
+type SortDir = "asc" | "desc";
+
+const SORTABLE_COLUMNS: {
+  key: SortKey;
+  label: string;
+  align: "left" | "center";
+}[] = [
+  { key: "nom", label: "Nom complet", align: "left" },
+  { key: "email", label: "Email", align: "left" },
+  { key: "telephone", label: "Téléphone", align: "center" },
+  { key: "nb_seances", label: "Séances", align: "center" },
+  { key: "derniere_seance", label: "Dernière séance", align: "center" },
+  { key: "created_at", label: "Date de création", align: "center" },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null | undefined) {
@@ -45,6 +70,35 @@ function initials(prenom: string | null, nom: string | null) {
   const p = prenom?.[0]?.toUpperCase() ?? "";
   const n = nom?.[0]?.toUpperCase() ?? "";
   return `${p}${n}` || "?";
+}
+
+function fullName(prenom: string | null, nom: string | null) {
+  return `${prenom ?? ""} ${nom ?? ""}`.trim() || "—";
+}
+
+function comparePatients(a: Patient, b: Patient, key: SortKey): number {
+  switch (key) {
+    case "nom":
+      return fullName(a.prenom, a.nom)
+        .toLocaleLowerCase("fr")
+        .localeCompare(fullName(b.prenom, b.nom).toLocaleLowerCase("fr"), "fr");
+    case "email":
+      return (a.email ?? "")
+        .toLocaleLowerCase("fr")
+        .localeCompare((b.email ?? "").toLocaleLowerCase("fr"), "fr");
+    case "telephone":
+      return (a.telephone ?? "").localeCompare(b.telephone ?? "", "fr");
+    case "nb_seances":
+      return (a.nb_seances ?? 0) - (b.nb_seances ?? 0);
+    case "derniere_seance":
+    case "created_at": {
+      const at = a[key] ? new Date(a[key]).getTime() : 0;
+      const bt = b[key] ? new Date(b[key]).getTime() : 0;
+      return at - bt;
+    }
+    default:
+      return 0;
+  }
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -208,6 +262,8 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("nom");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -229,6 +285,24 @@ export default function ClientsPage() {
       ),
     );
   }, [search, patients]);
+
+  const sortedFiltered = useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      const cmp = comparePatients(a, b, sortKey);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [filtered, sortKey, sortDir]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir("asc");
+  };
 
   const loadPatients = useCallback(
     async (sid: string) => {
@@ -408,34 +482,45 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             {/* Header */}
-            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
-              {[
-                "Nom complet",
-                "Email",
-                "Téléphone",
-                "Séances",
-                "Dernière séance",
-                "Fiche client",
-              ].map((h) => (
-                <span
-                  key={h}
-                  className={`text-xs font-semibold uppercase tracking-wide text-slate-400${
-                    h === "Nom complet" || h === "Email" ? "" : " text-center"
-                  }`}
-                >
-                  {h}
-                </span>
-              ))}
+            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1fr] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
+              {SORTABLE_COLUMNS.map(({ key, label, align }) => {
+                const isActive = sortKey === key;
+                const SortIcon = isActive
+                  ? sortDir === "asc"
+                    ? ArrowUp
+                    : ArrowDown
+                  : null;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleSort(key)}
+                    className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:text-slate-600 ${
+                      align === "center" ? "justify-center" : "justify-start"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    {SortIcon ? (
+                      <SortIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    ) : (
+                      <span className="inline-block h-3.5 w-3.5 shrink-0" aria-hidden />
+                    )}
+                  </button>
+                );
+              })}
+              <span className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Fiche client
+              </span>
             </div>
 
             {/* Rows */}
             <div className="divide-y divide-slate-100">
-              {filtered.map((p) => {
-                const nom = `${p.prenom ?? ""} ${p.nom ?? ""}`.trim() || "—";
+              {sortedFiltered.map((p) => {
+                const nom = fullName(p.prenom, p.nom);
                 return (
                   <div
                     key={p.id}
-                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr] md:items-center md:gap-4"
+                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1fr] md:items-center md:gap-4"
                   >
                     {/* Nom */}
                     <div className="flex items-center gap-3">
@@ -451,7 +536,7 @@ export default function ClientsPage() {
                     </span>
 
                     {/* Téléphone */}
-                    <span className="text-sm text-slate-600">
+                    <span className="text-center text-sm text-slate-600 md:block">
                       {p.telephone ?? "—"}
                     </span>
 
@@ -463,6 +548,11 @@ export default function ClientsPage() {
                     {/* Dernière séance */}
                     <span className="text-center text-sm text-slate-500">
                       {formatDate(p.derniere_seance)}
+                    </span>
+
+                    {/* Date de création */}
+                    <span className="text-center text-sm text-slate-500">
+                      {formatDate(p.created_at)}
                     </span>
 
                     {/* Action */}
