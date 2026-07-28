@@ -211,7 +211,7 @@ export default function ReserverPage() {
       // Exclude temporary blocks that have already expired
       const nowIso = new Date().toISOString();
       const { data: seances } = await supabase
-        .from("seances")
+        .from("seances_disponibilite")
         .select("debut_at, fin_at")
         .eq("sophrologue_id", sid)
         .in("statut", ["confirmee", "en_attente"])

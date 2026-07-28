@@ -93,7 +93,7 @@ export async function computeNextAvailableSlotIso(
       .eq("id", sophrologueId)
       .maybeSingle<{ horaires: unknown }>(),
     supabase
-      .from("seances")
+      .from("seances_disponibilite")
       .select("debut_at, fin_at")
       .eq("sophrologue_id", sophrologueId)
       .in("statut", ["confirmee", "en_attente"])
