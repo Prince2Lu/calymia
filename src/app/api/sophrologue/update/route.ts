@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       formations,
       certifications,
       syndicats,
+      siret,
     } = body as {
       userId?: string;
       prenom?: string;
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
       formations?: string[];
       certifications?: string[];
       syndicats?: string[];
+      siret?: string;
     };
 
     console.log("[sophrologue/update] userId reçu :", userId);
@@ -94,6 +96,7 @@ export async function POST(request: Request) {
       ...(formations !== undefined && { formations }),
       ...(certifications !== undefined && { certifications }),
       ...(syndicats !== undefined && { syndicats }),
+      ...(siret !== undefined && { siret }),
     };
 
     console.log("[sophrologue/update] Colonnes mises à jour :", updatePayload);

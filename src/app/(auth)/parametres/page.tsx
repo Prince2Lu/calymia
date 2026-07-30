@@ -37,6 +37,7 @@ type Sophrologue = {
   bio: string | null;
   specialites: string[] | null;
   numero_rpps: string | null;
+  siret: string | null;
   lien_teleconsultation: string | null;
   adresse: string | null;
   ville: string | null;
@@ -55,7 +56,7 @@ type Sophrologue = {
 };
 
 const SOPHROLOGUE_SELECT =
-  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
+  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, siret, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
 
 type TypeSeance = {
   id: string;
@@ -162,6 +163,7 @@ function TabProfil({
     bio: sophrologue.bio ?? "",
     specialites: (sophrologue.specialites ?? []).join(", "),
     numero_rpps: sophrologue.numero_rpps ?? "",
+    siret: sophrologue.siret ?? "",
     lien_teleconsultation: sophrologue.lien_teleconsultation ?? "",
     adresse: sophrologue.adresse ?? "",
     ville: sophrologue.ville ?? "",
@@ -223,6 +225,7 @@ function TabProfil({
           .map((s) => s.trim())
           .filter(Boolean),
         rpps: form.numero_rpps,
+        siret: form.siret.trim(),
         teleconsultationUrl: form.lien_teleconsultation,
         address: form.adresse,
         city: form.ville,
@@ -389,6 +392,23 @@ function TabProfil({
         {field("Ville", "ville", { placeholder: "Paris" })}
         {field("Code postal", "code_postal", { placeholder: "75001" })}
         {field("N° RPPS", "numero_rpps", { placeholder: "10 chiffres" })}
+        <div className="space-y-1">
+          <label
+            className="text-xs font-medium text-slate-600"
+            title="Requis si vous facturez en votre nom propre — laissez vide si vous n'en avez pas encore"
+          >
+            Numéro SIRET (optionnel)
+          </label>
+          <Input
+            value={form.siret}
+            onChange={(e) => setForm({ ...form, siret: e.target.value })}
+            placeholder="14 chiffres"
+          />
+          <p className="text-xs text-slate-500">
+            Requis si vous facturez en votre nom propre — laissez vide si vous
+            n&apos;en avez pas encore. Affiché sur vos factures si renseigné.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-1">

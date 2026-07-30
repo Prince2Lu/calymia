@@ -1,3 +1,4 @@
+import path from "path";
 import {
   Document,
   Page,
@@ -5,20 +6,61 @@ import {
   View,
   StyleSheet,
   renderToBuffer,
+  Font,
 } from "@react-pdf/renderer";
 import React from "react";
 import { createClient } from "@supabase/supabase-js";
 import { formatParisTime } from "@/lib/timezone";
 
+Font.register({
+  family: "Playfair Display",
+  fonts: [
+    {
+      src: path.join(
+        process.cwd(),
+        "src/lib/factures/fonts/PlayfairDisplay-Regular.ttf",
+      ),
+    },
+    {
+      src: path.join(
+        process.cwd(),
+        "src/lib/factures/fonts/PlayfairDisplay-Medium.ttf",
+      ),
+      fontWeight: 500,
+    },
+  ],
+});
+
+Font.register({
+  family: "DM Sans",
+  fonts: [
+    {
+      src: path.join(
+        process.cwd(),
+        "src/lib/factures/fonts/DMSans-Regular.ttf",
+      ),
+    },
+    {
+      src: path.join(
+        process.cwd(),
+        "src/lib/factures/fonts/DMSans-Medium.ttf",
+      ),
+      fontWeight: 500,
+    },
+  ],
+});
+
+const MENTION_TVA = "TVA non applicable, art. 293 B du CGI.";
+
 export type FactureData = {
-  // Numéro de reçu
   numero: string;
   dateEmission: string;
-  // Sophrologue
+  // Vendeur (sophrologue)
   sophrologueNom: string;
   sophrologueAdresse?: string | null;
   sophrologueVille?: string | null;
-  // Patient
+  sophrologueSiret?: string | null;
+  // Client
   patientPrenom: string;
   patientNom: string;
   patientEmail: string;
@@ -31,19 +73,21 @@ export type FactureData = {
   montantTTC: number;
 };
 
-const BLEU = "#1E3A5F";
-const BLEU_MOYEN = "#2E75B6";
-const GRIS = "#64748b";
-const GRIS_CLAIR = "#f1f5f9";
-const NOIR = "#1e293b";
+const CREAM = "#FAF8F5";
+const VERT_FONCE = "#1B3A2D";
+const VERT_MOYEN = "#426F59";
+const BOX_BG = "#F1EEE4";
+const LEGAL_BG = "#EFE9D8";
+const NOIR = "#1A1A18";
+const GRIS = "#6B6860";
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "Helvetica",
+    fontFamily: "DM Sans",
     fontSize: 10,
     color: NOIR,
     padding: 48,
-    backgroundColor: "#ffffff",
+    backgroundColor: CREAM,
   },
   header: {
     flexDirection: "row",
@@ -51,14 +95,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 32,
     borderBottomWidth: 2,
-    borderBottomColor: BLEU,
+    borderBottomColor: VERT_FONCE,
     paddingBottom: 16,
   },
   brandName: {
     fontSize: 28,
-    fontFamily: "Helvetica-Bold",
-    color: BLEU,
-    letterSpacing: 2,
+    fontFamily: "Playfair Display",
+    color: VERT_FONCE,
+    letterSpacing: 1,
   },
   brandTagline: {
     fontSize: 9,
@@ -67,8 +111,9 @@ const styles = StyleSheet.create({
   },
   receiptLabel: {
     fontSize: 13,
-    fontFamily: "Helvetica-Bold",
-    color: BLEU_MOYEN,
+    fontFamily: "Playfair Display",
+    fontWeight: 500,
+    color: VERT_MOYEN,
     textAlign: "right",
   },
   receiptNumber: {
@@ -90,14 +135,15 @@ const styles = StyleSheet.create({
   },
   sectionBox: {
     flex: 1,
-    backgroundColor: GRIS_CLAIR,
+    backgroundColor: BOX_BG,
     borderRadius: 6,
     padding: 12,
   },
   sectionTitle: {
     fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    color: BLEU,
+    fontFamily: "DM Sans",
+    fontWeight: 500,
+    color: VERT_FONCE,
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 6,
@@ -114,20 +160,21 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: BLEU,
+    backgroundColor: VERT_FONCE,
     borderRadius: 4,
     padding: "8 12",
     marginBottom: 2,
   },
   tableHeaderText: {
     fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    color: "#ffffff",
+    fontFamily: "DM Sans",
+    fontWeight: 500,
+    color: CREAM,
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: "#E5E0D6",
     padding: "8 12",
   },
   colDescription: { flex: 3 },
@@ -142,7 +189,7 @@ const styles = StyleSheet.create({
   totalInner: {
     width: 200,
     borderTopWidth: 2,
-    borderTopColor: BLEU,
+    borderTopColor: VERT_FONCE,
     paddingTop: 8,
   },
   totalRow: {
@@ -160,25 +207,28 @@ const styles = StyleSheet.create({
   },
   totalTTCLabel: {
     fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    color: BLEU,
+    fontFamily: "Playfair Display",
+    fontWeight: 500,
+    color: VERT_FONCE,
   },
   totalTTCValue: {
     fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    color: BLEU,
+    fontFamily: "Playfair Display",
+    fontWeight: 500,
+    color: VERT_FONCE,
   },
   legalBox: {
     marginTop: 24,
-    backgroundColor: "#fef9c3",
+    backgroundColor: LEGAL_BG,
     borderLeftWidth: 3,
-    borderLeftColor: "#eab308",
+    borderLeftColor: VERT_MOYEN,
     padding: "8 12",
     borderRadius: 4,
   },
   legalText: {
     fontSize: 9,
-    color: "#713f12",
+    color: NOIR,
+    marginBottom: 4,
   },
   footer: {
     position: "absolute",
@@ -186,7 +236,7 @@ const styles = StyleSheet.create({
     left: 48,
     right: 48,
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: "#E5E0D6",
     paddingTop: 8,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -198,19 +248,20 @@ const styles = StyleSheet.create({
 });
 
 function FactureDocument({ data }: { data: FactureData }) {
+  const mandatText = `Facture éditée par KLS3 SARL (SIRET 949 563 340 00015, 14 allée du Fairway, 57200 Sarreguemines), pour le compte et au nom de ${data.sophrologueNom}, dans le cadre du mandat de facturation Calymia.`;
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* En-tête */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.brandName}>CALYMIA</Text>
+            <Text style={styles.brandName}>Calymia</Text>
             <Text style={styles.brandTagline}>
               Plateforme de gestion pour sophrologues
             </Text>
           </View>
           <View>
-            <Text style={styles.receiptLabel}>Reçu de paiement</Text>
+            <Text style={styles.receiptLabel}>Facture</Text>
             <Text style={styles.receiptNumber}>N° {data.numero}</Text>
             <Text style={styles.receiptDate}>
               Émis le {data.dateEmission}
@@ -218,10 +269,9 @@ function FactureDocument({ data }: { data: FactureData }) {
           </View>
         </View>
 
-        {/* Sophrologue + Patient */}
         <View style={styles.sectionRow}>
           <View style={styles.sectionBox}>
-            <Text style={styles.sectionTitle}>Sophrologue</Text>
+            <Text style={styles.sectionTitle}>Vendeur</Text>
             <Text style={styles.sectionLine}>{data.sophrologueNom}</Text>
             {data.sophrologueAdresse ? (
               <Text style={styles.sectionLineMuted}>
@@ -231,6 +281,11 @@ function FactureDocument({ data }: { data: FactureData }) {
             {data.sophrologueVille ? (
               <Text style={styles.sectionLineMuted}>
                 {data.sophrologueVille}
+              </Text>
+            ) : null}
+            {data.sophrologueSiret ? (
+              <Text style={styles.sectionLineMuted}>
+                SIRET : {data.sophrologueSiret}
               </Text>
             ) : null}
           </View>
@@ -243,7 +298,6 @@ function FactureDocument({ data }: { data: FactureData }) {
           </View>
         </View>
 
-        {/* Tableau séance */}
         <View style={styles.tableHeader}>
           <Text style={[styles.tableHeaderText, styles.colDescription]}>
             Description
@@ -295,7 +349,6 @@ function FactureDocument({ data }: { data: FactureData }) {
           </Text>
         </View>
 
-        {/* Total */}
         <View style={styles.totalBox}>
           <View style={styles.totalInner}>
             <View style={styles.totalRow}>
@@ -317,14 +370,11 @@ function FactureDocument({ data }: { data: FactureData }) {
           </View>
         </View>
 
-        {/* Mention légale */}
         <View style={styles.legalBox}>
-          <Text style={styles.legalText}>
-            TVA non applicable — article 293 B du CGI
-          </Text>
+          <Text style={styles.legalText}>{MENTION_TVA}</Text>
+          <Text style={styles.legalText}>{mandatText}</Text>
         </View>
 
-        {/* Pied de page */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Calymia — plateforme de gestion pour sophrologues
@@ -347,8 +397,6 @@ export function buildNumeroFacture(): string {
   return `CAL-${annee}-${seq}`;
 }
 
-// ─── Types internes pour la récupération Supabase ───────────────────────────
-
 type SeanceJoin = {
   id: string;
   debut_at: string;
@@ -359,6 +407,7 @@ type SeanceJoin = {
     nom: string | null;
     adresse: string | null;
     ville: string | null;
+    siret: string | null;
   } | null;
   patient: {
     prenom: string | null;
@@ -380,8 +429,6 @@ function formatDateFR(iso: string) {
   return formatParisTime(iso, "dateTimeLong");
 }
 
-// ─── Fonction principale : génère et stocke la facture pour une séance ───────
-
 export type GenerateFactureResult =
   | { success: true; facture_url: string }
   | { success: false; error: string };
@@ -396,12 +443,11 @@ export async function generateAndStoreFacture(
 
   console.log("[Facture] Début génération pour séance:", seance_id);
 
-  // 1) Récupérer la séance avec ses relations
   const { data: seance, error: seanceError } = await supabase
     .from("seances")
     .select(
       `id, debut_at, fin_at,
-       sophrologue:sophrologues(id, prenom, nom, adresse, ville),
+       sophrologue:sophrologues(id, prenom, nom, adresse, ville, siret),
        patient:patients(prenom, nom, email),
        type_seance:types_seances(nom)`,
     )
@@ -413,7 +459,6 @@ export async function generateAndStoreFacture(
     return { success: false, error: "Séance introuvable." };
   }
 
-  // 2) Récupérer le paiement réussi
   const { data: paiement, error: paiementError } = await supabase
     .from("paiements")
     .select("id, montant_total, stripe_payment_intent_id")
@@ -426,12 +471,10 @@ export async function generateAndStoreFacture(
     return { success: false, error: "Paiement introuvable pour cette séance." };
   }
 
-  // 3) Calculer la durée en minutes
   const dureeMs =
     new Date(seance.fin_at).getTime() - new Date(seance.debut_at).getTime();
   const dureeMinutes = Math.round(dureeMs / (1000 * 60));
 
-  // 4) Construire les données de la facture
   const sophrologueNom =
     `${seance.sophrologue?.prenom ?? ""} ${seance.sophrologue?.nom ?? ""}`.trim() ||
     "Sophrologue";
@@ -442,6 +485,7 @@ export async function generateAndStoreFacture(
     sophrologueNom,
     sophrologueAdresse: seance.sophrologue?.adresse ?? null,
     sophrologueVille: seance.sophrologue?.ville ?? null,
+    sophrologueSiret: seance.sophrologue?.siret ?? null,
     patientPrenom: seance.patient?.prenom ?? "",
     patientNom: seance.patient?.nom ?? "",
     patientEmail: seance.patient?.email ?? "",
@@ -454,7 +498,6 @@ export async function generateAndStoreFacture(
 
   console.log("[Facture] Données construites, numéro:", factureData.numero);
 
-  // 5) Générer le PDF
   let pdfBuffer: Buffer;
   try {
     pdfBuffer = await generateFacturePDF(factureData);
@@ -464,7 +507,6 @@ export async function generateAndStoreFacture(
     return { success: false, error: "Échec de la génération du PDF." };
   }
 
-  // 6) Upload dans Supabase Storage (bucket "factures")
   const fileName = `${factureData.numero}.pdf`;
 
   const { error: uploadError } = await supabase.storage
@@ -481,14 +523,12 @@ export async function generateAndStoreFacture(
 
   console.log("[Facture] Upload Storage OK:", fileName);
 
-  // 7) Récupérer l'URL publique
   const { data: publicUrlData } = supabase.storage
     .from("factures")
     .getPublicUrl(fileName);
 
   const factureUrl = publicUrlData.publicUrl;
 
-  // 8) Mettre à jour le paiement avec l'URL
   const { error: updateError } = await supabase
     .from("paiements")
     .update({ facture_url: factureUrl })
@@ -496,7 +536,6 @@ export async function generateAndStoreFacture(
 
   if (updateError) {
     console.error("[Facture] Erreur mise à jour paiement:", updateError);
-    // Non-bloquant : la facture est générée même si la mise à jour échoue
   } else {
     console.log("[Facture] facture_url enregistrée dans paiements");
   }
