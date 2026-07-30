@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import BillingPortalButton from "@/components/dashboard/BillingPortalButton";
 import PlanCheckoutButtons from "@/components/dashboard/PlanCheckoutButtons";
+import InvoiceHistoryTable from "@/components/dashboard/InvoiceHistoryTable";
 import { computeTrialDaysRemaining } from "@/lib/billing/trial-status";
 
 type Plan = "essentiel" | "professionnel" | "cabinet";
@@ -190,6 +191,8 @@ export default async function AbonnementPage() {
             </div>
           </section>
         ) : null}
+
+        <InvoiceHistoryTable />
 
         <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[560px] border-collapse text-sm">

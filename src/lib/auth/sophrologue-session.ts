@@ -7,6 +7,7 @@ export type SophrologueSessionInfo = {
   nom: string | null;
   plan: string | null;
   trial_ends_at: string | null;
+  stripe_customer_id: string | null;
 };
 
 export type SophrologueSession = {
@@ -30,7 +31,7 @@ export const getSophrologueSession = cache(
 
     const { data: sophrologue } = await supabase
       .from("sophrologues")
-      .select("id, prenom, nom, plan, trial_ends_at")
+      .select("id, prenom, nom, plan, trial_ends_at, stripe_customer_id")
       .eq("user_id", user.id)
       .maybeSingle<SophrologueSessionInfo>();
 
