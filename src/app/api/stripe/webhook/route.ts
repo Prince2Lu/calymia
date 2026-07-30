@@ -197,7 +197,123 @@ export async function POST(request: NextRequest) {
       }
     }
   }
-  else if (
+  else if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session
+
+    if (session.mode === 'setup') {
+      const priceId = session.metadata?.priceId?.trim()
+      const customerId =
+        typeof session.customer === 'string'
+          ? session.customer
+          : session.customer?.id
+
+      if (!priceId || !customerId) {
+        console.warn(
+          '[Webhook] checkout.session.completed (setup) ignoré: priceId ou customer manquant',
+          { priceId, customerId, sessionId: session.id }
+        )
+      } else if (!PRICE_ID_TO_PLAN[priceId]) {
+        console.warn(
+          '[Webhook] checkout.session.completed (setup) ignoré: price_id non mappé',
+          { priceId }
+        )
+      } else {
+        try {
+          // Attacher le moyen de paiement collecté comme défaut du customer
+          const setupIntentId =
+            typeof session.setup_intent === 'string'
+              ? session.setup_intent
+              : session.setup_intent?.id
+
+          let paymentMethodId: string | null = null
+          if (setupIntentId) {
+            const setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
+            paymentMethodId =
+              typeof setupIntent.payment_method === 'string'
+                ? setupIntent.payment_method
+                : setupIntent.payment_method?.id ?? null
+
+            if (paymentMethodId) {
+              await stripe.customers.update(customerId, {
+                invoice_settings: {
+                  default_payment_method: paymentMethodId,
+                },
+              })
+            }
+          }
+
+          const subs = await stripe.subscriptions.list({
+            customer: customerId,
+            status: 'all',
+            limit: 10,
+          })
+
+          const existing =
+            subs.data.find((s) => s.status === 'trialing') ??
+            subs.data.find((s) => s.status === 'active') ??
+            subs.data.find((s) => s.status === 'paused') ??
+            null
+
+          if (!existing) {
+            console.error(
+              '[Webhook] checkout.session.completed (setup): aucun abonnement existant pour le customer',
+              { customerId }
+            )
+          } else {
+            const currentItemId = existing.items.data[0]?.id
+            if (!currentItemId) {
+              console.error(
+                '[Webhook] checkout.session.completed (setup): item d’abonnement introuvable',
+                { subscriptionId: existing.id }
+              )
+            } else {
+              // Fin de trial immédiate + bascule prix, sans créer de 2e abonnement.
+              // proration_behavior: "none" = facturation du prix plein dès le changement (MVP).
+              const updated = await stripe.subscriptions.update(existing.id, {
+                items: [{ id: currentItemId, price: priceId }],
+                trial_end: 'now',
+                proration_behavior: 'none',
+                ...(paymentMethodId
+                  ? { default_payment_method: paymentMethodId }
+                  : {}),
+              })
+
+              const mappedPlan = PRICE_ID_TO_PLAN[priceId]
+              const { error: upgradeError } = await supabase
+                .from('sophrologues')
+                .update({
+                  plan: mappedPlan,
+                  trial_ends_at: null,
+                  stripe_subscription_id: updated.id,
+                })
+                .eq('stripe_customer_id', customerId)
+
+              if (upgradeError) {
+                console.error(
+                  '[Webhook] erreur sync Supabase après upgrade setup:',
+                  upgradeError
+                )
+              } else {
+                console.log(
+                  '[Webhook] upgrade trial → payé OK',
+                  {
+                    customerId,
+                    subscriptionId: updated.id,
+                    plan: mappedPlan,
+                  }
+                )
+              }
+            }
+          }
+        } catch (setupUpgradeErr) {
+          console.error(
+            '[Webhook] erreur upgrade après checkout setup:',
+            setupUpgradeErr
+          )
+        }
+      }
+    }
+  } else if (
     event.type === 'customer.subscription.updated'
   ) {
     const subscription = event.data.object as Stripe.Subscription
@@ -221,9 +337,20 @@ export async function POST(request: NextRequest) {
           { priceId }
         )
       } else {
+        const trialEndsAt =
+          subscription.status === 'active'
+            ? null
+            : subscription.trial_end
+              ? new Date(subscription.trial_end * 1000).toISOString()
+              : null
+
         const { error: planError } = await supabase
           .from('sophrologues')
-          .update({ plan: mappedPlan })
+          .update({
+            plan: mappedPlan,
+            trial_ends_at: trialEndsAt,
+            stripe_subscription_id: subscription.id,
+          })
           .eq('stripe_customer_id', customerId)
 
         if (planError) {
@@ -233,8 +360,8 @@ export async function POST(request: NextRequest) {
           )
         } else {
           console.log(
-            '[Webhook] plan mis à jour depuis subscription.updated:',
-            mappedPlan
+            '[Webhook] plan/trial synchronisés depuis subscription.updated:',
+            { mappedPlan, trialEndsAt, subscriptionId: subscription.id }
           )
         }
       }

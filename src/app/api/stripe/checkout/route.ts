@@ -86,13 +86,19 @@ export async function POST(request: NextRequest) {
 
   const appUrl = getSiteUrl();
 
+  // Mode "setup" : collecte un moyen de paiement par défaut sans créer
+  // de nouvel abonnement. L'upgrade de l'abonnement trial existant se
+  // fait dans le webhook checkout.session.completed.
   const session = await stripe.checkout.sessions.create({
     customer: sophrologue.stripe_customer_id,
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
+    mode: "setup",
+    payment_method_types: ["card"],
     success_url: `${appUrl}/dashboard/abonnement?success=true`,
     cancel_url: `${appUrl}/dashboard/abonnement`,
     locale: "fr",
+    metadata: {
+      priceId,
+    },
   });
 
   return NextResponse.json({ url: session.url });

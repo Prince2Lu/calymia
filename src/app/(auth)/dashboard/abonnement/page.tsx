@@ -11,6 +11,7 @@ type Plan = "essentiel" | "professionnel" | "cabinet";
 type SophrologueBilling = {
   plan: string | null;
   trial_ends_at: string | null;
+  stripe_subscription_id: string | null;
 };
 
 function normalizePlan(raw: string | null | undefined): Plan {
@@ -75,7 +76,7 @@ export default async function AbonnementPage() {
 
   const { data } = await supabaseAdmin
     .from("sophrologues")
-    .select("plan, trial_ends_at")
+    .select("plan, trial_ends_at, stripe_subscription_id")
     .eq("user_id", user.id)
     .maybeSingle<SophrologueBilling>();
 
@@ -84,10 +85,17 @@ export default async function AbonnementPage() {
   const trialEndDate = formatTrialEndDate(data?.trial_ends_at ?? null);
   const trialEndTs = data?.trial_ends_at ? new Date(data.trial_ends_at).getTime() : null;
   const nowTs = Date.now();
+  // Essai actif uniquement si trial_ends_at est dans le futur.
+  // Si trial_ends_at est null (après upgrade) → état payé, jamais essai.
+  // stripe_subscription_id est renseigné à l'upgrade ; les comptes encore
+  // en essai d'inscription peuvent l'avoir null (createStripeCustomer ne
+  // le persiste pas) — on ne le exige donc pas pour afficher l'essai.
   const isTrialActive = trialEndTs !== null && trialEndTs > nowTs;
   const isTrialExpired = trialEndTs !== null && trialEndTs <= nowTs;
   const isTrialExpiredEssentiel = isTrialExpired && plan === "essentiel";
-  const isPaidState = !isTrialActive && !isTrialExpiredEssentiel;
+  const isPaidState =
+    data?.trial_ends_at == null ||
+    (!isTrialActive && !isTrialExpiredEssentiel);
   const essentielPriceId = process.env.STRIPE_PRICE_ESSENTIEL ?? null;
   const professionnelPriceId = process.env.STRIPE_PRICE_PROFESSIONNEL ?? null;
 
