@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 27 juillet 2026
+Dernière mise à jour : 31 juillet 2026
 
 ---
 
@@ -47,6 +47,9 @@ manuel reste possible en secours :
 vercel link  # sélectionner le projet "calymia" (pas "calymia-prod")
 vercel --prod
 ```
+⚠️ **Toujours se re-linker sur `calymia` (DEV) immédiatement après toute opération sur
+`calymia-prod`** (`vercel link` → sélectionner `calymia`) pour éviter tout déploiement
+accidentel en PROD depuis le CLI.
 
 ### Déploiement PROD
 ```bash
@@ -56,6 +59,9 @@ git merge develop
 git push origin main
 git checkout develop
 ```
+Checklist avant tout merge `develop` → `main` : `npx tsc --noEmit` et `npm run build` sans
+erreur, pas de nouveau `console.error` dans les logs Vercel DEV récents, migrations Supabase
+déjà validées sur DEV **et** appliquées sur PROD.
 
 ---
 
@@ -67,12 +73,12 @@ src/
 │   ├── (auth)/              # Dashboard sophrologue (protégé)
 │   │   ├── dashboard/       # KPIs + agenda + score complétude profil
 │   │   ├── seances/         # Agenda semaine + drawer détail
-│   │   ├── clients/         # Liste + fiche client [id]
+│   │   ├── clients/         # Liste + fiche client [id] — suppression client ✅ (31/07)
 │   │   ├── patient/         # Espace client
-│   │   ├── parametres/      # 4 onglets dont Cabinet/Vitrine
+│   │   ├── parametres/      # 4 onglets dont Cabinet/Vitrine + champ SIRET (Profil, 30/07)
 │   │   ├── emails/          # Templates emails (Pro+)
 │   │   ├── communications/  # Journal (Pro+)
-│   │   └── abonnement/      # Plans & abonnement ✅ Stripe Billing actif
+│   │   └── abonnement/      # Plans & abonnement + historique de facturation ✅ (31/07)
 │   ├── (public)/
 │   │   └── sophrologues/[dept]/[ville]/[slug]/  # Page publique SSR
 │   │       └── reserver/    # Tunnel réservation 4 étapes
@@ -81,15 +87,26 @@ src/
 │   ├── connexion/           # Login
 │   └── api/
 │       ├── auth/            # create-client-account, check-email
-│       ├── stripe/          # Webhooks Stripe
+│       ├── stripe/
+│       │   ├── webhook/         # payment_intent.succeeded, checkout.session.completed (30/07),
+│       │   │                    # customer.subscription.updated/deleted/trial_will_end
+│       │   ├── checkout/        # Checkout Session mode "setup" (upgrade pendant trial, 30/07)
+│       │   ├── billing-portal/  # Lien vers le Billing Portal Stripe
+│       │   └── invoices/        # GET factures Stripe du sophrologue (31/07)
 │       ├── sophrologue/     # CRUD sophrologue
+│       ├── patients/
+│       │   ├── create/          # Ajout manuel client (dashboard)
+│       │   └── [id]/delete/     # Suppression client, RPC transactionnelle (31/07)
 │       ├── reservations/    # create-payment-intent, annuler
 │       ├── public/          # prochain-creneau (badge temps réel, force-dynamic)
+│       ├── factures/        # generer (facture séance, redesign 30/07 — voir section 6)
 │       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
 ├── components/
 │   ├── dashboard/
 │   │   ├── ProfileScoreCard.tsx         # Widget score complétude (Server Component)
-│   │   └── ProfileScoreCardWrapper.tsx  # Wrapper client pour ProfileScoreCard
+│   │   ├── ProfileScoreCardWrapper.tsx  # Wrapper client pour ProfileScoreCard
+│   │   ├── PlanCheckoutButtons.tsx      # Boutons "Choisir Essentiel/Professionnel"
+│   │   └── InvoiceHistoryTable.tsx      # Historique de facturation abonnement (31/07)
 │   ├── factures/            # BoutonFacture.tsx
 │   ├── providers/           # SophrologueProvider.tsx
 │   ├── public/              # SophrologueRppsLine.tsx, ProchainCreneauBadge.tsx (both "use client")
@@ -98,21 +115,29 @@ src/
 │   └── ...
 ├── hooks/
 │   ├── useFacture.ts        # Récupère facture_url depuis paiements
-│   ├── usePlan.ts           # Restrictions selon plan sophrologue
+│   ├── usePlan.ts           # Restrictions selon plan sophrologue (feature flags uniquement,
+│   │                        # pas de blocage réel sur la limite 15 clients — voir section 11)
 │   └── ...
 └── lib/
     ├── auth/
-    │   └── sophrologue-session.ts  # getSophrologueSession() avec cache() React
+    │   └── sophrologue-session.ts  # getSophrologueSession() avec cache() React,
+    │                                # inclut stripe_customer_id depuis le 31/07
     ├── billing/
     │   └── trial-status.ts  # computeTrialDaysRemaining(), getSidebarPlanBadge()
+    ├── stripe/
+    │   └── billing.ts       # createStripeCustomerForSophrologue() — preferred_locales: ['fr']
     ├── booking/
     │   └── compute-next-slot.ts  # computeNextAvailableSlotIso() — lit sophrologues.horaires
     ├── config/
     │   └── site-url.ts      # getSiteUrl(), getSophrologueProfileUrl()
     ├── factures/
-    │   └── generate.tsx     # Génération PDF reçu de paiement
+    │   ├── generate.tsx     # Génération PDF facture séance — redesign complet 30/07 (section 6)
+    │   └── fonts/           # PlayfairDisplay-*.ttf, DMSans-*.ttf (committés, pas de fetch réseau)
+    ├── notifications/
+    │   └── limite-clients-alerte.ts  # Alerte dépassement 15 clients (plan Essentiel) — 31/07
     ├── emails/
-    │   └── templates.ts     # Templates emails Resend
+    │   ├── templates.ts     # Templates emails Resend
+    │   └── send.ts          # sendEmail() — init Resend paresseuse via getResendClient() (31/07)
     ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow
     ├── horaires.ts          # normalizeHoraires(), dispoByJsDayFromHoraires() — source unique horaires (voir section 10)
     ├── supabase/            # Clients Supabase (browser + server)
@@ -147,17 +172,20 @@ chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canoniqu
 - Toute nouvelle fiche cabinet créée reprend l'identité canonique si elle existe
 - Une fiche cabinet existante n'est plus jamais écrasée sur `prenom`/`nom`/`telephone` par
   une réservation ultérieure — seul `user_id` peut encore être complété s'il manquait
+- **Suppression d'un patient** (31/07) : RPC transactionnelle `delete_patient_cascade` (paiements
+  → communications → seance_notes → seances → patient), appelée depuis
+  `DELETE /api/patients/[id]/delete`. Bloque avec 409 si des séances futures non annulées existent.
 
 ### Tables principales
 | Table | Colonnes clés | Notes |
 |---|---|---|
-| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10) |
+| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet`, `siret`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `limite_clients_alerte_envoyee_at` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10). `siret` nullable, ajouté 30/07 (affiché sur la facture si renseigné). `limite_clients_alerte_envoyee_at` ajouté 31/07 (voir section 11) |
 | `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus |
 | `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut` | `statut` = 'confirmee' / 'terminee' / 'annulee' |
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
 | `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif` | |
 | `disponibilites` | `id`, `sophrologue_id`, `jour_semaine`, `heure_debut`, `heure_fin`, `actif` | ⚠️ **Legacy** — plus lue ni écrite pour le booking depuis le 27/07 (voir section 10). Reste en base, non supprimée |
-| `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut` | ⚠️ Pas `communications_log` |
+| `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut`, `sent_at`, `destinataire_email`, `destinataire_nom`, `objet`, `contenu` | ⚠️ Pas `communications_log`. Colonne date = `sent_at` (pas `created_at`). Contrainte `communications_type_check` : liste fermée de valeurs autorisées pour `type` — **toujours vérifier/étendre cette contrainte** avant d'introduire un nouveau type d'email journalisé (ajouté `limite_clients_alerte` le 31/07 ; la contrainte réelle en base contenait déjà `avis`, absent du fichier de migration d'origine — écart base/repo à garder en tête) |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
 | `seance_notes` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `contenu_html` | Pro+ uniquement |
 
@@ -173,7 +201,7 @@ import { normalizeHoraires } from "@/lib/horaires"
 |---|---|---|
 | `avatars` | Public | Photos de profil |
 | `cabinet-photos` | Public | Photos cabinet (`{user_id}/{filename}`) |
-| `factures` | Privé (URL signée) | Reçus PDF (`CAL-{année}-{seq}.pdf`) |
+| `factures` | ⚠️ Upload/lecture actuels en `public` + `getPublicUrl()` dans le code, alors que ce bucket est documenté comme **privé avec URL signée** — écart constaté le 30/07, à vérifier/corriger (risque de confidentialité si non intentionnel) | Factures PDF (`CAL-{année}-{seq}.pdf`, numérotation via `Date.now()` — pas une vraie séquence incrémentale, à surveiller si le document doit un jour respecter une numérotation comptable stricte) |
 
 ### RLS — Règles de sécurité établies
 - Les policies `service_insert_*` doivent être restreintes au rôle `service_role` (jamais `public`)
@@ -202,6 +230,16 @@ Les templates sont dans `src/lib/emails/templates.ts`.
 SMTP Supabase (emails d'auth : reset password, etc.) est également configuré via Resend
 depuis le 22 juillet 2026.
 
+⚠️ **Init paresseuse obligatoire (31/07)** : le client Resend dans `src/lib/emails/send.ts` doit
+être créé via `getResendClient()` (lazy, avec garde sur `RESEND_API_KEY` absente), jamais via
+`new Resend(...)` au niveau module. Une instanciation top-level fait planter **l'import entier**
+du module dès que `RESEND_API_KEY` est absente (ex: en local sans `.env.local` complet), ce qui
+peut casser en cascade toute route qui importe indirectement `send.ts` — y compris des routes
+sans rapport comme `create-payment-intent` (bug vécu le 31/07 : 500 sur le paiement à cause d'un
+crash d'import Resend).
+
+`to` accepte `string | string[]` depuis le 31/07 (notifications internes à plusieurs destinataires).
+
 ### SSR — obligatoire sur les pages publiques
 Toutes les pages sous `(public)/` doivent être en SSR (Server Side Rendering).
 Ne jamais ajouter `"use client"` sur les pages publiques sophrologues. Si un bloc nécessite
@@ -229,17 +267,44 @@ import { PlanGuard } from "@/components/PlanGuard"
 ```
 Plans : `essentiel` (29€, max 15 clients) / `professionnel` (59€, illimité) / `cabinet` (139€, V2 — grisé partout)
 
+⚠️ **La limite de 15 clients (Essentiel) n'est pas techniquement bloquante** (diagnostic du
+30/07) — ni sur le tunnel de réservation publique, ni sur l'API de création de patient. Elle
+n'est appliquée qu'en soft-block UI (bouton "Nouveau client" masqué dans `clients/page.tsx`).
+Décision produit : compensé par un système d'alerte email (voir section 11), pas par un blocage
+réel. Ne pas supposer que `usePlan().maxClients` bloque quoi que ce soit — cette valeur n'est
+que déclarative.
+
 ### Trial Stripe Billing
 - Nouveaux inscrits → `plan = 'professionnel'` + `trial_ends_at = now + 14j`
 - Après 14j sans paiement → downgrade vers `essentiel` via webhook Stripe
 - Ne jamais modifier `plan` manuellement en dehors des webhooks Stripe (sauf offre fondateur,
   voir mémoire commerciale : 3 mois gratuits pour les 10 premiers clients, `trial_ends_at`
   modifié manuellement dans ce cas précis)
+- **Upgrade pendant le trial (fix du 30/07)** : le bouton "Choisir Professionnel/Essentiel"
+  déclenche une Checkout Session en **mode `setup`** (pas `subscription`) — elle ne sert qu'à
+  enregistrer un moyen de paiement, le `priceId` cible est passé en `metadata`. Le webhook
+  `checkout.session.completed` retrouve l'abonnement existant du customer et l'upgrade via
+  `subscriptions.update(..., trial_end: "now", proration_behavior: "none")`, plutôt que de créer
+  un second abonnement. **Avant ce fix, chaque upgrade créait un abonnement Stripe en doublon** —
+  historique de bug à ne pas réintroduire si ce flow est retouché.
+- `trial_ends_at` est resynchronisé (`null` si `status === 'active'`, sinon `trial_end` ISO) dans
+  le handler `customer.subscription.updated`, en plus de `plan` et `stripe_subscription_id`.
+- Nouveaux customers Stripe créés avec `preferred_locales: ['fr']` (`createStripeCustomerForSophrologue`,
+  `src/lib/stripe/billing.ts`) — factures Stripe en français par défaut. Les comptes créés avant
+  cette date restent en anglais sauf modification manuelle du customer dans Stripe Dashboard.
 
 ### Stripe — deux secrets distincts
 - `STRIPE_WEBHOOK_SECRET` est différent entre DEV et PROD
 - Ne jamais utiliser la même valeur dans les deux environnements
 - Le webhook est dans `src/app/api/stripe/webhook/route.ts`
+- ⚠️ Vérifié le 30/07 : un environnement Stripe TEST peut avoir **plusieurs endpoints webhook**
+  pointant vers la même URL si mal nettoyé (doublon constaté sur DEV) — vérifier
+  Développeurs → Webhooks avant de diagnostiquer un event manquant, un endpoint fantôme sans
+  trafic peut coexister avec le vrai.
+- Le **branding Stripe** (logo, icône, couleurs `#1B3A2D`/`#426F59`) est un réglage **au niveau
+  du compte**, pas dupliqué par mode Test/Live comme les clés API ou les webhooks — configuré une
+  fois, actif dans les deux modes. Ne pas chercher à le reconfigurer séparément en Live après
+  l'avoir fait en Test.
 
 ### Client Supabase
 ```typescript
@@ -259,7 +324,10 @@ protégées lourdes doivent être des Server Components avec fetch SSR plutôt q
 
 ⚠️ **Attention Vercel serverless** : le fire-and-forget async (`waitUntil`) ne fonctionne
 que s'il est appelé directement depuis un Request handler, pas depuis une fonction utilitaire.
-Dans les fonctions cron, utiliser des `await` explicites.
+Dans les fonctions cron, utiliser des `await` explicites. Pour les traitements best-effort qui
+ne doivent **jamais** bloquer la réponse principale (ex: alerte limite clients après paiement),
+préférer un `await` explicite enveloppé dans son propre `try/catch` local plutôt que `waitUntil`
+seul — voir section 11.
 
 ### ISR et données temps réel — pattern établi (27 juillet 2026)
 Une page publique en ISR (`export const revalidate = 3600`) peut afficher des données figées
@@ -289,14 +357,56 @@ route API `force-dynamic` à chaque affichage. Exemple : `ProchainCreneauBadge.t
   `/dashboard`, pas un sous-dossier)
 - `SophrologueRow` : type structurel défini dans `profile-score.ts` (pas de type centralisé pour l'instant)
 
-### Facture PDF
-- Générée dans `src/lib/factures/generate.tsx` via `@react-pdf/renderer`
-- Déclenchée par le webhook `payment_intent.succeeded`
-- Stockée dans bucket `factures`, URL sauvegardée dans `paiements.facture_url`
-- Accessible au sophrologue via `<BoutonFacture seanceId={...} />` ou `factureUrl` passé directement
-- Accessible dans l'espace client (`/patient`) sur prochains RDV et historique
+### Facture PDF séance — redesign complet (30 juillet 2026)
+- Générée dans `src/lib/factures/generate.tsx` via `@react-pdf/renderer`, déclenchée par le
+  webhook `payment_intent.succeeded`
+- **Identité visuelle Calymia** : fond crème `#FAF8F5`, vert foncé `#1B3A2D` / vert moyen
+  `#426F59`, polices **Playfair Display** (titres, "Facture", Total TTC) + **DM Sans** (corps) —
+  fichiers `.ttf` committés dans `src/lib/factures/fonts/` et enregistrés via `Font.register()`,
+  **jamais de fetch réseau Google Fonts au moment du render** (fiabilité webhook)
+- **Le sophrologue est le vendeur légal**, pas Calymia — modèle de mandat de facturation
+  (comme Uber/Deliveroo) : encadré mentionnant "Facture éditée par KLS3 SARL (SIRET
+  949 563 340 00015, 14 allée du Fairway, 57200 Sarreguemines), pour le compte et au nom de
+  {sophrologue}, dans le cadre du mandat de facturation Calymia"
+- Ligne SIRET affichée dans le bloc vendeur **uniquement si `sophrologues.siret` est renseigné**
+  (champ optionnel, ajouté dans Paramètres → Mon profil, **pas** dans l'onboarding — décision
+  volontaire pour ne pas alourdir l'inscription)
+- Mention TVA : `MENTION_TVA` constante ("TVA non applicable, art. 293 B du CGI") — hypothèse
+  par défaut (auto-entrepreneur sous seuil), pas encore configurable par sophrologue
+- Stockée dans bucket `factures`, URL sauvegardée dans `paiements.facture_url` — voir écart
+  public/privé signalé section 4
+- Accessible au sophrologue via `<BoutonFacture seanceId={...} />`, dans l'espace client
+  (`/patient`), et en pièce jointe de l'email de confirmation
 - Email sophrologue inclut le lien facture après chaque paiement réussi
 - Email client inclut les coordonnées du sophrologue (tél, email, adresse) dans un encadré vert
+
+### Facturation abonnement Stripe Billing (31 juillet 2026)
+- Distincte de la facture séance ci-dessus : ici **Calymia (KLS3 SARL) est le vrai vendeur**
+  (vente directe B2B), les factures sont **générées nativement par Stripe Invoicing** — aucun
+  code Calymia ne les construit
+- Branding configuré côté Stripe Dashboard (logo, couleurs) — voir section 5
+- `InvoiceHistoryTable.tsx` sur `/dashboard/abonnement` affiche jusqu'à 12 dernières factures
+  avec lien de téléchargement direct (`invoice_pdf`), sans obliger le sophrologue à passer par
+  le Billing Portal juste pour consulter — route `GET /api/stripe/invoices`. Retourne liste vide
+  (pas d'erreur) si `stripe_customer_id` est absent.
+
+### Alerte dépassement limite clients (31 juillet 2026)
+- Contexte : la limite 15 clients (plan Essentiel) n'est pas bloquante techniquement (voir
+  section 5) — compensée par une notification, pas un blocage
+- `checkEtNotifierDepassementLimite(sophrologueId)` dans `src/lib/notifications/limite-clients-alerte.ts` :
+  ignore si `plan !== 'essentiel'`, si `count < 16`, ou si `limite_clients_alerte_envoyee_at`
+  déjà renseigné (un seul envoi par dépassement)
+  - Email au sophrologue (from `bonjour@calymia.com`)
+  - Email interne à `eric@calymia.com`, `lilian@calymia.com`, `bonjour@calymia.com` pour relance
+    commerciale manuelle
+  - Marque `limite_clients_alerte_envoyee_at = now()` après envoi
+- Déclencheurs (fire-and-forget isolé, jamais bloquant) : après création d'une **nouvelle** fiche
+  patient dans `create-payment-intent/route.ts` **et** dans `patients/create/route.ts` — pas
+  déclenché si une fiche existante est réutilisée (voir modèle d'identité client, section 4)
+- Reset de `limite_clients_alerte_envoyee_at` à `null` dans le webhook Stripe quand un
+  sophrologue redescend en `essentiel` depuis un plan supérieur
+- **Piste V2/V3 notée mais non retenue pour le lancement** : facturation à l'usage
+  (Stripe metered billing) au-delà de 15 clients, à envisager une fois du volume réel
 
 ### Horaires — source unique `sophrologues.horaires` (27 juillet 2026)
 **Historique du bug** : jusqu'au 27/07, l'onboarding écrivait dans `disponibilites` (créneaux
@@ -346,6 +456,7 @@ affichés comme fermés mais réservables quand même).
   - Sinon → nom du plan (Essentiel / Professionnel / Cabinet)
 - `usePlan()` ne gère que les feature flags — ne pas y ajouter la logique trial
 - La sidebar charge `trial_ends_at` dans sa propre requête Supabase
+- Voir section 5 pour le fix du 30/07 sur l'upgrade pendant le trial (mode `setup`)
 
 ### Suppression d'un compte sophrologue en base (ordre FK)
 ```sql
@@ -360,6 +471,7 @@ BEGIN
   DELETE FROM seance_notes WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM communications WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM email_templates WHERE sophrologue_id = v_sophrologue_id;
+  DELETE FROM paiements WHERE seance_id IN (SELECT id FROM seances WHERE sophrologue_id = v_sophrologue_id);
   DELETE FROM seances WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM disponibilites WHERE sophrologue_id = v_sophrologue_id;
   DELETE FROM types_seances WHERE sophrologue_id = v_sophrologue_id;
@@ -370,6 +482,13 @@ END $$;
 -- Puis supprimer l'user dans Supabase → Authentication → Users
 -- Et supprimer les fichiers Storage : buckets avatars, cabinet-photos, factures
 ```
+⚠️ Un bloc `DO $$ ... END $$;` renvoie toujours "Success. No rows returned", que la suppression
+ait réellement eu lieu ou non (ex: `slug`/`user_id` ne correspondant à rien) — **toujours
+vérifier après coup** avec un `SELECT` de confirmation, ne jamais se fier au seul message de
+succès du bloc `DO`.
+
+Pour supprimer un patient/client (pas un compte sophrologue), utiliser la RPC
+`delete_patient_cascade` plutôt que de reproduire cette séquence manuellement (voir section 3 et 4).
 
 ### n8n — workflows déployés sur Hetzner (`automation.kls3-dev.com`)
 | Workflow | Déclencheur | Action |
@@ -384,8 +503,9 @@ END $$;
 Les workflows appellent les endpoints `/api/cron/*` avec un Bearer token (`CRON_SECRET`).
 **Ne jamais modifier les endpoints cron sans mettre à jour les workflows n8n.**
 Exports JSON dans `n8n-workflows/` (prod), `n8n-workflows/Dev/` (dev), `n8n-workflows/Prospection/` (prospection).
-⚠️ En attente (24 juillet 2026) : `Génération Articles Blog v14` et `Génération Sujets Blog v3`
-existent sur n8n mais ne sont pas encore poussés vers ce dossier.
+⚠️ En attente : `Génération Articles Blog v14` et `Génération Sujets Blog v3` existent sur n8n
+mais ne sont pas encore poussés vers ce dossier. Nœud email récap Resend dans "Génération Sujets
+Blog" (envoi dimanche de la liste des sujets générés) encore à terminer — priorité basse.
 
 ### URLs publiques
 ```
@@ -402,6 +522,14 @@ Toujours utiliser `NEXT_PUBLIC_APP_URL` — jamais hardcoder `app.calymia.com` o
 
 > ⚠️ Les données de test sont à recréer après chaque purge de la base DEV.
 > Utiliser des emails réels accessibles à Eric pour recevoir les emails de test.
+
+Comptes sophrologues DEV actifs au 31/07 : Sophie Marchand, Thomas Petit, Eric Test, Lilian
+SCARPINO — tous avec `stripe_customer_id` valide. Compte legacy `eri-scarpino-sarreguemines`
+**supprimé en PROD le 31 juillet 2026**.
+
+Toujours nettoyer les données de test créées (patients, séances, paiements, communications) en
+respectant l'ordre FK — voir section 6 pour l'ordre exact et le piège du message "Success. No
+rows returned".
 
 ---
 
@@ -424,6 +552,10 @@ Un client peut réserver chez plusieurs sophrologues sous le même compte. Modè
   peut encore être complété s'il manquait.
 - Un client **non connecté** (checkout via "Continuer sans connexion") garde le comportement
   d'origine : les valeurs saisies dans le formulaire font foi, aucun verrouillage.
+- ⚠️ Conséquence pratique pour les tests (constatée le 31/07) : réserver avec un email déjà
+  utilisé chez le **même** sophrologue **réutilise** la fiche patient existante et ne crée pas
+  de nouveau `patients.id` — important à savoir si un test dépend du comptage du nombre de
+  clients (ex: alerte limite clients, section 6).
 
 ✅ **Résolu le 27 juillet 2026** — voir section 10 pour le détail du fix `cn()`/`tailwind-merge`
 (qui touchait notamment les champs readOnly de ce même tunnel de réservation).
@@ -460,6 +592,11 @@ Si le push SSH échoue de nouveau (`Permission denied (publickey)`) sur une nouv
 vérifier en premier que ce fichier de config existe et pointe vers la bonne clé, avant de
 suspecter un problème côté GitHub.
 
+⚠️ **Piège vécu le 30/07** : un retour Cursor annonçant une implémentation terminée ne veut pas
+toujours dire que le code a été commité/poussé. Toujours vérifier `git status` avant de tester
+en DEV/PROD — un test qui "ne montre pas le changement attendu" peut simplement signifier que
+rien n'a été déployé, pas que le code est bugué.
+
 ---
 
 ## 10. cn() / tailwind-merge (27 juillet 2026)
@@ -486,6 +623,51 @@ Surface du bug : seuls 4 composants utilisent `cn()` — `button.tsx`, `badge.ts
 Point de vigilance identifié pendant l'audit (à surveiller, pas de bug confirmé) :
 `dashboard/page.tsx` utilise `<Card className="... p-0 ...">` pour écraser le `p-6` par
 défaut — confirmé fonctionnel après le fix (`p-0` gagne bien via `twMerge`).
+
+---
+
+## 11. Session du 28 → 31 juillet 2026 — synthèse
+
+Grosse session multi-jours centrée sur la facturation (séance + abonnement) et la conformité
+commerciale du plan Essentiel. Détail des patterns techniques déjà intégré dans les sections
+correspondantes (3, 4, 5, 6) ; résumé chronologique et décisions produit ci-dessous.
+
+### Livré et déployé en PROD
+- Refonte complète de la facture PDF séance (identité Calymia, mandat KLS3 SARL, SIRET
+  conditionnel, vraies fonts Playfair Display / DM Sans)
+- Fix du flow d'upgrade d'abonnement pendant le trial (mode `setup`, plus de doublon
+  d'abonnement Stripe, synchronisation `trial_ends_at`)
+- Tableau "Historique de facturation" sur `/dashboard/abonnement` (factures Stripe Billing,
+  téléchargement direct)
+- Système d'alerte de dépassement de la limite 15 clients (plan Essentiel) : email sophrologue +
+  email interne (eric/lilian/bonjour) pour relance commerciale manuelle
+- Suppression de client depuis le dashboard (bouton icône poubelle + confirmation + RPC
+  transactionnelle, bloque si séances futures actives)
+- Branding Stripe (logo, couleurs Calymia) configuré sur les 3 onglets (Reçus, Checkout,
+  Portail client)
+- `preferred_locales: ['fr']` pour les nouveaux customers Stripe
+- Corrections associées : init Resend paresseuse (`getResendClient()`), extension de la
+  contrainte `communications_type_check`, suppression du compte test
+  `eri-scarpino-sarreguemines` en PROD
+
+### Décisions produit actées
+- **Limite 15 clients** : reste un soft-block incitatif, pas un blocage technique réel pour le
+  lancement (option A retenue — email d'alerte). Facturation à l'usage au-delà de 15
+  (Stripe metered billing) notée comme piste V2/V3, pas prioritaire.
+- **Facture séance** : modèle de mandat de facturation (sophrologue = vendeur légal, Calymia =
+  mandataire de facturation) plutôt que Calymia comme émetteur direct — nécessaire pour la
+  conformité légale française sur la facturation.
+
+### Backlog restant (non traité cette session)
+- Templates email Supabase (Confirm signup, Invite, Magic Link, Change Email,
+  Reauthentication) — écart DEV/PROD non encore audité
+- Nœud email récap Resend dans le workflow n8n "Génération Sujets Blog" (priorité basse)
+- Route API `disponibilites` (INSERT/DELETE) orpheline — à évaluer pour suppression
+- Écart bucket `factures` public vs privé signalé (section 4) — à trancher
+- Numérotation facture séance non réellement séquentielle (`Date.now()`) — à surveiller si besoin
+  de conformité comptable stricte
+- État de l'abonnement Stripe de Sophie Marchand (compte de test) à valider si réutilisé pour de
+  futurs tests — nombreuses manipulations manuelles effectuées pendant cette session
 
 ---
 
