@@ -8,13 +8,13 @@ import {
   UserPlus,
   X,
   Loader2,
-  User,
   ChevronRight,
   Users,
   AlertTriangle,
   ArrowUpRight,
   ArrowUp,
   ArrowDown,
+  Trash2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,136 @@ function comparePatients(a: Patient, b: Patient, key: SortKey): number {
     default:
       return 0;
   }
+}
+
+// ─── Modal suppression ────────────────────────────────────────────────────────
+
+type DeleteModalProps = {
+  patient: Patient;
+  seancesCount: number;
+  blockReason: string | null;
+  onClose: () => void;
+  onDeleted: (patientId: string) => void;
+};
+
+function SupprimerPatientModal({
+  patient,
+  seancesCount,
+  blockReason,
+  onClose,
+  onDeleted,
+}: DeleteModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const nom = fullName(patient.prenom, patient.nom);
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current && !loading) onClose();
+  };
+
+  const handleConfirm = async () => {
+    if (blockReason) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/patients/${patient.id}/delete`, {
+        method: "DELETE",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof json.error === "string"
+            ? json.error
+            : "Impossible de supprimer ce client.",
+        );
+        return;
+      }
+      onDeleted(patient.id);
+      onClose();
+    } catch {
+      setError("Impossible de supprimer ce client.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleOverlayClick}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h2 className="text-lg font-semibold text-[#1E3A5F]">
+            Supprimer le client
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <p className="text-sm text-slate-700">
+            Vous êtes sur le point de supprimer{" "}
+            <strong className="text-slate-900">{nom}</strong>.
+          </p>
+
+          {blockReason ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {blockReason}
+            </p>
+          ) : (
+            <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+              Cette action est irréversible —{" "}
+              <strong>
+                {seancesCount} séance{seancesCount !== 1 ? "s" : ""}
+              </strong>{" "}
+              {seancesCount !== 1 ? "seront" : "sera"} également{" "}
+              {seancesCount !== 1 ? "supprimées" : "supprimée"}.
+            </p>
+          )}
+
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Annuler
+            </Button>
+            {!blockReason && (
+              <Button
+                type="button"
+                onClick={handleConfirm}
+                disabled={loading}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Supprimer définitivement"
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -264,6 +394,14 @@ export default function ClientsPage() {
   const [showModal, setShowModal] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("nom");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    patient: Patient;
+    seancesCount: number;
+    blockReason: string | null;
+  } | null>(null);
+  const [deletePreparingId, setDeletePreparingId] = useState<string | null>(
+    null,
+  );
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -385,6 +523,48 @@ export default function ClientsPage() {
     setPatients((prev) => [...prev, enriched]);
   };
 
+  const handlePatientDeleted = (patientId: string) => {
+    setPatients((prev) => prev.filter((p) => p.id !== patientId));
+  };
+
+  const openDeleteModal = async (patient: Patient) => {
+    setDeletePreparingId(patient.id);
+    try {
+      const nowIso = new Date().toISOString();
+      const [{ count: seancesCount }, { data: futureSeances }] =
+        await Promise.all([
+          supabase
+            .from("seances")
+            .select("id", { count: "exact", head: true })
+            .eq("patient_id", patient.id),
+          supabase
+            .from("seances")
+            .select("id")
+            .eq("patient_id", patient.id)
+            .gt("debut_at", nowIso)
+            .neq("statut", "annulee")
+            .limit(1),
+        ]);
+
+      const hasFuture = (futureSeances?.length ?? 0) > 0;
+      setDeleteTarget({
+        patient,
+        seancesCount: seancesCount ?? 0,
+        blockReason: hasFuture
+          ? "Impossible de supprimer ce client : des séances à venir non annulées existent. Annulez-les d'abord."
+          : null,
+      });
+    } catch {
+      setDeleteTarget({
+        patient,
+        seancesCount: patient.nb_seances ?? 0,
+        blockReason: null,
+      });
+    } finally {
+      setDeletePreparingId(null);
+    }
+  };
+
   const isEssentiel = plan?.toLowerCase() === "essentiel";
   const limitReached = isEssentiel && patients.length >= LIMITE_ESSENTIEL;
 
@@ -482,7 +662,7 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             {/* Header */}
-            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1fr] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
+            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1.2fr] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
               {SORTABLE_COLUMNS.map(({ key, label, align }) => {
                 const isActive = sortKey === key;
                 const SortIcon = isActive
@@ -509,7 +689,7 @@ export default function ClientsPage() {
                 );
               })}
               <span className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Fiche client
+                Actions
               </span>
             </div>
 
@@ -520,7 +700,7 @@ export default function ClientsPage() {
                 return (
                   <div
                     key={p.id}
-                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1fr] md:items-center md:gap-4"
+                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1.2fr] md:items-center md:gap-4"
                   >
                     {/* Nom */}
                     <div className="flex items-center gap-3">
@@ -555,14 +735,31 @@ export default function ClientsPage() {
                       {formatDate(p.created_at)}
                     </span>
 
-                    {/* Action */}
-                    <button
-                      onClick={() => router.push(`/clients/${p.id}`)}
-                      className="mx-auto flex items-center justify-center gap-1 text-xs font-medium text-[#2E75B6] transition-colors hover:text-[#1E3A5F] hover:underline"
-                    >
-                      Voir la fiche
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Actions */}
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/clients/${p.id}`)}
+                        className="flex items-center justify-center gap-1 text-xs font-medium text-[#2E75B6] transition-colors hover:text-[#1E3A5F] hover:underline"
+                      >
+                        Voir
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openDeleteModal(p)}
+                        disabled={deletePreparingId === p.id}
+                        title="Supprimer"
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletePreparingId === p.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -577,6 +774,15 @@ export default function ClientsPage() {
           sophrologueId={sophrologueId}
           onClose={() => setShowModal(false)}
           onCreated={handlePatientCreated}
+        />
+      )}
+      {deleteTarget && (
+        <SupprimerPatientModal
+          patient={deleteTarget.patient}
+          seancesCount={deleteTarget.seancesCount}
+          blockReason={deleteTarget.blockReason}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={handlePatientDeleted}
         />
       )}
     </main>
