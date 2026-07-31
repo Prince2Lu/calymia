@@ -34,6 +34,7 @@ export async function createStripeCustomerForSophrologue({
   const customer = await stripe.customers.create({
     email,
     name: fullName || undefined,
+    preferred_locales: ["fr"],
     metadata: {
       sophrologue_id: sophrologueId,
     },

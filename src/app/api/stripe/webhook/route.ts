@@ -337,6 +337,18 @@ export async function POST(request: NextRequest) {
           { priceId }
         )
       } else {
+        // Lire le plan actuel avant update pour détecter un downgrade Pro/Cabinet → Essentiel
+        const { data: currentSophro } = await supabase
+          .from('sophrologues')
+          .select('plan')
+          .eq('stripe_customer_id', customerId)
+          .maybeSingle<{ plan: string | null }>()
+
+        const previousPlan = (currentSophro?.plan ?? '').toLowerCase()
+        const isDowngradeToEssentiel =
+          mappedPlan === 'essentiel' &&
+          (previousPlan === 'professionnel' || previousPlan === 'cabinet')
+
         const trialEndsAt =
           subscription.status === 'active'
             ? null
@@ -344,13 +356,25 @@ export async function POST(request: NextRequest) {
               ? new Date(subscription.trial_end * 1000).toISOString()
               : null
 
+        const updatePayload: {
+          plan: typeof mappedPlan
+          trial_ends_at: string | null
+          stripe_subscription_id: string
+          limite_clients_alerte_envoyee_at?: null
+        } = {
+          plan: mappedPlan,
+          trial_ends_at: trialEndsAt,
+          stripe_subscription_id: subscription.id,
+        }
+
+        if (isDowngradeToEssentiel) {
+          // Autorise une nouvelle alerte si le compte repasse Essentiel avec >15 clients
+          updatePayload.limite_clients_alerte_envoyee_at = null
+        }
+
         const { error: planError } = await supabase
           .from('sophrologues')
-          .update({
-            plan: mappedPlan,
-            trial_ends_at: trialEndsAt,
-            stripe_subscription_id: subscription.id,
-          })
+          .update(updatePayload)
           .eq('stripe_customer_id', customerId)
 
         if (planError) {
@@ -361,7 +385,12 @@ export async function POST(request: NextRequest) {
         } else {
           console.log(
             '[Webhook] plan/trial synchronisés depuis subscription.updated:',
-            { mappedPlan, trialEndsAt, subscriptionId: subscription.id }
+            {
+              mappedPlan,
+              trialEndsAt,
+              subscriptionId: subscription.id,
+              limiteAlerteReset: isDowngradeToEssentiel,
+            }
           )
         }
       }
@@ -378,9 +407,22 @@ export async function POST(request: NextRequest) {
         '[Webhook] customer.subscription.deleted ignoré: customer manquant'
       )
     } else {
+      const { data: currentSophro } = await supabase
+        .from('sophrologues')
+        .select('plan')
+        .eq('stripe_customer_id', customerId)
+        .maybeSingle<{ plan: string | null }>()
+
+      const previousPlan = (currentSophro?.plan ?? '').toLowerCase()
+      const wasProPlus =
+        previousPlan === 'professionnel' || previousPlan === 'cabinet'
+
       const { error: resetPlanError } = await supabase
         .from('sophrologues')
-        .update({ plan: 'essentiel' })
+        .update({
+          plan: 'essentiel',
+          ...(wasProPlus ? { limite_clients_alerte_envoyee_at: null } : {}),
+        })
         .eq('stripe_customer_id', customerId)
 
       if (resetPlanError) {
@@ -390,7 +432,8 @@ export async function POST(request: NextRequest) {
         )
       } else {
         console.log(
-          "[Webhook] plan réinitialisé à 'essentiel' après suppression d'abonnement"
+          "[Webhook] plan réinitialisé à 'essentiel' après suppression d'abonnement",
+          { limiteAlerteReset: wasProPlus }
         )
       }
     }

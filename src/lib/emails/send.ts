@@ -2,7 +2,18 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { waitUntil } from "@vercel/functions";
 
-const resend = new Resend(process.env.RESEND_API_KEY!);
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[send.ts] RESEND_API_KEY manquante — envoi d'email ignoré");
+    return null;
+  }
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 /** Métadonnées optionnelles pour alimenter le journal `communications` */
 export type EmailJournalLog = {
@@ -25,16 +36,24 @@ export async function sendEmail({
   subject,
   html,
   log,
+  from = "Calymia <noreply@calymia.com>",
 }: {
   to: string;
   subject: string;
   html: string;
   /** Si renseigné avec sophrologue_id, enregistre une ligne dans `communications` */
   log?: EmailJournalLog;
+  /** Expéditeur Resend (défaut noreply@calymia.com) */
+  from?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error: resendError } = await resend.emails.send({
-      from: "Calymia <noreply@calymia.com>",
+    const client = getResendClient();
+    if (!client) {
+      return { success: false, error: "RESEND_API_KEY manquante" };
+    }
+
+    const { error: resendError } = await client.emails.send({
+      from,
       to,
       subject,
       html,

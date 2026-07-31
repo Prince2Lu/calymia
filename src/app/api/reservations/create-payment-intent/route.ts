@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAuthUserIdByEmail } from "@/lib/supabase/fetch-auth-user-id-by-email";
+import { checkEtNotifierDepassementLimite } from "@/lib/notifications/limite-clients-alerte";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-02-25.clover",
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
     // ── 1) Récupérer ou créer le client (une fiche par couple email + sophrologue) ─
     // Même email chez un autre sophrologue ⇒ nouvelle ligne `patients` (multi-cabinet).
     let patient: { id: string | number } | null = null;
+    let isNewPatient = false;
 
     const authUserId = await fetchAuthUserIdByEmail(patientEmailNorm);
 
@@ -203,6 +205,7 @@ export async function POST(request: Request) {
         );
       }
       patient = created;
+      isNewPatient = true;
       console.log("Create PI - nouveau client créé (sophrologue):", patient.id);
     }
 
@@ -245,6 +248,18 @@ export async function POST(request: Request) {
         { error: "Impossible d'initialiser le paiement." },
         { status: 500 },
       );
+    }
+
+    // Alerte dépassement limite Essentiel — fire-and-forget strict
+    // (ne doit jamais bloquer ni faire échouer la réponse paiement)
+    if (isNewPatient) {
+      void (async () => {
+        try {
+          await checkEtNotifierDepassementLimite(String(sophrologue_id));
+        } catch (err) {
+          console.error("Create PI - limite-clients (avalée):", err);
+        }
+      })();
     }
 
     return NextResponse.json({

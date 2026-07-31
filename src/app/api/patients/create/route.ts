@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkEtNotifierDepassementLimite } from "@/lib/notifications/limite-clients-alerte";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +35,15 @@ export async function POST(request: NextRequest) {
       console.error("[patients/create] Erreur Supabase:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Alerte dépassement limite Essentiel — fire-and-forget strict
+    void (async () => {
+      try {
+        await checkEtNotifierDepassementLimite(String(sophrologue_id));
+      } catch (err) {
+        console.error("[patients/create] limite-clients (avalée):", err);
+      }
+    })();
 
     return NextResponse.json({ patient }, { status: 201 });
   } catch (err) {
