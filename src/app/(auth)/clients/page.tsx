@@ -662,7 +662,7 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             {/* Header */}
-            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1.2fr] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
+            <div className="hidden grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_minmax(9.5rem,1.6fr)] gap-4 border-b border-slate-100 bg-slate-50 px-6 py-3 md:grid">
               {SORTABLE_COLUMNS.map(({ key, label, align }) => {
                 const isActive = sortKey === key;
                 const SortIcon = isActive
@@ -700,7 +700,7 @@ export default function ClientsPage() {
                 return (
                   <div
                     key={p.id}
-                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_1.2fr] md:items-center md:gap-4"
+                    className="grid grid-cols-1 gap-2 px-6 py-4 transition-colors hover:bg-slate-50 md:grid-cols-[2fr_2fr_1fr_0.8fr_1fr_1fr_minmax(9.5rem,1.6fr)] md:items-center md:gap-4"
                   >
                     {/* Nom */}
                     <div className="flex items-center gap-3">
@@ -736,28 +736,28 @@ export default function ClientsPage() {
                     </span>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => router.push(`/clients/${p.id}`)}
                         className="flex items-center justify-center gap-1 text-xs font-medium text-[#2E75B6] transition-colors hover:text-[#1E3A5F] hover:underline"
                       >
-                        Voir
-                        <ChevronRight className="h-3.5 w-3.5" />
+                        Voir le profil
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                       </button>
                       <button
                         type="button"
                         onClick={() => openDeleteModal(p)}
                         disabled={deletePreparingId === p.id}
                         title="Supprimer"
-                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                        aria-label="Supprimer"
+                        className="inline-flex items-center justify-center rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                       >
                         {deletePreparingId === p.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Trash2 className="h-3.5 w-3.5" />
                         )}
-                        Supprimer
                       </button>
                     </div>
                   </div>
