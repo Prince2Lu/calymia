@@ -3,7 +3,11 @@ import { sendEmail } from "@/lib/emails/send";
 import { getSiteUrl } from "@/lib/config/site-url";
 
 const LIMITE_ESSENTIEL = 15;
-const INTERNAL_ALERT_EMAIL = "eric@calymia.com";
+const INTERNAL_ALERT_EMAILS = [
+  "eric@calymia.com",
+  "lilian@calymia.com",
+  "bonjour@calymia.com",
+] as const;
 const FROM_EMAIL = "Calymia <bonjour@calymia.com>";
 
 type SophrologueAlerte = {
@@ -216,7 +220,7 @@ export async function checkEtNotifierDepassementLimite(
     }
 
     const rInterne = await sendEmail({
-      to: INTERNAL_ALERT_EMAIL,
+      to: [...INTERNAL_ALERT_EMAILS],
       subject: subjectInterne,
       html: htmlInterne,
       from: FROM_EMAIL,

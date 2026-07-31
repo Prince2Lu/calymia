@@ -38,7 +38,7 @@ export async function sendEmail({
   log,
   from = "Calymia <noreply@calymia.com>",
 }: {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   /** Si renseigné avec sophrologue_id, enregistre une ligne dans `communications` */
@@ -46,6 +46,7 @@ export async function sendEmail({
   /** Expéditeur Resend (défaut noreply@calymia.com) */
   from?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  const toLabel = Array.isArray(to) ? to.join(", ") : to;
   try {
     const client = getResendClient();
     if (!client) {
@@ -61,7 +62,7 @@ export async function sendEmail({
     if (resendError) {
       throw new Error(resendError.message);
     }
-    console.log(`[email] Envoyé à ${to} — ${subject}`);
+    console.log(`[email] Envoyé à ${toLabel} — ${subject}`);
     if (log?.sophrologue_id && log.type) {
       const supabase = getServiceSupabase();
       if (supabase) {
@@ -74,7 +75,7 @@ export async function sendEmail({
               patient_id: log.patient_id ?? null,
               seance_id: log.seance_id ?? null,
               type: log.type,
-              destinataire_email: to,
+              destinataire_email: toLabel,
               destinataire_nom: log.destinataire_nom ?? null,
               objet: subject,
               contenu: html,
@@ -92,7 +93,7 @@ export async function sendEmail({
     return { success: true };
   } catch (err) {
     const msg = (err as Error)?.message ?? "Erreur inconnue";
-    console.error(`[email] Échec envoi à ${to} — ${subject}:`, msg);
+    console.error(`[email] Échec envoi à ${toLabel} — ${subject}:`, msg);
     return { success: false, error: msg };
   }
 }
