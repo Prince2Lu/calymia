@@ -34,7 +34,7 @@ type SophrologueEmbed = {
   nom: string | null;
 } | null;
 
-type TypeSeanceEmbed = { nom: string | null } | null;
+type TypeSeanceEmbed = { nom: string | null; mode: string | null } | null;
 
 type SeanceRappelRow = {
   id: string;
@@ -42,6 +42,7 @@ type SeanceRappelRow = {
   patient_id: string | null;
   sophrologue_id: string;
   type_seance_id: string | null;
+  lien_teleconsultation: string | null;
   patient: PatientEmbed | PatientEmbed[];
   sophrologue: SophrologueEmbed | SophrologueEmbed[];
   type_seance: TypeSeanceEmbed | TypeSeanceEmbed[];
@@ -72,10 +73,10 @@ async function runRappelsJ1(): Promise<NextResponse> {
     const { data: rows, error } = await supabase
       .from("seances")
       .select(
-        `id, debut_at, patient_id, sophrologue_id, type_seance_id,
+        `id, debut_at, patient_id, sophrologue_id, type_seance_id, lien_teleconsultation,
          patient:patients(email, prenom, nom),
          sophrologue:sophrologues(prenom, nom),
-         type_seance:types_seances(nom)`,
+         type_seance:types_seances(nom, mode)`,
       )
       .eq("statut", "confirmee")
       .gte("debut_at", fromIso)
@@ -145,6 +146,10 @@ async function runRappelsJ1(): Promise<NextResponse> {
       const date_seance = formatParisTime(row.debut_at, "date");
       const heure_seance = formatParisTime(row.debut_at, "HH:mm");
       const typeNom = typeSeance?.nom ?? "Séance de sophrologie";
+      const lienVisio =
+        typeSeance?.mode === "visio"
+          ? row.lien_teleconsultation?.trim() || null
+          : null;
 
       const { subject, html } = await buildCronRappelJ1Email(supabase, {
         plan,
@@ -156,6 +161,7 @@ async function runRappelsJ1(): Promise<NextResponse> {
         prenomSophro: prenom_sophrologue,
         nomSophro: nom_sophrologue,
         typeSeance: typeNom,
+        lienTeleconsultation: lienVisio,
       });
 
       const result = await sendEmail({

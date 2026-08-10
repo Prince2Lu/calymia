@@ -10,6 +10,7 @@ import {
 } from '@/lib/emails/templates'
 import { sendEmail } from '@/lib/emails/send'
 import { formatParisTime } from '@/lib/timezone'
+import { createDailyRoom } from '@/lib/visio/daily'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,6 +88,74 @@ export async function POST(request: NextRequest) {
       console.log('Paiement inserted successfully')
 
       let factureUrl: string | null = null
+      let lienVisio: string | null = null
+
+      // Lien visio Daily.co (isolé — ne doit jamais faire échouer le webhook)
+      try {
+        const { data: seanceVisio } = await supabase
+          .from('seances')
+          .select(
+            `id, fin_at, sophrologue_id,
+             type_seance:types_seances(mode),
+             sophrologue:sophrologues(lien_teleconsultation)`,
+          )
+          .eq('id', seance_id)
+          .maybeSingle<{
+            id: string
+            fin_at: string
+            sophrologue_id: string
+            type_seance: { mode: string | null } | { mode: string | null }[] | null
+            sophrologue:
+              | { lien_teleconsultation: string | null }
+              | { lien_teleconsultation: string | null }[]
+              | null
+          }>()
+
+        const typeRow = Array.isArray(seanceVisio?.type_seance)
+          ? seanceVisio?.type_seance[0]
+          : seanceVisio?.type_seance
+        const sophroRow = Array.isArray(seanceVisio?.sophrologue)
+          ? seanceVisio?.sophrologue[0]
+          : seanceVisio?.sophrologue
+
+        if (seanceVisio && typeRow?.mode === 'visio') {
+          try {
+            const url = await createDailyRoom(seanceVisio.fin_at)
+            const { error: lienErr } = await supabase
+              .from('seances')
+              .update({ lien_teleconsultation: url })
+              .eq('id', seance_id)
+            if (lienErr) {
+              console.error('[Webhook] Échec update lien_teleconsultation:', lienErr)
+            } else {
+              lienVisio = url
+              console.log('[Webhook] Salle Daily.co créée:', url)
+            }
+          } catch (dailyErr) {
+            const msg =
+              dailyErr instanceof Error ? dailyErr.message : String(dailyErr)
+            console.error('[Webhook] Génération lien visio échouée:', msg)
+
+            const fallback = sophroRow?.lien_teleconsultation?.trim() || null
+            if (fallback) {
+              const { error: fbErr } = await supabase
+                .from('seances')
+                .update({ lien_teleconsultation: fallback })
+                .eq('id', seance_id)
+              if (fbErr) {
+                console.error('[Webhook] Fallback lien profil échoué:', fbErr)
+              } else {
+                lienVisio = fallback
+                console.log(
+                  '[Webhook] Fallback lien_teleconsultation profil appliqué',
+                )
+              }
+            }
+          }
+        }
+      } catch (visioOuterErr) {
+        console.error('[Webhook] Erreur inattendue bloc visio:', visioOuterErr)
+      }
 
       // Génération automatique de la facture PDF (appel direct, sans HTTP)
       try {
@@ -106,11 +175,17 @@ export async function POST(request: NextRequest) {
       try {
         const { data: seance } = await supabase
           .from('seances')
-          .select('debut_at, fin_at, type_seance_id, patient_id, sophrologue_id')
+          .select(
+            'debut_at, fin_at, type_seance_id, patient_id, sophrologue_id, lien_teleconsultation',
+          )
           .eq('id', seance_id)
           .single()
 
         if (seance) {
+          if (!lienVisio && seance.lien_teleconsultation) {
+            lienVisio = seance.lien_teleconsultation
+          }
+
           const [{ data: patient }, { data: sophrologue }, { data: typeSeance }] = await Promise.all([
             supabase.from('patients').select('prenom, nom, email').eq('id', seance.patient_id).single(),
             supabase
@@ -142,6 +217,7 @@ export async function POST(request: NextRequest) {
               sophrologue_adresse: sophrologue?.adresse ?? null,
               sophrologue_ville: sophrologue?.ville ?? null,
               sophrologue_code_postal: sophrologue?.code_postal ?? null,
+              lien_teleconsultation: lienVisio,
             })
             await sendEmail({
               to: patient.email,
@@ -171,6 +247,7 @@ export async function POST(request: NextRequest) {
               type_seance: typeSeance?.nom ?? 'Séance',
               montant,
               facture_url: factureUrl,
+              lien_teleconsultation: lienVisio,
             })
             await sendEmail({
               to: sophrologue.email,

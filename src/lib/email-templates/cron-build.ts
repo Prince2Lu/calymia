@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   postSeance,
   rappelJ1,
+  buildLienVisioBlock,
   wrapSophrologueEmailHtml,
 } from "@/lib/emails/templates";
 import {
@@ -18,6 +19,15 @@ const POST_FALLBACK_SUJET = "Merci pour votre séance 🌿";
 const POST_FALLBACK_CORPS =
   "<p>Bonjour,</p><p>Merci pour votre séance du {{seance.date}} à {{seance.heure}}.</p>";
 
+function withOptionalVisioFragment(
+  fragment: string,
+  lienTeleconsultation?: string | null,
+): string {
+  const block = buildLienVisioBlock(lienTeleconsultation);
+  if (!block) return fragment;
+  return `${fragment}${block}`;
+}
+
 export async function buildCronRappelJ1Email(
   admin: SupabaseClient,
   args: {
@@ -30,6 +40,7 @@ export async function buildCronRappelJ1Email(
     prenomSophro: string;
     nomSophro: string;
     typeSeance: string;
+    lienTeleconsultation?: string | null;
   },
 ): Promise<{ subject: string; html: string }> {
   const v: EmailPlaceholderValues = {
@@ -54,6 +65,7 @@ export async function buildCronRappelJ1Email(
         date_seance: args.dateParis,
         heure_seance: args.heureParis,
         type_seance: args.typeSeance,
+        lien_teleconsultation: args.lienTeleconsultation,
       }),
     };
   }
@@ -70,7 +82,10 @@ export async function buildCronRappelJ1Email(
     return {
       subject: applyEmailTemplatePlaceholders(template.sujet, v),
       html: wrapSophrologueEmailHtml(
-        applyEmailTemplatePlaceholders(template.corps_html, v),
+        withOptionalVisioFragment(
+          applyEmailTemplatePlaceholders(template.corps_html, v),
+          args.lienTeleconsultation,
+        ),
       ),
     };
   }
@@ -78,7 +93,10 @@ export async function buildCronRappelJ1Email(
   return {
     subject: applyEmailTemplatePlaceholders(RAPPEL_FALLBACK_SUJET, v),
     html: wrapSophrologueEmailHtml(
-      applyEmailTemplatePlaceholders(RAPPEL_FALLBACK_CORPS, v),
+      withOptionalVisioFragment(
+        applyEmailTemplatePlaceholders(RAPPEL_FALLBACK_CORPS, v),
+        args.lienTeleconsultation,
+      ),
     ),
   };
 }

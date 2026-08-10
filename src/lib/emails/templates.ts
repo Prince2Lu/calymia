@@ -82,12 +82,14 @@ function buildCoordonneesSophrologueBlock({
   adresse,
   ville,
   code_postal,
+  lien_teleconsultation,
 }: {
   telephone?: string | null;
   email?: string | null;
   adresse?: string | null;
   ville?: string | null;
   code_postal?: string | null;
+  lien_teleconsultation?: string | null;
 }): string {
   const tel = telephone?.trim() ?? "";
   const em = email?.trim() ?? "";
@@ -96,6 +98,7 @@ function buildCoordonneesSophrologueBlock({
   const cp = code_postal?.trim() ?? "";
   const villeCp = [cp, city].filter(Boolean).join(" ");
   const adresseComplete = [adr, villeCp].filter(Boolean).join(", ");
+  const lienVisio = lien_teleconsultation?.trim() ?? "";
 
   const lines: string[] = [];
   if (tel) {
@@ -109,7 +112,11 @@ function buildCoordonneesSophrologueBlock({
       `<p style="margin:0 0 8px;">✉️ <strong>Email :</strong> <a href="mailto:${em}" style="color:${BRAND};text-decoration:none;">${em}</a></p>`,
     );
   }
-  if (adresseComplete) {
+  if (lienVisio) {
+    lines.push(
+      `<p style="margin:0;">💻 <strong>Visioconférence :</strong> <a href="${lienVisio}" style="color:${BRAND};font-weight:600;word-break:break-all;">${lienVisio}</a></p>`,
+    );
+  } else if (adresseComplete) {
     lines.push(
       `<p style="margin:0;">📍 <strong>Adresse :</strong> ${adresseComplete}</p>`,
     );
@@ -123,6 +130,23 @@ function buildCoordonneesSophrologueBlock({
         <td style="font-size:14px;color:#374151;line-height:1.8;">
           <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:${BRAND};">Coordonnées du sophrologue</p>
           ${lines.join("")}
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+export function buildLienVisioBlock(lien?: string | null): string {
+  const url = lien?.trim() ?? "";
+  if (!url) return "";
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:${BRAND};">Lien de visioconférence</p>
+          <p style="margin:0 0 12px;">Votre séance se déroule en ligne. Cliquez sur le bouton ci-dessous à l’heure du rendez-vous :</p>
+          <p style="margin:0;"><a href="${url}" style="display:inline-block;background:${BRAND};color:#ffffff!important;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;">Rejoindre la visioconférence</a></p>
+          <p style="margin:12px 0 0;font-size:12px;color:#6b7280;word-break:break-all;">${url}</p>
         </td>
       </tr>
     </table>
@@ -143,6 +167,7 @@ export function confirmationReservation({
   sophrologue_adresse,
   sophrologue_ville,
   sophrologue_code_postal,
+  lien_teleconsultation,
 }: {
   prenom_client: string;
   prenom_sophrologue: string;
@@ -157,6 +182,7 @@ export function confirmationReservation({
   sophrologue_adresse?: string | null;
   sophrologue_ville?: string | null;
   sophrologue_code_postal?: string | null;
+  lien_teleconsultation?: string | null;
 }): string {
   const factureBlock = facture_url
     ? `<p style="margin:16px 0 0;"><a href="${facture_url}" style="display:inline-block;background:${BRAND};color:#ffffff!important;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;">Télécharger ma facture</a></p>`
@@ -167,6 +193,7 @@ export function confirmationReservation({
     adresse: sophrologue_adresse,
     ville: sophrologue_ville,
     code_postal: sophrologue_code_postal,
+    lien_teleconsultation,
   });
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
@@ -198,6 +225,7 @@ export function confirmationReservationSophrologue({
   type_seance,
   montant,
   facture_url,
+  lien_teleconsultation,
 }: {
   prenom_sophrologue: string;
   prenom_client: string;
@@ -207,10 +235,12 @@ export function confirmationReservationSophrologue({
   type_seance: string;
   montant: number;
   facture_url?: string | null;
+  lien_teleconsultation?: string | null;
 }): string {
   const factureBlock = facture_url
     ? `<p style="margin:16px 0 0;">Le reçu de paiement est disponible ici : <a href="${facture_url}" style="color:${BRAND};font-weight:600;">Télécharger le reçu</a></p>`
     : "";
+  const visioBlock = buildLienVisioBlock(lien_teleconsultation);
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_sophrologue},</p>
     <p style="margin:0 0 16px;">Une nouvelle réservation a été confirmée.</p>
@@ -218,6 +248,7 @@ export function confirmationReservationSophrologue({
     <p style="margin:0 0 16px;"><strong>Date :</strong> ${date_seance} à ${heure_seance}</p>
     <p style="margin:0 0 16px;"><strong>Type :</strong> ${type_seance}</p>
     <p style="margin:0 0 16px;"><strong>Montant :</strong> ${montant.toFixed(2)} €</p>
+    ${visioBlock}
     ${factureBlock}
     <p style="margin:24px 0 0;">À bientôt,<br><strong>L'équipe Calymia</strong></p>
   `;
@@ -276,6 +307,7 @@ export function rappelJ1({
   date_seance,
   heure_seance,
   type_seance,
+  lien_teleconsultation,
 }: {
   prenom_client: string;
   prenom_sophrologue: string;
@@ -283,7 +315,9 @@ export function rappelJ1({
   date_seance: string;
   heure_seance: string;
   type_seance: string;
+  lien_teleconsultation?: string | null;
 }): string {
+  const visioBlock = buildLienVisioBlock(lien_teleconsultation);
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
     <p style="margin:0 0 16px;">Votre séance de sophrologie est <strong>demain</strong>. Voici un petit rappel pour que vous soyez prêt(e) ✨</p>
@@ -296,6 +330,7 @@ export function rappelJ1({
         </td>
       </tr>
     </table>
+    ${visioBlock}
     <p style="margin:16px 0;">Conseil : prenez quelques minutes ce soir pour vous détendre et préparer votre esprit à la séance de demain. Une bonne nuit de sommeil fait toute la différence 🌙</p>
     <p style="margin:24px 0 0;">À demain,<br><strong>${prenom_sophrologue} ${nom_sophrologue}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
   `;

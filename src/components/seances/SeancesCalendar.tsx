@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   XCircle,
   CalendarDays,
+  Copy,
+  Video,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BoutonFacture } from "@/components/factures/BoutonFacture";
@@ -139,7 +142,19 @@ type DrawerProps = {
   onClose: () => void;
   onMarkDone: (id: string) => Promise<void>;
   onCancel: (id: string) => Promise<void>;
+  onLienVisioUpdated: (id: string, lien: string) => void;
 };
+
+function resolveTypeSeance(type_seance: Seance["type_seance"]): {
+  nom: string;
+  mode: string | null;
+} {
+  const row = Array.isArray(type_seance) ? type_seance[0] : type_seance;
+  return {
+    nom: row?.nom ?? "Séance",
+    mode: row?.mode ?? null,
+  };
+}
 
 function SeanceDrawer({
   seance,
@@ -148,9 +163,22 @@ function SeanceDrawer({
   onClose,
   onMarkDone,
   onCancel,
+  onLienVisioUpdated,
 }: DrawerProps) {
   const [acting, setActing] = useState<"done" | "cancel" | null>(null);
+  const [lienVisio, setLienVisio] = useState(
+    seance.lien_teleconsultation?.trim() || null,
+  );
+  const [visioActing, setVisioActing] = useState<"copy" | "regen" | null>(null);
+  const [visioError, setVisioError] = useState<string | null>(null);
+  const [visioCopied, setVisioCopied] = useState(false);
   const st = statutStyle(seance.statut);
+
+  useEffect(() => {
+    setLienVisio(seance.lien_teleconsultation?.trim() || null);
+    setVisioError(null);
+    setVisioCopied(false);
+  }, [seance.id, seance.lien_teleconsultation]);
 
   const nomPatient =
     `${seance.patient?.prenom ?? ""} ${seance.patient?.nom ?? ""}`.trim() ||
@@ -160,9 +188,8 @@ function SeanceDrawer({
   const montant = paiementRow?.montant_total ?? null;
   const factureUrl = paiementRow?.facture_url ?? null;
 
-  const typeNom = Array.isArray(seance.type_seance)
-    ? (seance.type_seance[0]?.nom ?? "Séance")
-    : (seance.type_seance?.nom ?? "Séance");
+  const { nom: typeNom, mode: typeMode } = resolveTypeSeance(seance.type_seance);
+  const isVisio = typeMode === "visio";
 
   const email = seance.patient?.email ?? null;
   const tel = seance.patient?.telephone ?? null;
@@ -177,6 +204,50 @@ function SeanceDrawer({
     setActing("cancel");
     await onCancel(seance.id);
     setActing(null);
+  };
+
+  const handleCopyLien = async () => {
+    if (!lienVisio) return;
+    setVisioError(null);
+    setVisioActing("copy");
+    try {
+      await navigator.clipboard.writeText(lienVisio);
+      setVisioCopied(true);
+      setTimeout(() => setVisioCopied(false), 2000);
+    } catch {
+      setVisioError("Impossible de copier le lien.");
+    } finally {
+      setVisioActing(null);
+    }
+  };
+
+  const handleRegenererVisio = async () => {
+    setVisioError(null);
+    setVisioActing("regen");
+    try {
+      const res = await fetch(`/api/seances/${seance.id}/regenerer-visio`, {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => null)) as {
+        lien_teleconsultation?: string;
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        setVisioError(json?.error ?? "Échec de la régénération du lien.");
+        return;
+      }
+      const url = json?.lien_teleconsultation?.trim();
+      if (!url) {
+        setVisioError("Réponse invalide : lien manquant.");
+        return;
+      }
+      setLienVisio(url);
+      onLienVisioUpdated(seance.id, url);
+    } catch {
+      setVisioError("Erreur réseau lors de la régénération.");
+    } finally {
+      setVisioActing(null);
+    }
   };
 
   return (
@@ -196,11 +267,19 @@ function SeanceDrawer({
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ${st.bg} ${st.text} ${st.ring}`}
-          >
-            {st.label}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ${st.bg} ${st.text} ${st.ring}`}
+            >
+              {st.label}
+            </span>
+            {isVisio && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF3DE] px-3 py-1 text-xs font-semibold text-[#426F59]">
+                <Video className="h-3.5 w-3.5" />
+                Visio
+              </span>
+            )}
+          </div>
 
           <section className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -249,6 +328,56 @@ function SeanceDrawer({
               </div>
             )}
           </section>
+
+          {isVisio && (
+            <section className="space-y-3 rounded-xl border border-[#426F59]/20 bg-[#F0F7F4] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#426F59]">
+                Visioconférence
+              </p>
+              {lienVisio ? (
+                <>
+                  <p className="break-all text-xs text-slate-600">{lienVisio}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-[#426F59]/30"
+                    onClick={handleCopyLien}
+                    disabled={visioActing !== null}
+                  >
+                    {visioActing === "copy" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Copy className="mr-2 h-4 w-4" />
+                        {visioCopied ? "Lien copié" : "Copier le lien"}
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={handleRegenererVisio}
+                  disabled={visioActing !== null}
+                >
+                  {visioActing === "regen" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Régénérer le lien
+                    </>
+                  )}
+                </Button>
+              )}
+              {visioError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+                  {visioError}
+                </p>
+              )}
+            </section>
+          )}
 
           {(seance.statut === "confirmee" || seance.statut === "terminee") &&
             seance.patient_id && (
@@ -554,9 +683,8 @@ export default function SeancesCalendar({
                           const nomPatient =
                             `${s.patient?.prenom ?? ""} ${s.patient?.nom ?? ""}`.trim() ||
                             "Client";
-                          const typeNom = Array.isArray(s.type_seance)
-                            ? (s.type_seance[0]?.nom ?? "Séance")
-                            : (s.type_seance?.nom ?? "Séance");
+                          const { nom: typeNom, mode: typeMode } =
+                            resolveTypeSeance(s.type_seance);
                           return (
                             <button
                               key={s.id}
@@ -567,6 +695,11 @@ export default function SeancesCalendar({
                                 className={`truncate text-xs font-semibold ${st.text}`}
                               >
                                 {nomPatient}
+                                {typeMode === "visio" && (
+                                  <span className="ml-1 font-medium text-[#426F59]">
+                                    · Visio
+                                  </span>
+                                )}
                               </p>
                               <p className="truncate text-[10px] text-slate-500">
                                 {formatTime(s.debut_at)} · {typeNom}
@@ -592,6 +725,18 @@ export default function SeancesCalendar({
           onClose={() => setSelected(null)}
           onMarkDone={handleMarkDone}
           onCancel={handleCancel}
+          onLienVisioUpdated={(id, lien) => {
+            setSeances((prev) =>
+              prev.map((s) =>
+                s.id === id ? { ...s, lien_teleconsultation: lien } : s,
+              ),
+            );
+            setSelected((prev) =>
+              prev && prev.id === id
+                ? { ...prev, lien_teleconsultation: lien }
+                : prev,
+            );
+          }}
         />
       )}
 
