@@ -6,6 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+const MODES_VALIDES = ["presentiel", "visio"] as const;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -15,7 +17,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "id est requis." }, { status: 400 });
     }
 
-    const allowed = ["nom", "duree_minutes", "tarif", "actif"];
+    if ("mode" in fields) {
+      if (
+        typeof fields.mode !== "string" ||
+        !(MODES_VALIDES as readonly string[]).includes(fields.mode)
+      ) {
+        return NextResponse.json(
+          { error: "mode doit être 'presentiel' ou 'visio'." },
+          { status: 400 },
+        );
+      }
+    }
+
+    const allowed = ["nom", "duree_minutes", "tarif", "actif", "mode"];
     const payload: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in fields) payload[key] = fields[key];

@@ -32,6 +32,7 @@ type SelectedTypeSeance = {
   nom: string;
   duree_minutes: number;
   tarif: number;
+  mode: "presentiel" | "visio";
 };
 
 type SophrologueLite = {
@@ -39,6 +40,9 @@ type SophrologueLite = {
   prenom: string | null;
   nom: string | null;
   horaires: unknown;
+  adresse: string | null;
+  ville: string | null;
+  code_postal: string | null;
 };
 
 type PatientInfo = {
@@ -115,6 +119,23 @@ function buildSlotsFromDispo(
     .sort((a, b) => a.getTime() - b.getTime());
 }
 
+const VISIO_LIEU_MESSAGE =
+  "Séance en visioconférence — le lien de connexion vous sera envoyé par email après confirmation";
+
+function formatCabinetAdresse(s: {
+  adresse: string | null;
+  ville: string | null;
+  code_postal: string | null;
+} | null): string | null {
+  if (!s) return null;
+  const adr = s.adresse?.trim() ?? "";
+  const villeCp = [s.code_postal?.trim(), s.ville?.trim()]
+    .filter(Boolean)
+    .join(" ");
+  const full = [adr, villeCp].filter(Boolean).join(", ");
+  return full || null;
+}
+
 export default function ReserverPage() {
   const params = useParams<{
     dept: string;
@@ -187,7 +208,7 @@ export default function ReserverPage() {
       // 1) Sophrologue de base (+ horaires JSONB = source des créneaux)
       const { data: sophroData } = await supabase
         .from("sophrologues")
-        .select("id, prenom, nom, horaires")
+        .select("id, prenom, nom, horaires, adresse, ville, code_postal")
         .eq("slug", slug)
         .eq("actif", true)
         .maybeSingle<SophrologueLite>();
@@ -245,7 +266,7 @@ export default function ReserverPage() {
 
       const { data: typesRows } = await supabase
         .from("types_seances")
-        .select("id, nom, duree_minutes, tarif")
+        .select("id, nom, duree_minutes, tarif, mode")
         .eq("sophrologue_id", sid)
         .eq("actif", true)
         .order("nom");
@@ -257,6 +278,7 @@ export default function ReserverPage() {
         nom: r.nom ?? "Séance",
         duree_minutes: Number(r.duree_minutes) || 60,
         tarif: Number(r.tarif) || 0,
+        mode: r.mode === "visio" ? "visio" : "presentiel",
       }));
 
       setSessionTypes(types);
@@ -300,6 +322,17 @@ export default function ReserverPage() {
     const full = `${prenom} ${nom}`.trim();
     return full || "le sophrologue";
   }, [sophrologue]);
+
+  const cabinetAdresse = useMemo(
+    () => formatCabinetAdresse(sophrologue),
+    [sophrologue],
+  );
+
+  const lieuSeanceLabel = useMemo(() => {
+    if (!selectedTypeSeance) return null;
+    if (selectedTypeSeance.mode === "visio") return VISIO_LIEU_MESSAGE;
+    return cabinetAdresse;
+  }, [selectedTypeSeance, cabinetAdresse]);
 
   const days = useMemo(() => {
     const today = startOfParisCalendarDay(new Date());
@@ -756,9 +789,21 @@ export default function ReserverPage() {
                               : "border-slate-200 bg-white hover:border-[#426F59]/40 hover:bg-slate-50"
                           }`}
                         >
-                          <p className="font-semibold text-[#1E3A5F]">{t.nom}</p>
+                          <p className="font-semibold text-[#1E3A5F]">
+                            {t.nom}
+                            {t.mode === "visio" && (
+                              <span className="ml-2 inline-block rounded-full bg-[#EAF3DE] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#426F59]">
+                                Visio
+                              </span>
+                            )}
+                          </p>
                           <p className="mt-1 text-sm text-slate-600">
                             Durée : {t.duree_minutes} min
+                            {t.mode === "visio"
+                              ? " · En visioconférence"
+                              : cabinetAdresse
+                                ? " · Au cabinet"
+                                : ""}
                           </p>
                           <p className="mt-2 text-lg font-semibold text-[#426F59]">
                             {t.tarif.toFixed(2)}&nbsp;€
@@ -925,6 +970,14 @@ export default function ReserverPage() {
                           <p className="mt-1 text-xs text-slate-600">
                             {selectedTypeSeance.nom} · {selectedTypeSeance.tarif.toFixed(2)}&nbsp;€
                           </p>
+                          {lieuSeanceLabel && (
+                            <p className="mt-2 text-xs text-slate-600">
+                              <span className="font-semibold text-[#1E3A5F]">
+                                Lieu
+                              </span>{" "}
+                              : {lieuSeanceLabel}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1080,6 +1133,12 @@ export default function ReserverPage() {
                         )}`
                       : "Non sélectionné"}
                   </p>
+                  {lieuSeanceLabel && (
+                    <p className="text-sm text-slate-800">
+                      <span className="font-semibold text-[#1E3A5F]">Lieu</span>{" "}
+                      : {lieuSeanceLabel}
+                    </p>
+                  )}
                 </div>
 
                 <Button
@@ -1122,6 +1181,12 @@ export default function ReserverPage() {
                     </span>{" "}
                     : {sophrologueName}
                   </p>
+                  {lieuSeanceLabel && (
+                    <p>
+                      <span className="font-semibold text-[#1E3A5F]">Lieu</span>{" "}
+                      : {lieuSeanceLabel}
+                    </p>
+                  )}
                 </div>
 
                 {clientSecret && seanceId != null && selectedTypeSeance ? (
@@ -1181,6 +1246,12 @@ export default function ReserverPage() {
                         )}`
                       : "—"}
                   </p>
+                  {lieuSeanceLabel && (
+                    <p>
+                      <span className="font-semibold text-[#1E3A5F]">Lieu</span>{" "}
+                      : {lieuSeanceLabel}
+                    </p>
+                  )}
                 </div>
 
                 {/* ── Compte existant (check-email → emailStatus === "exists") ── */}

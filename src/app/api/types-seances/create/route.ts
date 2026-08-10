@@ -6,13 +6,32 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+const MODES_VALIDES = ["presentiel", "visio"] as const;
+type ModeSeance = (typeof MODES_VALIDES)[number];
+
+function parseMode(value: unknown): ModeSeance | null {
+  if (typeof value !== "string") return null;
+  return (MODES_VALIDES as readonly string[]).includes(value)
+    ? (value as ModeSeance)
+    : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { sophrologue_id, nom, duree_minutes, tarif } = await request.json();
+    const { sophrologue_id, nom, duree_minutes, tarif, mode } =
+      await request.json();
 
     if (!sophrologue_id || !nom || duree_minutes == null || tarif == null) {
       return NextResponse.json(
         { error: "sophrologue_id, nom, duree_minutes et tarif sont requis." },
+        { status: 400 },
+      );
+    }
+
+    const modeParsed = parseMode(mode ?? "presentiel");
+    if (!modeParsed) {
+      return NextResponse.json(
+        { error: "mode doit être 'presentiel' ou 'visio'." },
         { status: 400 },
       );
     }
@@ -24,9 +43,10 @@ export async function POST(request: NextRequest) {
         nom: nom.trim(),
         duree_minutes: Number(duree_minutes),
         tarif: Number(tarif),
+        mode: modeParsed,
         actif: true,
       })
-      .select("id, nom, duree_minutes, tarif, actif")
+      .select("id, nom, duree_minutes, tarif, mode, actif")
       .single();
 
     if (error) {

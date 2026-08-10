@@ -58,11 +58,14 @@ type Sophrologue = {
 const SOPHROLOGUE_SELECT =
   "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, siret, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
 
+type ModeSeance = "presentiel" | "visio";
+
 type TypeSeance = {
   id: string;
   nom: string;
   duree_minutes: number;
   tarif: number;
+  mode: ModeSeance;
   actif: boolean;
 };
 
@@ -469,6 +472,7 @@ function ModalSeance({
     nom: editing?.nom ?? "",
     duree: editing?.duree_minutes ?? 60,
     tarif: editing ? String(editing.tarif) : "",
+    mode: (editing?.mode ?? "presentiel") as ModeSeance,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -492,11 +496,18 @@ function ModalSeance({
             nom: form.nom.trim(),
             duree_minutes: form.duree,
             tarif: parseFloat(form.tarif),
+            mode: form.mode,
           }),
         });
         const json = await res.json();
         if (!res.ok) { setError(json.error ?? "Erreur."); return; }
-        onUpdated({ ...editing, nom: form.nom.trim(), duree_minutes: form.duree, tarif: parseFloat(form.tarif) });
+        onUpdated({
+          ...editing,
+          nom: form.nom.trim(),
+          duree_minutes: form.duree,
+          tarif: parseFloat(form.tarif),
+          mode: form.mode,
+        });
       } else {
         // ── Création ──────────────────────────────────────────────────
         const res = await fetch("/api/types-seances/create", {
@@ -507,6 +518,7 @@ function ModalSeance({
             nom: form.nom.trim(),
             duree_minutes: form.duree,
             tarif: parseFloat(form.tarif),
+            mode: form.mode,
           }),
         });
         const json = await res.json();
@@ -567,6 +579,19 @@ function ModalSeance({
               onChange={(e) => setForm({ ...form, tarif: e.target.value })}
             />
           </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-600">Mode</label>
+            <select
+              value={form.mode}
+              onChange={(e) =>
+                setForm({ ...form, mode: e.target.value as ModeSeance })
+              }
+              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2E75B6]/30"
+            >
+              <option value="presentiel">Présentiel</option>
+              <option value="visio">Visio</option>
+            </select>
+          </div>
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
@@ -613,7 +638,7 @@ function TabSeances({
   useEffect(() => {
     supabase
       .from("types_seances")
-      .select("id, nom, duree_minutes, tarif, actif")
+      .select("id, nom, duree_minutes, tarif, mode, actif")
       .eq("sophrologue_id", sophrologueId)
       .order("nom")
       .returns<TypeSeance[]>()
@@ -695,7 +720,14 @@ function TabSeances({
                 key={t.id}
                 className="grid grid-cols-1 items-center gap-2 px-5 py-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] sm:gap-4"
               >
-                <span className="font-medium text-slate-900">{t.nom}</span>
+                <span className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
+                  {t.nom}
+                  {t.mode === "visio" && (
+                    <span className="rounded-full bg-[#EAF3DE] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#426F59]">
+                      Visio
+                    </span>
+                  )}
+                </span>
                 <span className="text-sm text-slate-600">{t.duree_minutes} min</span>
                 <span className="text-sm font-medium text-slate-900">{t.tarif.toFixed(2)} €</span>
                 <button
