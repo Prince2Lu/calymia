@@ -1247,10 +1247,19 @@ export default function ReserverPage() {
                       : "—"}
                   </p>
                   {lieuSeanceLabel && (
-                    <p>
-                      <span className="font-semibold text-[#1E3A5F]">Lieu</span>{" "}
-                      : {lieuSeanceLabel}
-                    </p>
+                    <>
+                      <p>
+                        <span className="font-semibold text-[#1E3A5F]">Lieu</span>{" "}
+                        : {lieuSeanceLabel}
+                      </p>
+                      {selectedTypeSeance?.mode === "visio" && (
+                        <p className="text-xs text-slate-500">
+                          Pensez à vérifier vos spams si vous ne recevez pas
+                          l&apos;email de confirmation dans les prochaines
+                          minutes.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
