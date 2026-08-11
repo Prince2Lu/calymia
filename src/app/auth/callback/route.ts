@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const type = requestUrl.searchParams.get("type");
+  const next = requestUrl.searchParams.get("next");
 
   if (!code) {
     const errorUrl = new URL("/connexion", request.url);
@@ -12,10 +13,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(errorUrl);
   }
 
-  // Déterminer la redirection selon le type AVANT d'échanger le code
-  const redirectTo = type === "recovery"
-    ? new URL("/reinitialiser-mot-de-passe", request.url)
-    : new URL("/dashboard", request.url);
+  // `next` (posé par resetPasswordForEmail) prioritaire ; `type=recovery` en fallback
+  const redirectTo =
+    next === "/reinitialiser-mot-de-passe" || type === "recovery"
+      ? new URL("/reinitialiser-mot-de-passe", request.url)
+      : new URL("/dashboard", request.url);
 
   const response = NextResponse.redirect(redirectTo);
 

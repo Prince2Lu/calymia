@@ -31,7 +31,7 @@ export default function MotDePasseOubliePage() {
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       trimmed,
       {
-        redirectTo: `${getSiteUrl()}/auth/callback`,
+        redirectTo: `${getSiteUrl()}/auth/callback?next=/reinitialiser-mot-de-passe`,
       },
     );
     setLoading(false);
