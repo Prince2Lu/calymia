@@ -698,86 +698,118 @@ export default function PatientSpacePage() {
               Aucune séance passée pour l'instant.
             </p>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              {/* Header */}
-              <div className="hidden grid-cols-[1.5fr_2fr_1.5fr_1fr_1fr_auto] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 md:grid">
-                {["Date", "Sophrologue", "Type", "Statut", "Montant", ""].map(
-                  (h) => (
-                    <span
-                      key={h}
-                      className="text-xs font-semibold uppercase tracking-wide text-slate-400"
-                    >
-                      {h}
-                    </span>
-                  ),
-                )}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:grid md:grid-cols-[1.5fr_2fr_1.5fr_1fr_1fr_auto] md:items-center">
+              <div className="hidden md:contents">
+                {(
+                  [
+                    ["Date", "pl-5 pr-2"],
+                    ["Sophrologue", "px-2"],
+                    ["Type", "px-2"],
+                    ["Statut", "px-2"],
+                    ["Montant", "px-2"],
+                    ["Reçu", "block w-full pl-2 pr-5 text-center"],
+                  ] as const
+                ).map(([h, sidePad]) => (
+                  <span
+                    key={h || "actions"}
+                    className={`border-b border-slate-100 bg-slate-50 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 ${sidePad}`}
+                  >
+                    {h}
+                  </span>
+                ))}
               </div>
 
-              <div className="divide-y divide-slate-100">
-                {pastSeances.map((s) => {
-                  const sophrologue = resolveOne(s.sophrologue);
-                  const typeSeance = resolveOne(s.type_seance);
-                  const paiement = resolveOne(s.paiement);
-                  const nomSophro =
-                    `${sophrologue?.prenom ?? ""} ${sophrologue?.nom ?? ""}`.trim() ||
-                    "—";
-                  return (
-                    <div
-                      key={s.id}
-                      className="grid grid-cols-1 gap-1 px-5 py-3 md:grid-cols-[1.5fr_2fr_1.5fr_1fr_1fr_auto] md:items-center md:gap-4"
+              {pastSeances.map((s, index) => {
+                const sophrologue = resolveOne(s.sophrologue);
+                const typeSeance = resolveOne(s.type_seance);
+                const paiement = resolveOne(s.paiement);
+                const nomSophro =
+                  `${sophrologue?.prenom ?? ""} ${sophrologue?.nom ?? ""}`.trim() ||
+                  "—";
+                const isLast = index === pastSeances.length - 1;
+                // Sur desktop (md:contents), la bordure doit vivre sur chaque cellule
+                const cellBorder = isLast
+                  ? ""
+                  : "md:border-b md:border-slate-100";
+                return (
+                  <div
+                    key={s.id}
+                    className={`grid grid-cols-1 gap-1 px-5 py-3 md:contents ${
+                      isLast ? "" : "border-b border-slate-100"
+                    }`}
+                  >
+                    {/* Date */}
+                    <div className={`md:py-3 md:pl-5 md:pr-2 ${cellBorder}`}>
+                      <p className="text-sm font-medium text-slate-800">
+                        {formatDateShort(s.debut_at)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {formatTime(s.debut_at)}
+                      </p>
+                    </div>
+
+                    {/* Sophrologue */}
+                    <span
+                      className={`text-sm text-slate-700 md:px-2 md:py-3 ${cellBorder}`}
                     >
-                      {/* Date */}
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">
-                          {formatDateShort(s.debut_at)}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {formatTime(s.debut_at)}
-                        </p>
-                      </div>
+                      {nomSophro}
+                    </span>
 
-                      {/* Sophrologue */}
-                      <span className="text-sm text-slate-700">{nomSophro}</span>
+                    {/* Type */}
+                    <span
+                      className={`text-sm text-slate-500 md:px-2 md:py-3 ${cellBorder}`}
+                    >
+                      {typeSeance?.nom ?? "Séance"}
+                    </span>
 
-                      {/* Type */}
-                      <span className="text-sm text-slate-500">
-                        {typeSeance?.nom ?? "Séance"}
-                      </span>
-
-                      {/* Statut */}
+                    {/* Statut */}
+                    <div
+                      className={`md:flex md:items-center md:px-2 md:py-3 ${cellBorder}`}
+                    >
                       <span
                         className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statutStyle(s.statut)}`}
                       >
                         {statutLabel(s.statut)}
                       </span>
-
-                      {/* Montant */}
-                      <span className="text-sm font-medium text-slate-800">
-                        {paiement?.montant_total != null
-                          ? `${paiement.montant_total.toFixed(2)} €`
-                          : "—"}
-                      </span>
-
-                      {/* Reçu */}
-                      {paiement?.montant_total != null && paiement?.facture_url ? (
-                        <a
-                          href={paiement.facture_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:text-[#1E3A5F]"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Télécharger mon reçu
-                        </a>
-                      ) : paiement?.montant_total != null ? (
-                        <span className="text-xs text-slate-400">Reçu en cours</span>
-                      ) : (
-                        <span className="text-xs text-slate-300">—</span>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Montant */}
+                    <span
+                      className={`text-sm font-medium text-slate-800 md:px-2 md:py-3 ${cellBorder}`}
+                    >
+                      {paiement?.montant_total != null
+                        ? `${paiement.montant_total.toFixed(2)} €`
+                        : "—"}
+                    </span>
+
+                    {/* Reçu */}
+                    {paiement?.montant_total != null &&
+                    paiement?.facture_url ? (
+                      <a
+                        href={paiement.facture_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-1 text-xs font-medium text-[#2E75B6] hover:text-[#1E3A5F] md:py-3 md:pl-2 md:pr-5 ${cellBorder}`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Télécharger mon reçu
+                      </a>
+                    ) : paiement?.montant_total != null ? (
+                      <span
+                        className={`text-xs text-slate-400 md:py-3 md:pl-2 md:pr-5 ${cellBorder}`}
+                      >
+                        Reçu en cours
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-xs text-slate-300 md:py-3 md:pl-2 md:pr-5 ${cellBorder}`}
+                      >
+                        —
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
