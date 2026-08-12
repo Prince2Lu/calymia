@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 31 juillet 2026
+Dernière mise à jour : 12 août 2026
 
 ---
 
@@ -14,7 +14,7 @@ Calymia est une plateforme SaaS B2B2C pour les sophrologues en France.
 - **Calymia** : prélève 3% de commission sur chaque réservation + abonnement mensuel sophrologue
 
 **Repo GitHub** : `github.com/Prince2Lu/calymia`
-**Stack** : Next.js 14 App Router, Supabase (PostgreSQL + RLS), Stripe Connect + Billing, Resend, n8n
+**Stack** : Next.js 14 App Router, Supabase (PostgreSQL + RLS), Stripe Connect + Billing, Resend, Daily.co (visio), n8n
 
 ---
 
@@ -25,6 +25,7 @@ Calymia est une plateforme SaaS B2B2C pour les sophrologues en France.
 | **URL app** | `calymia.vercel.app` | `app.calymia.com` |
 | **Supabase projet** | `cdfltpuzlkyoymjgdhcr` | `tsydrlqcshgnblgiacow` |
 | **Stripe** | TEST (clés test) | LIVE (clés live) ✅ actif |
+| **Daily.co** | compte `calymia-dev` (`DAILY_API_KEY` sur Vercel `calymia`) | compte `calymia-prod` (`DAILY_API_KEY` sur Vercel `calymia-prod`) — même séparation que Stripe TEST/LIVE |
 | **Branche Git** | `develop` | `main` |
 | **Projet Vercel** | `calymia` | `calymia-prod` |
 | **n8n CALYMIA_BASE_URL** | `https://calymia.vercel.app` | `https://app.calymia.com` ✅ actif |
@@ -59,9 +60,20 @@ git merge develop
 git push origin main
 git checkout develop
 ```
-Checklist avant tout merge `develop` → `main` : `npx tsc --noEmit` et `npm run build` sans
-erreur, pas de nouveau `console.error` dans les logs Vercel DEV récents, migrations Supabase
-déjà validées sur DEV **et** appliquées sur PROD.
+
+Checklist avant tout merge `develop` → `main` :
+1. `npx tsc --noEmit` et `npm run build` sans erreur
+2. Pas de nouveau `console.error` dans les logs Vercel DEV récents
+3. Migrations Supabase déjà validées sur DEV
+4. **Migrations Supabase appliquées sur PROD** (`tsydrlqcshgnblgiacow`) — étape **distincte et
+   obligatoire AVANT** `git push origin main`. Vérifier en base (colonnes/tables attendues
+   présentes) ; ne pas se contenter du fait que le code a été validé sur DEV. Un push Git
+   déploie le code Next.js, **pas** les migrations SQL.
+
+⚠️ **Incident août 2026** : le code visioconférence a été mergé/déployé en PROD sans appliquer
+la migration `types_seances.mode` (`20260810180000_types_seances_mode.sql`) → erreur
+« Could not find the 'mode' column » à la première utilisation. Toujours appliquer la
+migration SQL PROD **avant** (ou au pire simultanément à) le déploiement du code qui en dépend.
 
 ---
 
@@ -72,23 +84,27 @@ src/
 ├── app/
 │   ├── (auth)/              # Dashboard sophrologue (protégé)
 │   │   ├── dashboard/       # KPIs + agenda + score complétude profil
-│   │   ├── seances/         # Agenda semaine + drawer détail
+│   │   ├── seances/         # Agenda semaine + drawer détail (badge Visio + Copier/Régénérer)
 │   │   ├── clients/         # Liste + fiche client [id] — suppression client ✅ (31/07)
-│   │   ├── patient/         # Espace client
+│   │   ├── patient/         # Espace client — fix alignement grille séances ✅ develop only (août 2026)
 │   │   ├── parametres/      # 4 onglets dont Cabinet/Vitrine + champ SIRET (Profil, 30/07)
 │   │   ├── emails/          # Templates emails (Pro+)
 │   │   ├── communications/  # Journal (Pro+)
 │   │   └── abonnement/      # Plans & abonnement + historique de facturation ✅ (31/07)
 │   ├── (public)/
 │   │   └── sophrologues/[dept]/[ville]/[slug]/  # Page publique SSR
-│   │       └── reserver/    # Tunnel réservation 4 étapes
+│   │       └── reserver/    # Tunnel réservation 5 étapes (+ rappel anti-spam visio à l'étape 5)
 │   ├── onboarding/          # Wizard 5 étapes
 │   ├── inscription/         # Création compte
 │   ├── connexion/           # Login
+│   ├── mot-de-passe-oublie/ # resetPasswordForEmail + next=/reinitialiser-mot-de-passe (fix août 2026)
+│   ├── reinitialiser-mot-de-passe/  # Formulaire nouveau mot de passe (post-recovery)
+│   ├── auth/
+│   │   └── callback/        # Échange code PKCE ; priorise `next`, fallback `type=recovery`
 │   └── api/
 │       ├── auth/            # create-client-account, check-email
 │       ├── stripe/
-│       │   ├── webhook/         # payment_intent.succeeded, checkout.session.completed (30/07),
+│       │   ├── webhook/         # payment_intent.succeeded (+ génération lien visio), checkout.session.completed (30/07),
 │       │   │                    # customer.subscription.updated/deleted/trial_will_end
 │       │   ├── checkout/        # Checkout Session mode "setup" (upgrade pendant trial, 30/07)
 │       │   ├── billing-portal/  # Lien vers le Billing Portal Stripe
@@ -97,6 +113,8 @@ src/
 │       ├── patients/
 │       │   ├── create/          # Ajout manuel client (dashboard)
 │       │   └── [id]/delete/     # Suppression client, RPC transactionnelle (31/07)
+│       ├── seances/
+│       │   └── [id]/regenerer-visio/  # POST — recrée une salle Daily.co (août 2026)
 │       ├── reservations/    # create-payment-intent, annuler
 │       ├── public/          # prochain-creneau (badge temps réel, force-dynamic)
 │       ├── factures/        # generer (facture séance, redesign 30/07 — voir section 6)
@@ -138,6 +156,8 @@ src/
     ├── emails/
     │   ├── templates.ts     # Templates emails Resend
     │   └── send.ts          # sendEmail() — init Resend paresseuse via getResendClient() (31/07)
+    ├── visio/
+    │   └── daily.ts         # createDailyRoom() — salles Daily.co (août 2026)
     ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow
     ├── horaires.ts          # normalizeHoraires(), dispoByJsDayFromHoraires() — source unique horaires (voir section 10)
     ├── supabase/            # Clients Supabase (browser + server)
@@ -179,11 +199,11 @@ chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canoniqu
 ### Tables principales
 | Table | Colonnes clés | Notes |
 |---|---|---|
-| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet`, `siret`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `limite_clients_alerte_envoyee_at` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10). `siret` nullable, ajouté 30/07 (affiché sur la facture si renseigné). `limite_clients_alerte_envoyee_at` ajouté 31/07 (voir section 11) |
+| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet`, `siret`, `lien_teleconsultation`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `limite_clients_alerte_envoyee_at` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10). `siret` nullable, ajouté 30/07 (affiché sur la facture si renseigné). `lien_teleconsultation` = fallback profil si création Daily.co échoue (voir section 6 — Visioconférence). `limite_clients_alerte_envoyee_at` ajouté 31/07 (voir section 11) |
 | `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus |
-| `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut` | `statut` = 'confirmee' / 'terminee' / 'annulee' |
+| `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut`, `lien_teleconsultation` | `statut` = 'confirmee' / 'terminee' / 'annulee'. `lien_teleconsultation` **activement lue/écrite** depuis août 2026 (lien Daily.co par séance, voir section 6) — plus un champ legacy mort |
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
-| `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif` | |
+| `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif`, `mode` | `mode` = `'presentiel'` \| `'visio'` (défaut `presentiel`), migration `20260810180000_types_seances_mode.sql` — août 2026 |
 | `disponibilites` | `id`, `sophrologue_id`, `jour_semaine`, `heure_debut`, `heure_fin`, `actif` | ⚠️ **Legacy** — plus lue ni écrite pour le booking depuis le 27/07 (voir section 10). Reste en base, non supprimée |
 | `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut`, `sent_at`, `destinataire_email`, `destinataire_nom`, `objet`, `contenu` | ⚠️ Pas `communications_log`. Colonne date = `sent_at` (pas `created_at`). Contrainte `communications_type_check` : liste fermée de valeurs autorisées pour `type` — **toujours vérifier/étendre cette contrainte** avant d'introduire un nouveau type d'email journalisé (ajouté `limite_clients_alerte` le 31/07 ; la contrainte réelle en base contenait déjà `avis`, absent du fichier de migration d'origine — écart base/repo à garder en tête) |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
@@ -306,6 +326,18 @@ que déclarative.
   fois, actif dans les deux modes. Ne pas chercher à le reconfigurer séparément en Live après
   l'avoir fait en Test.
 
+### Daily.co — deux comptes / deux clés (août 2026)
+- Deux comptes séparés : `calymia-dev` (DEV) et `calymia-prod` (PROD) — même logique que Stripe
+  TEST/LIVE. Ne jamais partager `DAILY_API_KEY` entre environnements.
+- `DAILY_API_KEY` est **server-only** (jamais `NEXT_PUBLIC_*`), configurée séparément sur Vercel
+  projet `calymia` et projet `calymia-prod`.
+- Création de salle via `createDailyRoom()` (`src/lib/visio/daily.ts`) — voir section 6.
+- ⚠️ **TODO opérationnel non résolu** : aucun des deux comptes Daily.co n'a de carte bancaire
+  enregistrée. Sans CB, la création de salle via l'API fonctionne, mais le *join* échoue avec
+  « Missing payment method ». Action requise : ajouter une CB sur **les deux** comptes (DEV et
+  PROD) dans Daily Dashboard → Billing (15$ de crédit offert à l'ajout) avant que la feature
+  soit utilisable de bout en bout, y compris en PROD.
+
 ### Client Supabase
 ```typescript
 // Côté client (composants "use client")
@@ -408,6 +440,34 @@ route API `force-dynamic` à chaque affichage. Exemple : `ProchainCreneauBadge.t
 - **Piste V2/V3 notée mais non retenue pour le lancement** : facturation à l'usage
   (Stripe metered billing) au-delà de 15 clients, à envisager une fois du volume réel
 
+### Visioconférence — Daily.co (août 2026)
+- `types_seances.mode` : `'presentiel'` | `'visio'` (défaut `presentiel`), migration
+  `supabase/migrations/20260810180000_types_seances_mode.sql`
+- **`seances.lien_teleconsultation`** : lien de la salle pour la séance — **activement lu et
+  écrit** (plus un champ legacy / dead code). Rempli à la confirmation de paiement, régénérable
+  depuis l'agenda.
+- **`sophrologues.lien_teleconsultation`** : fallback profil si `createDailyRoom()` échoue —
+  plus un champ orphelin non branché (éditable dans Paramètres → profil).
+- Génération : `createDailyRoom()` dans `src/lib/visio/daily.ts`, appelée depuis le webhook
+  `payment_intent.succeeded` dans un `try/catch` isolé — **jamais bloquante** pour la
+  confirmation du paiement. Régénération manuelle : `POST /api/seances/[id]/regenerer-visio`.
+- Diffusion du lien : email confirmation client + sophrologue, rappel J-1 (`/api/cron/rappels-j1`),
+  dashboard agenda (badge « Visio » + boutons Copier / Régénérer dans `SeancesCalendar`).
+- Tunnel réservation : rappel anti-spam à l'étape 5 (confirmation finale), **uniquement** pour
+  les séances `mode === 'visio'`.
+- Infra / TODO CB : voir section 5 (Daily.co) — sans moyen de paiement sur les comptes Daily,
+  le *join* échoue malgré une création de salle réussie.
+
+### Reset mot de passe — callback PKCE (fix août 2026)
+- Symptôme : lien email de reset → `/auth/callback` → redirection incorrecte vers `/dashboard`
+  au lieu de `/reinitialiser-mot-de-passe`.
+- Cause : le callback ne routait que sur `type=recovery`, paramètre **jamais posé** par
+  `resetPasswordForEmail()` sur l'URL de retour PKCE.
+- Fix : `redirectTo` de `resetPasswordForEmail()` inclut `next=/reinitialiser-mot-de-passe`
+  (`src/app/mot-de-passe-oublie/page.tsx`) ; le callback (`src/app/auth/callback/route.ts`)
+  lit `next` en priorité, conserve `type === "recovery"` en fallback.
+- Déployé et validé en DEV et PROD.
+
 ### Horaires — source unique `sophrologues.horaires` (27 juillet 2026)
 **Historique du bug** : jusqu'au 27/07, l'onboarding écrivait dans `disponibilites` (créneaux
 bookables) tandis que l'onglet Paramètres → Cabinet/vitrine écrivait dans `horaires` (JSONB,
@@ -493,7 +553,7 @@ Pour supprimer un patient/client (pas un compte sophrologue), utiliser la RPC
 ### n8n — workflows déployés sur Hetzner (`automation.kls3-dev.com`)
 | Workflow | Déclencheur | Action |
 |---|---|---|
-| `rappels-j1` | Cron 17h UTC | Emails rappel J-1 aux clients |
+| `rappels-j1` | Cron 17h UTC | Emails rappel J-1 aux clients (inclut lien visio si `mode === 'visio'`) |
 | `post-seance` | Cron 20h UTC | Emails post-séance + lien avis (Pro+) |
 | `cleanup-seances` | Cron /15min | Supprime séances en_attente expirées |
 | `génération-articles` | Manuel | Génère articles blog via Claude API + WordPress |
@@ -668,6 +728,45 @@ correspondantes (3, 4, 5, 6) ; résumé chronologique et décisions produit ci-d
   de conformité comptable stricte
 - État de l'abonnement Stripe de Sophie Marchand (compte de test) à valider si réutilisé pour de
   futurs tests — nombreuses manipulations manuelles effectuées pendant cette session
+
+✅ **Clos après cette session (août 2026)** : nettoyage des Redirect URLs Supabase DEV qui
+pointaient à tort vers `app.calymia.com` — Site URL et Redirect URLs du projet DEV
+`cdfltpuzlkyoymjgdhcr` corrigés vers `calymia.vercel.app` (voir section 12).
+
+---
+
+## 12. Session août 2026 — synthèse
+
+Session centrée sur la visioconférence (Daily.co), corrections auth / UI, et durcissement du
+processus de déploiement PROD. Détail technique déjà intégré dans les sections 2–6.
+
+### Livré et déployé en PROD
+- **Visioconférence** : `types_seances.mode`, génération de salles Daily.co au paiement,
+  diffusion emails / rappel J-1 / agenda, fallback `sophrologues.lien_teleconsultation`,
+  endpoint `POST /api/seances/[id]/regenerer-visio` (voir section 6)
+- **Fix reset mot de passe** : `next=/reinitialiser-mot-de-passe` dans le `redirectTo` PKCE,
+  lu en priorité par `/auth/callback` (voir section 6)
+- Migration SQL `types_seances.mode` appliquée sur PROD **après** un premier deploy code-only
+  (incident documenté section 2)
+
+### Livré sur `develop` uniquement (pas encore mergé `main` / PROD)
+- **Fix alignement colonnes** « Historique des séances » (`src/app/(auth)/patient/page.tsx`) :
+  grids par ligne indépendants remplacés par un grid CSS partagé (`display: contents`),
+  padding par cellule (plus de `gap-x-4` créant des bandes blanches), titre « Reçu » centré
+  sur la dernière colonne du header
+
+### Infra / ops clos
+- Redirect URLs Supabase DEV : Site URL + Redirect URLs du projet `cdfltpuzlkyoymjgdhcr`
+  corrigés vers `calymia.vercel.app` (plus d'entrées erronées `app.calymia.com`)
+
+### TODO opérationnel ouvert
+- Ajouter une CB sur les comptes Daily.co `calymia-dev` **et** `calymia-prod` (Dashboard →
+  Billing) — sans cela le *join* de salle échoue (« Missing payment method ») alors que la
+  création API réussit (voir section 5)
+
+### Leçon déploiement
+- Ne jamais pousser sur `main` du code qui dépend d'une migration SQL tant que cette migration
+  n'est pas appliquée et vérifiée sur la base PROD (checklist section 2, étape 4).
 
 ---
 
