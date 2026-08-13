@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       certifications,
       syndicats,
       siret,
+      afficher_email,
+      afficher_telephone,
     } = body as {
       userId?: string;
       prenom?: string;
@@ -58,6 +60,8 @@ export async function POST(request: Request) {
       certifications?: string[];
       syndicats?: string[];
       siret?: string;
+      afficher_email?: boolean;
+      afficher_telephone?: boolean;
     };
 
     console.log("[sophrologue/update] userId reçu :", userId);
@@ -97,6 +101,8 @@ export async function POST(request: Request) {
       ...(certifications !== undefined && { certifications }),
       ...(syndicats !== undefined && { syndicats }),
       ...(siret !== undefined && { siret }),
+      ...(typeof afficher_email === "boolean" && { afficher_email }),
+      ...(typeof afficher_telephone === "boolean" && { afficher_telephone }),
     };
 
     console.log("[sophrologue/update] Colonnes mises à jour :", updatePayload);

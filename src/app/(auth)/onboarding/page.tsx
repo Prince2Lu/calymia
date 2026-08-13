@@ -149,6 +149,7 @@ export default function OnboardingPage() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [sophrologueId, setSophrologueId] = useState<string | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState("");
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [loading, setLoading] = useState(false);
@@ -180,7 +181,10 @@ export default function OnboardingPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user || cancelled) return;
-      if (!cancelled) setAuthUserId(user.id);
+      if (!cancelled) {
+        setAuthUserId(user.id);
+        setAuthEmail(user.email ?? "");
+      }
       const { data } = await supabase
         .from("sophrologues")
         .select("id, prenom, nom, slug, ville, departement")
@@ -460,6 +464,8 @@ export default function OnboardingPage() {
         horaires_texte: state.vitrine.horaires_texte,
         infos_pratiques: state.vitrine.infos_pratiques,
         modes_paiement: state.vitrine.modes_paiement,
+        afficher_email: state.vitrine.afficherEmail,
+        afficher_telephone: state.vitrine.afficherTelephone,
         formations: state.vitrine.formations,
         certifications: state.vitrine.certifications,
         syndicats: state.vitrine.syndicats,
@@ -1113,6 +1119,8 @@ export default function OnboardingPage() {
                     onChange={vitrineOnChange}
                     supabase={supabase}
                     userId={authUserId}
+                    email={authEmail}
+                    telephone={state.phone}
                     maxPhotos={maxPhotos}
                     onError={(msg) => setError(msg)}
                   />

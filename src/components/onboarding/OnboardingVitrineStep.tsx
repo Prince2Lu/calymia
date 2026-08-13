@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Mail, Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VitrineTagListBlock } from "@/components/cabinet-vitrine/VitrineTagListBlock";
@@ -28,6 +28,8 @@ export interface OnboardingVitrineData {
   horaires_texte: string;
   infos_pratiques: string;
   modes_paiement: string[];
+  afficherEmail: boolean;
+  afficherTelephone: boolean;
   formations: string[];
   certifications: string[];
   syndicats: string[];
@@ -38,6 +40,8 @@ export interface OnboardingVitrineStepProps {
   onChange: (field: keyof OnboardingVitrineData, value: unknown) => void;
   supabase: SupabaseClient;
   userId: string;
+  email: string;
+  telephone: string;
   /** Limite photos vitrine selon le plan (défaut : constante storage) */
   maxPhotos?: number;
   /** Erreurs courtes (upload, etc.) — optionnel */
@@ -49,6 +53,8 @@ export function OnboardingVitrineStep({
   onChange,
   supabase,
   userId,
+  email,
+  telephone,
   maxPhotos = CABINET_MAX_PHOTOS,
   onError,
 }: OnboardingVitrineStepProps) {
@@ -257,6 +263,67 @@ export function OnboardingVitrineStep({
 
       <hr className="border-slate-200" />
 
+      {/* D2 — Coordonnées publiques */}
+      <section className="space-y-3">
+        <h3 className="text-base font-semibold text-slate-800">
+          Coordonnées publiques
+        </h3>
+        <div className="space-y-3">
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={data.afficherEmail}
+              onChange={(e) => onChange("afficherEmail", e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-[#426F59] focus:ring-[#426F59]"
+            />
+            <Mail className="h-4 w-4 shrink-0 text-[#426F59]" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-slate-800">
+                Afficher mon email
+              </span>
+              <span className="block text-xs text-slate-500">
+                {email.trim() || "—"}
+              </span>
+            </span>
+          </label>
+          <label
+            className={`flex items-center gap-3 rounded-lg border border-slate-200 p-3 ${
+              telephone.trim()
+                ? "cursor-pointer transition-colors hover:bg-slate-50"
+                : "cursor-not-allowed opacity-60"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(telephone.trim()) && data.afficherTelephone}
+              disabled={!telephone.trim()}
+              onChange={(e) => {
+                if (!telephone.trim()) return;
+                onChange("afficherTelephone", e.target.checked);
+              }}
+              className="h-4 w-4 rounded border-slate-300 text-[#426F59] focus:ring-[#426F59] disabled:cursor-not-allowed"
+            />
+            <Phone className="h-4 w-4 shrink-0 text-[#426F59]" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-slate-800">
+                Afficher mon téléphone
+              </span>
+              <span className="block text-xs text-slate-500">
+                {telephone.trim()
+                  ? telephone.trim()
+                  : "Renseignez d'abord votre téléphone dans Paramètres → Mon profil"}
+              </span>
+            </span>
+          </label>
+        </div>
+        <p className="text-xs text-slate-500">
+          ℹ️ L&apos;email et le téléphone sont affichés sur votre page publique
+          uniquement si vous cochez les cases correspondantes.
+        </p>
+      </section>
+
+      <hr className="border-slate-200" />
+
       {/* E — Tags */}
       <section className="space-y-8">
         <h3 className="text-base font-semibold text-slate-800">
@@ -301,6 +368,8 @@ export function createInitialVitrineData(): OnboardingVitrineData {
     horaires_texte: "",
     infos_pratiques: "",
     modes_paiement: [],
+    afficherEmail: false,
+    afficherTelephone: false,
     formations: [],
     certifications: [],
     syndicats: [],

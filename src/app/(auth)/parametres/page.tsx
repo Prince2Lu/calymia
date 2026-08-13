@@ -53,10 +53,12 @@ type Sophrologue = {
   formations: string[] | null;
   certifications: string[] | null;
   syndicats: string[] | null;
+  afficher_email: boolean;
+  afficher_telephone: boolean;
 };
 
 const SOPHROLOGUE_SELECT =
-  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, siret, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats";
+  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, siret, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats, afficher_email, afficher_telephone";
 
 type ModeSeance = "presentiel" | "visio";
 

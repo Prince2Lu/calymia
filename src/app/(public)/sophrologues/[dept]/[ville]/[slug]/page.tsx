@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { CreditCard, Info, MapPin } from "lucide-react";
+import { CreditCard, Info, Mail, MapPin, Phone } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
 import { SophrologueRppsLine } from "@/components/public/SophrologueRppsLine";
 import { ProchainCreneauBadge } from "@/components/public/ProchainCreneauBadge";
@@ -61,6 +61,10 @@ type SophrologuePublicRow = {
   syndicats: string[] | null;
   specialites: string[] | null;
   numero_rpps: string | null;
+  email: string | null;
+  telephone: string | null;
+  afficher_email: boolean;
+  afficher_telephone: boolean;
   types_seances: TypeSeanceRow[] | null;
 };
 
@@ -87,6 +91,10 @@ const PUBLIC_SELECT = `
   syndicats,
   specialites,
   numero_rpps,
+  email,
+  telephone,
+  afficher_email,
+  afficher_telephone,
   types_seances ( id, nom, duree_minutes, tarif, actif )
 `;
 
@@ -287,7 +295,18 @@ export default async function SophrologueProfilPage({
   const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
   const numeroRpps = sophrologue.numero_rpps?.trim() ?? "";
   const hasRpps = numeroRpps.length > 0;
-  const showInfos = hasAdresse || hasInfosPratiques || modes.length > 0;
+  const publicEmail = sophrologue.email?.trim() ?? "";
+  const publicTelephone = sophrologue.telephone?.trim() ?? "";
+  const showEmail = Boolean(sophrologue.afficher_email && publicEmail);
+  const showTelephone = Boolean(
+    sophrologue.afficher_telephone && publicTelephone,
+  );
+  const showInfos =
+    hasAdresse ||
+    hasInfosPratiques ||
+    modes.length > 0 ||
+    showEmail ||
+    showTelephone;
 
   const showHorairesBloc =
     hasHorairesContenu(horaires) ||
@@ -337,6 +356,8 @@ export default async function SophrologueProfilPage({
     ...(openingSpecs.length > 0
       ? { openingHoursSpecification: openingSpecs }
       : {}),
+    ...(showEmail ? { email: publicEmail } : {}),
+    ...(showTelephone ? { telephone: publicTelephone } : {}),
   };
 
   const sectionMeta = [
@@ -480,6 +501,34 @@ export default async function SophrologueProfilPage({
                         : ""}
                       {city}
                     </p>
+                  </div>
+                )}
+                {showEmail && (
+                  <div className="flex gap-3 text-sm text-slate-700">
+                    <Mail
+                      className="mt-0.5 h-5 w-5 shrink-0 text-[#426F59]"
+                      aria-hidden
+                    />
+                    <a
+                      href={`mailto:${publicEmail}`}
+                      className="text-[#426F59] hover:underline"
+                    >
+                      {publicEmail}
+                    </a>
+                  </div>
+                )}
+                {showTelephone && (
+                  <div className="flex gap-3 text-sm text-slate-700">
+                    <Phone
+                      className="mt-0.5 h-5 w-5 shrink-0 text-[#426F59]"
+                      aria-hidden
+                    />
+                    <a
+                      href={`tel:${publicTelephone.replace(/\s/g, "")}`}
+                      className="text-[#426F59] hover:underline"
+                    >
+                      {publicTelephone}
+                    </a>
                   </div>
                 )}
                 {hasInfosPratiques && (

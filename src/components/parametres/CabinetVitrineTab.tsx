@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Loader2, Save, X } from "lucide-react";
+import { Loader2, Mail, Phone, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VitrineTagListBlock } from "@/components/cabinet-vitrine/VitrineTagListBlock";
@@ -436,6 +436,129 @@ function ModesPaiementSection({
   );
 }
 
+function CoordonneesPubliquesSection({
+  userId,
+  email,
+  telephone,
+  initialAfficherEmail,
+  initialAfficherTelephone,
+  showToast,
+  refetch,
+}: {
+  userId: string;
+  email: string | null;
+  telephone: string | null;
+  initialAfficherEmail: boolean;
+  initialAfficherTelephone: boolean;
+  showToast: (msg: string, ok?: boolean) => void;
+  refetch: () => Promise<void>;
+}) {
+  const [afficherEmail, setAfficherEmail] = useState(initialAfficherEmail);
+  const [afficherTelephone, setAfficherTelephone] = useState(
+    initialAfficherTelephone,
+  );
+  const [saving, setSaving] = useState(false);
+
+  const emailTrim = email?.trim() ?? "";
+  const telephoneTrim = telephone?.trim() ?? "";
+  const hasTelephone = telephoneTrim.length > 0;
+
+  useEffect(() => {
+    setAfficherEmail(initialAfficherEmail);
+    setAfficherTelephone(initialAfficherTelephone);
+  }, [initialAfficherEmail, initialAfficherTelephone]);
+
+  const toggle = async (
+    field: "afficher_email" | "afficher_telephone",
+    next: boolean,
+  ) => {
+    if (field === "afficher_telephone" && !hasTelephone) return;
+
+    const snapshotEmail = afficherEmail;
+    const snapshotTel = afficherTelephone;
+    if (field === "afficher_email") setAfficherEmail(next);
+    else setAfficherTelephone(next);
+
+    setSaving(true);
+    try {
+      const r = await patchSophrologue(userId, { [field]: next });
+      if (!r.ok) {
+        showToast(r.error ?? "Erreur lors de la sauvegarde", false);
+        setAfficherEmail(snapshotEmail);
+        setAfficherTelephone(snapshotTel);
+        return;
+      }
+      await refetch();
+      showToast("Modifications enregistrées ✓");
+    } catch {
+      showToast("Erreur lors de la sauvegarde", false);
+      setAfficherEmail(snapshotEmail);
+      setAfficherTelephone(snapshotTel);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h2 className="text-lg font-semibold text-[#1E3A5F]">Coordonnées publiques</h2>
+      <div className="space-y-3">
+        <label
+          className={`flex cursor-pointer items-center gap-3 rounded-lg border border-[#d1d5db] p-3 transition-colors hover:bg-slate-50 ${saving ? "opacity-60 pointer-events-none" : ""}`}
+        >
+          <input
+            type="checkbox"
+            checked={afficherEmail}
+            onChange={(e) => void toggle("afficher_email", e.target.checked)}
+            className="h-4 w-4 rounded border-[#d1d5db] text-[#426F59] focus:ring-[#426F59]"
+          />
+          <Mail className="h-4 w-4 shrink-0 text-[#426F59]" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-slate-800">
+              Afficher mon email
+            </span>
+            <span className="block text-xs text-slate-500">
+              {emailTrim || "—"}
+            </span>
+          </span>
+        </label>
+        <label
+          className={`flex items-center gap-3 rounded-lg border border-[#d1d5db] p-3 transition-colors ${
+            hasTelephone
+              ? `cursor-pointer hover:bg-slate-50 ${saving ? "opacity-60 pointer-events-none" : ""}`
+              : "cursor-not-allowed opacity-60"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={hasTelephone && afficherTelephone}
+            disabled={!hasTelephone}
+            onChange={(e) =>
+              void toggle("afficher_telephone", e.target.checked)
+            }
+            className="h-4 w-4 rounded border-[#d1d5db] text-[#426F59] focus:ring-[#426F59] disabled:cursor-not-allowed"
+          />
+          <Phone className="h-4 w-4 shrink-0 text-[#426F59]" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-slate-800">
+              Afficher mon téléphone
+            </span>
+            <span className="block text-xs text-slate-500">
+              {hasTelephone
+                ? telephoneTrim
+                : "Renseignez d'abord votre téléphone dans Paramètres → Mon profil"}
+            </span>
+          </span>
+        </label>
+      </div>
+      <p className="text-xs text-slate-500">
+        ℹ️ L&apos;email et le téléphone sont affichés sur votre page publique
+        uniquement si vous cochez les cases correspondantes.
+      </p>
+    </div>
+  );
+}
+
 function FormationsCertificationsSection({
   userId,
   initialFormations,
@@ -558,6 +681,10 @@ function FormationsCertificationsSection({
 
 export type CabinetSophrologueFields = {
   user_id: string;
+  email: string | null;
+  telephone: string | null;
+  afficher_email: boolean;
+  afficher_telephone: boolean;
   photos_cabinet: string[] | null;
   horaires: unknown;
   horaires_texte: string | null;
@@ -608,6 +735,15 @@ export function CabinetVitrineTab({
       <ModesPaiementSection
         userId={sophrologue.user_id}
         initial={sophrologue.modes_paiement}
+        showToast={showToast}
+        refetch={refetchSophrologue}
+      />
+      <CoordonneesPubliquesSection
+        userId={sophrologue.user_id}
+        email={sophrologue.email}
+        telephone={sophrologue.telephone}
+        initialAfficherEmail={sophrologue.afficher_email ?? false}
+        initialAfficherTelephone={sophrologue.afficher_telephone ?? false}
         showToast={showToast}
         refetch={refetchSophrologue}
       />
