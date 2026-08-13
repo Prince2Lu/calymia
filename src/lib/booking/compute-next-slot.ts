@@ -6,67 +6,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   dispoByJsDayFromHoraires,
   normalizeHoraires,
-  type DispoWindow,
 } from "@/lib/horaires";
 import {
   addParisCalendarDays,
-  dispoWindowParisDay,
   getParisJsDayOfWeek,
   startOfParisCalendarDay,
 } from "@/lib/timezone";
-
-type BookedInterval = { debut: Date; fin: Date };
-
-function isSlotBooked(
-  slotStart: Date,
-  bookedIntervals: BookedInterval[],
-  slotDurationMs: number,
-): boolean {
-  const slotEnd = new Date(slotStart.getTime() + slotDurationMs);
-  return bookedIntervals.some(
-    ({ debut, fin }) => debut < slotEnd && fin > slotStart,
-  );
-}
-
-const SLOT_GRID_STEP_MS = 15 * 60 * 1000;
-
-function buildSlotsFromDispo(
-  day: Date,
-  dispos: DispoWindow[],
-  bookedIntervals: BookedInterval[],
-  delaiMinHeures: number,
-  slotDurationMs: number,
-): Date[] {
-  const allSlots: Date[] = [];
-  const now = new Date();
-  const cutoff = new Date(now.getTime() + delaiMinHeures * 60 * 60 * 1000);
-
-  for (const dispo of dispos) {
-    const { start, end } = dispoWindowParisDay(day, dispo);
-    for (
-      let t = start.getTime();
-      t + slotDurationMs <= end.getTime();
-      t += SLOT_GRID_STEP_MS
-    ) {
-      const slot = new Date(t);
-      if (slot <= cutoff) continue;
-      if (isSlotBooked(slot, bookedIntervals, slotDurationMs)) {
-        continue;
-      }
-      allSlots.push(slot);
-    }
-  }
-
-  const seen = new Set<number>();
-  return allSlots
-    .filter((s) => {
-      const k = s.getTime();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    })
-    .sort((a, b) => a.getTime() - b.getTime());
-}
+import {
+  SLOT_GRID_STEP_MS,
+  buildSlotsFromDispo,
+  type BookedInterval,
+} from "@/lib/booking/slots";
 
 /**
  * Retourne l’ISO du premier créneau libre dans les 28 prochains jours, ou null.
