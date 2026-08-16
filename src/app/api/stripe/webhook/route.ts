@@ -11,6 +11,7 @@ import {
 import { sendEmail } from '@/lib/emails/send'
 import { formatParisTime } from '@/lib/timezone'
 import { createDailyRoom } from '@/lib/visio/daily'
+import { upsertSeanceEvent } from '@/lib/google/calendar-sync'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -155,6 +156,15 @@ export async function POST(request: NextRequest) {
         }
       } catch (visioOuterErr) {
         console.error('[Webhook] Erreur inattendue bloc visio:', visioOuterErr)
+      }
+
+      // Google Agenda (isolé — ne doit jamais faire échouer le webhook)
+      try {
+        if (seance_id) {
+          await upsertSeanceEvent(String(seance_id))
+        }
+      } catch (googleErr) {
+        console.error('[Webhook] Erreur inattendue bloc Google Agenda:', googleErr)
       }
 
       // Génération automatique de la facture PDF (appel direct, sans HTTP)

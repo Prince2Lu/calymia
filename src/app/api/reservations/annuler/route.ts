@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { annulationClient, annulationSophrologue } from "@/lib/emails/templates";
 import { sendEmail } from "@/lib/emails/send";
 import { formatParisTime } from "@/lib/timezone";
+import { deleteSeanceEvent } from "@/lib/google/calendar-sync";
 
 // ─── Clients Supabase ─────────────────────────────────────────────────────────
 
@@ -274,6 +275,12 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[annuler] Séance ${seance_id} successfully marked 'annulee'`);
+
+    try {
+      await deleteSeanceEvent(String(seance_id));
+    } catch (googleErr) {
+      console.error("[annuler] Erreur inattendue bloc Google Agenda:", googleErr);
+    }
 
     // ── 7) Log dans la table communications (best-effort) ────────────────────
     try {

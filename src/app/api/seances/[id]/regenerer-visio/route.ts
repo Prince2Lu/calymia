@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createDailyRoom } from "@/lib/visio/daily";
+import { upsertSeanceEvent } from "@/lib/google/calendar-sync";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -126,6 +127,12 @@ export async function POST(
         { error: "Impossible d’enregistrer le lien visio." },
         { status: 500 },
       );
+    }
+
+    try {
+      await upsertSeanceEvent(seanceId);
+    } catch (googleErr) {
+      console.error("[regenerer-visio] Google Agenda:", googleErr);
     }
 
     return NextResponse.json({ lien_teleconsultation: url });

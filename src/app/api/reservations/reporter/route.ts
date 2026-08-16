@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { upsertSeanceEvent } from "@/lib/google/calendar-sync";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -129,6 +130,12 @@ export async function POST(request: NextRequest) {
         { error: "Impossible de reporter la séance. Merci de réessayer." },
         { status: 500 },
       );
+    }
+
+    try {
+      await upsertSeanceEvent(String(seance_id));
+    } catch (googleErr) {
+      console.error("Reporter - Google Agenda:", googleErr);
     }
 
     return NextResponse.json({ success: true });
