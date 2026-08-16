@@ -97,7 +97,7 @@ export async function computeProfileScore(
         "Apparaissent sur votre page publique et permettent la réservation en ligne",
       impact: "Conversion",
       completed: hasHoraires,
-      href: "/parametres?tab=vitrine",
+      href: "/parametres?tab=cabinet",
       // Fusion ex-critères « disponibilites » + « horaires » → 20 pts pour rester /100
       points: 20,
     },
@@ -108,7 +108,7 @@ export async function computeProfileScore(
       sublabel: "Augmentent le taux de réservation",
       impact: "Conversion",
       completed: isNonEmptyArray(sophrologue.photos_cabinet),
-      href: "/parametres?tab=vitrine",
+      href: "/parametres?tab=cabinet",
     },
     {
       key: "formations",
@@ -117,7 +117,7 @@ export async function computeProfileScore(
       sublabel: "Renforcent la confiance des clients",
       impact: "Confiance",
       completed: isNonEmptyArray(sophrologue.formations),
-      href: "/parametres?tab=vitrine",
+      href: "/parametres?tab=cabinet",
     },
     {
       key: "rpps",
@@ -135,7 +135,7 @@ export async function computeProfileScore(
       sublabel: "Renforcent la confiance des clients",
       impact: "Confiance",
       completed: isNonEmptyArray(sophrologue.syndicats),
-      href: "/parametres?tab=vitrine",
+      href: "/parametres?tab=cabinet",
     },
   ];
 

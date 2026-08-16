@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { uploadAvatarWithSession } from "@/lib/supabase/upload-avatar-client";
 import { CabinetVitrineTab } from "@/components/parametres/CabinetVitrineTab";
+import { IntegrationsTab } from "@/components/parametres/IntegrationsTab";
 import {
   Loader2,
   Save,
@@ -20,6 +22,7 @@ import {
   ExternalLink,
   Copy,
   Check,
+  Link2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -88,21 +91,32 @@ const DELAIS = [
 // ─── Helper toast ─────────────────────────────────────────────────────────────
 
 function useToast() {
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
-  const show = (msg: string, ok = true) => {
+  const [toast, setToast] = useState<{
+    msg: string;
+    ok: boolean | "neutral";
+  } | null>(null);
+  const show = useCallback((msg: string, ok: boolean | "neutral" = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3500);
-  };
+  }, []);
   return { toast, show };
 }
 
-function Toast({ toast }: { toast: { msg: string; ok: boolean } | null }) {
+function Toast({
+  toast,
+}: {
+  toast: { msg: string; ok: boolean | "neutral" } | null;
+}) {
   if (!toast) return null;
+  const tone =
+    toast.ok === "neutral"
+      ? "bg-slate-700 text-white"
+      : toast.ok
+        ? "bg-[#27AE60] text-white"
+        : "bg-red-600 text-white";
   return (
     <div
-      className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium shadow-lg ${
-        toast.ok ? "bg-[#27AE60] text-white" : "bg-red-600 text-white"
-      }`}
+      className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium shadow-lg ${tone}`}
     >
       {toast.msg}
     </div>
@@ -111,7 +125,22 @@ function Toast({ toast }: { toast: { msg: string; ok: boolean } | null }) {
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
-type Tab = "profil" | "seances" | "disponibilites" | "cabinet";
+type Tab =
+  | "profil"
+  | "seances"
+  | "disponibilites"
+  | "cabinet"
+  | "integrations";
+
+function isTab(value: string | null): value is Tab {
+  return (
+    value === "profil" ||
+    value === "seances" ||
+    value === "disponibilites" ||
+    value === "cabinet" ||
+    value === "integrations"
+  );
+}
 
 function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   const tabs: { key: Tab; label: string; icon: React.ReactNode; shortLabel?: string }[] = [
@@ -119,6 +148,7 @@ function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void 
     { key: "seances", label: "Types de séances", shortLabel: "Séances", icon: <Clock className="h-4 w-4" /> },
     { key: "disponibilites", label: "Disponibilités", shortLabel: "Dispo.", icon: <CalendarDays className="h-4 w-4" /> },
     { key: "cabinet", label: "Cabinet / vitrine", shortLabel: "Vitrine", icon: <Images className="h-4 w-4" /> },
+    { key: "integrations", label: "Intégrations", shortLabel: "Intégr.", icon: <Link2 className="h-4 w-4" /> },
   ];
   return (
     <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 sm:flex-nowrap">
@@ -892,8 +922,13 @@ function TabDisponibilites({
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-export default function ParametresPage() {
-  const [tab, setTab] = useState<Tab>("profil");
+function ParametresPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>(() => {
+    const raw = searchParams.get("tab");
+    return isTab(raw) ? raw : "profil";
+  });
   const [sophrologue, setSophrologue] = useState<Sophrologue | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast, show: showToast } = useToast();
@@ -939,6 +974,24 @@ export default function ParametresPage() {
     init();
     return () => { cancelled = true; };
   }, [supabase]);
+
+  useEffect(() => {
+    const google = searchParams.get("google");
+    if (google !== "connected" && google !== "error" && google !== "denied") {
+      return;
+    }
+    if (google === "connected") {
+      showToast("Google Agenda connecté.");
+    } else if (google === "error") {
+      showToast("La connexion à Google Agenda a échoué, réessayez.", false);
+    } else {
+      showToast("Connexion annulée.", "neutral");
+    }
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("google");
+    const qs = params.toString();
+    router.replace(qs ? `/parametres?${qs}` : "/parametres", { scroll: false });
+  }, [searchParams, router, showToast]);
 
   if (loading) {
     return (
@@ -990,10 +1043,27 @@ export default function ParametresPage() {
               refetchSophrologue={refetchSophrologue}
             />
           )}
+          {tab === "integrations" && (
+            <IntegrationsTab showToast={showToast} />
+          )}
         </div>
       </div>
 
       <Toast toast={toast} />
     </main>
+  );
+}
+
+export default function ParametresPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-slate-50">
+          <Loader2 className="h-8 w-8 animate-spin text-[#2E75B6]" />
+        </main>
+      }
+    >
+      <ParametresPageInner />
+    </Suspense>
   );
 }

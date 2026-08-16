@@ -14,6 +14,7 @@ export interface PlanFeatures {
   emailRappelPersonnalise: boolean;
   emailPostSeance: boolean;
   smsRappel: boolean;
+  googleCalendar: boolean;
   maxPhotos: number;
 }
 
@@ -26,6 +27,7 @@ const PLAN_FEATURES: Record<Plan, PlanFeatures> = {
     emailRappelPersonnalise: false,
     emailPostSeance: false,
     smsRappel: false,
+    googleCalendar: false,
     maxPhotos: 3,
   },
   professionnel: {
@@ -36,6 +38,7 @@ const PLAN_FEATURES: Record<Plan, PlanFeatures> = {
     emailRappelPersonnalise: true,
     emailPostSeance: true,
     smsRappel: true,
+    googleCalendar: true,
     maxPhotos: 5,
   },
   cabinet: {
@@ -46,6 +49,7 @@ const PLAN_FEATURES: Record<Plan, PlanFeatures> = {
     emailRappelPersonnalise: true,
     emailPostSeance: true,
     smsRappel: true,
+    googleCalendar: true,
     maxPhotos: 10,
   },
 };
