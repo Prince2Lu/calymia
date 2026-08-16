@@ -180,6 +180,18 @@ export default function ReserverPage() {
       // 2) Séances déjà réservées dans les 4 prochaines semaines
       // Exclude temporary blocks that have already expired
       const nowIso = new Date().toISOString();
+      const googleBusyPromise = fetch(
+        `/api/public/google-busy?sophrologue_id=${encodeURIComponent(String(sid))}&timeMin=${encodeURIComponent(nowIso)}&timeMax=${encodeURIComponent(horizon)}`,
+      )
+        .then(async (res) => {
+          if (!res.ok) return [] as { start: string; end: string }[];
+          const json = (await res.json().catch(() => null)) as {
+            intervals?: { start: string; end: string }[];
+          } | null;
+          return json?.intervals ?? [];
+        })
+        .catch(() => [] as { start: string; end: string }[]);
+
       const { data: seances } = await supabase
         .from("seances_disponibilite")
         .select("debut_at, fin_at")
@@ -205,11 +217,18 @@ export default function ReserverPage() {
         normalizeHoraires(sophroData.horaires),
       );
 
-      // Construire les intervalles de séances réservées
+      // Construire les intervalles de séances réservées (+ FreeBusy Google, best-effort)
       const bookedIntervals: BookedInterval[] = (seances ?? []).map((s) => ({
         debut: new Date(s.debut_at),
         fin: new Date(s.fin_at),
       }));
+      const googleBusy = await googleBusyPromise;
+      for (const interval of googleBusy) {
+        const debut = new Date(interval.start);
+        const fin = new Date(interval.end);
+        if (Number.isNaN(debut.getTime()) || Number.isNaN(fin.getTime())) continue;
+        bookedIntervals.push({ debut, fin });
+      }
 
       const delaiMinHeures = params_cabinet?.delai_min_reservation_heures ?? 24;
 

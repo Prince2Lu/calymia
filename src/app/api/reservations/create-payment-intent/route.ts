@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAuthUserIdByEmail } from "@/lib/supabase/fetch-auth-user-id-by-email";
 import { checkEtNotifierDepassementLimite } from "@/lib/notifications/limite-clients-alerte";
+import { assertPrimaryCalendarSlotAvailable } from "@/lib/google/freebusy";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-02-25.clover",
@@ -61,13 +62,15 @@ export async function POST(request: Request) {
     // ── 0) Vérifier la séance + type — montant = tarif BDD (pas le client) ─────
     const { data: seanceRow, error: seanceReadErr } = await supabase
       .from("seances")
-      .select("id, sophrologue_id, type_seance_id, statut")
+      .select("id, sophrologue_id, type_seance_id, statut, debut_at, fin_at")
       .eq("id", seance_id)
       .maybeSingle<{
         id: string;
         sophrologue_id: string | number;
         type_seance_id: string | number | null;
         statut: string;
+        debut_at: string;
+        fin_at: string;
       }>();
 
     if (seanceReadErr || !seanceRow) {
@@ -123,6 +126,23 @@ export async function POST(request: Request) {
     }
 
     const amountCents = Math.round(tarifEuros * 100);
+
+    const googleCheck = await assertPrimaryCalendarSlotAvailable(
+      String(sophrologue_id),
+      new Date(seanceRow.debut_at),
+      new Date(seanceRow.fin_at),
+    );
+    if (!googleCheck.ok) {
+      console.log(
+        "Create PI - FreeBusy Google:",
+        googleCheck.httpStatus,
+        seanceRow.debut_at,
+      );
+      return NextResponse.json(
+        { error: googleCheck.error },
+        { status: googleCheck.httpStatus },
+      );
+    }
 
     // ── 1) Récupérer ou créer le client (une fiche par couple email + sophrologue) ─
     // Même email chez un autre sophrologue ⇒ nouvelle ligne `patients` (multi-cabinet).

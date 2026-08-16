@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { assertPrimaryCalendarSlotAvailable } from "@/lib/google/freebusy";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,6 +60,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Ce créneau vient d'être réservé. Veuillez en choisir un autre." },
         { status: 409 },
+      );
+    }
+
+    const googleCheck = await assertPrimaryCalendarSlotAvailable(
+      String(sophrologue_id),
+      new Date(debut_at),
+      new Date(fin_at),
+    );
+    if (!googleCheck.ok) {
+      console.log(
+        "[bloquer-creneau] FreeBusy Google:",
+        googleCheck.httpStatus,
+        debut_at,
+      );
+      return NextResponse.json(
+        { error: googleCheck.error },
+        { status: googleCheck.httpStatus },
       );
     }
 

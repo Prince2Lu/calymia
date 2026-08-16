@@ -17,6 +17,7 @@ import {
   buildSlotsFromDispo,
   type BookedInterval,
 } from "@/lib/booking/slots";
+import { getBusyIntervals } from "@/lib/google/freebusy";
 
 /**
  * Retourne l’ISO du premier créneau libre dans les 28 prochains jours, ou null.
@@ -30,6 +31,11 @@ export async function computeNextAvailableSlotIso(
     29,
   ).toISOString();
   const nowIso = new Date().toISOString();
+  const googleBusyPromise = getBusyIntervals(
+    sophrologueId,
+    new Date(nowIso),
+    new Date(horizon),
+  );
 
   const [
     { data: sophro },
@@ -74,6 +80,14 @@ export async function computeNextAvailableSlotIso(
     debut: new Date(s.debut_at),
     fin: new Date(s.fin_at),
   }));
+
+  const googleBusy = await googleBusyPromise;
+  for (const interval of googleBusy) {
+    const debut = new Date(interval.start);
+    const fin = new Date(interval.end);
+    if (Number.isNaN(debut.getTime()) || Number.isNaN(fin.getTime())) continue;
+    bookedIntervals.push({ debut, fin });
+  }
 
   const delaiMinHeures = params?.delai_min_reservation_heures ?? 24;
 
