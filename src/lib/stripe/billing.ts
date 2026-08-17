@@ -5,10 +5,27 @@ export type BillingPlan = "essentiel" | "professionnel" | "cabinet";
 
 export const TRIAL_DURATION_DAYS = 14;
 
-export const PRICE_ID_TO_PLAN: Record<string, BillingPlan> = {
-  price_1TOZgOK1YZ6XSsrawCT8B1yp: "essentiel",
-  price_1TOZhQK1YZ6XSsraLCJ5MY8J: "professionnel",
-};
+let cachedPriceIdToPlan: Record<string, BillingPlan> | null = null;
+
+/**
+ * price_id Stripe → plan. Lu à l'appel (env DEV vs PROD), jamais au chargement du module.
+ * Les clés vides sont ignorées (cabinet peut rester non configuré).
+ */
+export function getPriceIdToPlan(): Record<string, BillingPlan> {
+  if (cachedPriceIdToPlan) return cachedPriceIdToPlan;
+
+  const map: Record<string, BillingPlan> = {};
+  const essentiel = process.env.STRIPE_PRICE_ESSENTIEL?.trim();
+  const professionnel = process.env.STRIPE_PRICE_PROFESSIONNEL?.trim();
+  const cabinet = process.env.STRIPE_PRICE_CABINET?.trim();
+
+  if (essentiel) map[essentiel] = "essentiel";
+  if (professionnel) map[professionnel] = "professionnel";
+  if (cabinet) map[cabinet] = "cabinet";
+
+  cachedPriceIdToPlan = map;
+  return cachedPriceIdToPlan;
+}
 
 type CreateStripeCustomerForSophrologueInput = {
   supabaseAdmin: SupabaseClient;

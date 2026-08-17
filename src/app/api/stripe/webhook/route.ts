@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { generateAndStoreFacture } from '@/lib/factures/generate'
-import { PRICE_ID_TO_PLAN } from '@/lib/stripe/billing'
+import { getPriceIdToPlan } from '@/lib/stripe/billing'
 import { stripe } from '@/lib/stripe'
 import {
   confirmationReservation,
@@ -299,7 +299,7 @@ export async function POST(request: NextRequest) {
           '[Webhook] checkout.session.completed (setup) ignoré: priceId ou customer manquant',
           { priceId, customerId, sessionId: session.id }
         )
-      } else if (!PRICE_ID_TO_PLAN[priceId]) {
+      } else if (!getPriceIdToPlan()[priceId]) {
         console.warn(
           '[Webhook] checkout.session.completed (setup) ignoré: price_id non mappé',
           { priceId }
@@ -365,7 +365,7 @@ export async function POST(request: NextRequest) {
                   : {}),
               })
 
-              const mappedPlan = PRICE_ID_TO_PLAN[priceId]
+              const mappedPlan = getPriceIdToPlan()[priceId]
               const { error: upgradeError } = await supabase
                 .from('sophrologues')
                 .update({
@@ -416,7 +416,7 @@ export async function POST(request: NextRequest) {
         { customerId, priceId }
       )
     } else {
-      const mappedPlan = PRICE_ID_TO_PLAN[priceId]
+      const mappedPlan = getPriceIdToPlan()[priceId]
 
       if (!mappedPlan) {
         console.warn(
