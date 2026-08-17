@@ -159,33 +159,22 @@ export async function queryGoogleFreeBusy(
   rangeEnd: Date,
   options?: { skipCache?: boolean },
 ): Promise<FreeBusyQueryResult> {
-  console.log("[freebusy][DIAG] entrée", { sophrologueId });
   if (
     Number.isNaN(rangeStart.getTime()) ||
     Number.isNaN(rangeEnd.getTime()) ||
     rangeStart >= rangeEnd
   ) {
-    console.log("[freebusy][DIAG] sortie", { status: "skipped" });
     return { status: "skipped" };
   }
 
   const loaded = await loadActiveConnection(sophrologueId);
-  if (loaded.status === "none") {
-    console.log("[freebusy][DIAG] sortie", { status: "skipped" });
-    return { status: "skipped" };
-  }
-  if (loaded.status === "error") {
-    console.log("[freebusy][DIAG] sortie", { status: "error" });
-    return { status: "error" };
-  }
+  if (loaded.status === "none") return { status: "skipped" };
+  if (loaded.status === "error") return { status: "error" };
 
   const key = cacheKey(sophrologueId, rangeStart, rangeEnd);
   if (!options?.skipCache) {
     const cached = cacheGet(key);
-    if (cached) {
-      console.log("[freebusy][DIAG] sortie", { status: "ok" });
-      return { status: "ok", intervals: cached };
-    }
+    if (cached) return { status: "ok", intervals: cached };
   }
 
   const controller = new AbortController();
@@ -216,7 +205,6 @@ export async function queryGoogleFreeBusy(
         res.status,
         body.slice(0, 300),
       );
-      console.log("[freebusy][DIAG] sortie", { status: "error" });
       return { status: "error" };
     }
 
@@ -232,21 +220,11 @@ export async function queryGoogleFreeBusy(
     const primary = data.calendars?.primary;
     if (primary?.errors && Array.isArray(primary.errors) && primary.errors.length > 0) {
       console.error("[google/freebusy] erreurs calendrier primary:", primary.errors);
-      console.log("[freebusy][DIAG] sortie", { status: "error" });
       return { status: "error" };
     }
 
     const intervals = parseBusyList(primary?.busy);
-    console.log("[freebusy][DIAG]", {
-      sophrologueId,
-      rangeStart: rangeStart.toISOString(),
-      rangeEnd: rangeEnd.toISOString(),
-      calendarIdConnexion: loaded.connection.calendar_id,
-      rawCalendars: JSON.stringify(data.calendars),
-      intervalsCount: intervals.length,
-    });
     cacheSet(key, intervals);
-    console.log("[freebusy][DIAG] sortie", { status: "ok" });
     return { status: "ok", intervals };
   } catch (err) {
     if (isAbortError(err)) {
@@ -254,7 +232,6 @@ export async function queryGoogleFreeBusy(
     } else {
       console.error("[google/freebusy]", err);
     }
-    console.log("[freebusy][DIAG] sortie", { status: "error" });
     return { status: "error" };
   } finally {
     clearTimeout(timer);

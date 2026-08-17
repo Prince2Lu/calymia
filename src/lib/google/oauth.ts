@@ -22,11 +22,12 @@ const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
 const CALYMIA_CALENDAR_SUMMARY = "Calymia";
 const CALYMIA_CALENDAR_TZ = "Europe/Paris";
 
-/** calendar.events + calendar.calendarlist + app.created (insert/delete du calendrier secondaire). */
+/** calendar.events + calendar.calendarlist + app.created (calendrier secondaire) + freebusy (primary, occupé/libre uniquement). */
 export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.calendarlist",
   "https://www.googleapis.com/auth/calendar.app.created",
+  "https://www.googleapis.com/auth/calendar.freebusy",
 ] as const;
 
 export type GoogleCalendarConnection = {
