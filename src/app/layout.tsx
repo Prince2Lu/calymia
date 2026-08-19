@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Playfair_Display } from "next/font/google";
+import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
+import { GoogleAnalytics } from "@/components/consent/GoogleAnalytics";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -30,6 +32,8 @@ export default function RootLayout({
         className={`${dmSans.className} bg-white text-slate-900 antialiased`}
       >
         {children}
+        <GoogleAnalytics />
+        <CookieConsentBanner />
       </body>
     </html>
   );
