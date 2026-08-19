@@ -423,7 +423,19 @@ function TabProfil({
         {field("Nom", "nom", { placeholder: "Dupont" })}
         {field("Email", "email", { type: "email", placeholder: "marie@exemple.fr" })}
         {field("Téléphone", "telephone", { type: "tel", placeholder: "06 12 34 56 78" })}
-        {field("Adresse cabinet", "adresse", { placeholder: "12 rue de la Paix" })}
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-600">
+            Adresse (numéro et rue uniquement)
+          </label>
+          <Input
+            placeholder="Ex : 12 rue de la Paix"
+            value={form.adresse}
+            onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+          />
+          <p className="text-xs text-slate-500">
+            La ville et le code postal se renseignent séparément ci-dessous.
+          </p>
+        </div>
         {field("Ville", "ville", { placeholder: "Paris" })}
         {field("Code postal", "code_postal", { placeholder: "75001" })}
         {field("N° RPPS", "numero_rpps", { placeholder: "10 chiffres" })}

@@ -826,15 +826,18 @@ export default function OnboardingPage() {
               <section className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-800">
-                    Adresse complète
+                    Adresse (numéro et rue uniquement)
                   </label>
                   <Input
                     value={state.address}
                     onChange={(e) =>
                       setState((prev) => ({ ...prev, address: e.target.value }))
                     }
-                    placeholder="Numéro, rue, complément..."
+                    placeholder="Ex : 12 rue de la Paix"
                   />
+                  <p className="text-xs text-slate-500">
+                    La ville et le code postal se renseignent séparément ci-dessous.
+                  </p>
                 </div>
                 {state.city.trim() !== "" || state.department.trim() !== "" ? (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
