@@ -6,9 +6,11 @@ import { X } from "lucide-react";
 export function PhotoLightbox({
   src,
   onClose,
+  sophrologueName,
 }: {
   src: string | null;
   onClose: () => void;
+  sophrologueName: string;
 }) {
   useEffect(() => {
     if (!src) return;
@@ -46,7 +48,7 @@ export function PhotoLightbox({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
-        alt=""
+        alt={`Photo du cabinet de ${sophrologueName} en grand format`}
         className="max-h-[80vh] max-w-[80vw] object-contain"
         onClick={(e) => e.stopPropagation()}
       />
@@ -55,7 +57,13 @@ export function PhotoLightbox({
 }
 
 /** Grille cliquable + lightbox (client — requis pour l’état d’ouverture). */
-export function CabinetPhotoGallery({ urls }: { urls: string[] }) {
+export function CabinetPhotoGallery({
+  urls,
+  sophrologueName,
+}: {
+  urls: string[];
+  sophrologueName: string;
+}) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <>
@@ -68,11 +76,19 @@ export function CabinetPhotoGallery({ urls }: { urls: string[] }) {
             className="relative h-24 w-full overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-[#426F59] focus:ring-offset-2"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="" className="h-full w-full object-cover" />
+            <img
+              src={url}
+              alt={`Photo du cabinet de ${sophrologueName}`}
+              className="h-full w-full object-cover"
+            />
           </button>
         ))}
       </div>
-      <PhotoLightbox src={open} onClose={() => setOpen(null)} />
+      <PhotoLightbox
+        src={open}
+        onClose={() => setOpen(null)}
+        sophrologueName={sophrologueName}
+      />
     </>
   );
 }

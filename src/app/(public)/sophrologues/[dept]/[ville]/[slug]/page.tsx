@@ -61,6 +61,7 @@ type SophrologuePublicRow = {
   syndicats: string[] | null;
   specialites: string[] | null;
   numero_rpps: string | null;
+  siret: string | null;
   email: string | null;
   telephone: string | null;
   afficher_email: boolean;
@@ -91,6 +92,7 @@ const PUBLIC_SELECT = `
   syndicats,
   specialites,
   numero_rpps,
+  siret,
   email,
   telephone,
   afficher_email,
@@ -295,6 +297,8 @@ export default async function SophrologueProfilPage({
   const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
   const numeroRpps = sophrologue.numero_rpps?.trim() ?? "";
   const hasRpps = numeroRpps.length > 0;
+  const numeroSiret = sophrologue.siret?.trim() ?? "";
+  const hasSiret = numeroSiret.length > 0;
   const publicEmail = sophrologue.email?.trim() ?? "";
   const publicTelephone = sophrologue.telephone?.trim() ?? "";
   const showEmail = Boolean(sophrologue.afficher_email && publicEmail);
@@ -329,12 +333,8 @@ export default async function SophrologueProfilPage({
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Person",
+    "@type": "ProfessionalService",
     name: fullName,
-    jobTitle: "Sophrologue",
-    ...(sophrologue.bio?.trim()
-      ? { description: sophrologue.bio.trim() }
-      : {}),
     ...(sophrologue.photo_url ? { image: sophrologue.photo_url } : {}),
     ...(sophrologue.adresse
       ? {
@@ -358,10 +358,16 @@ export default async function SophrologueProfilPage({
       : {}),
     ...(showEmail ? { email: publicEmail } : {}),
     ...(showTelephone ? { telephone: publicTelephone } : {}),
+    employee: {
+      "@type": "Person",
+      name: fullName,
+      jobTitle: "Sophrologue",
+      ...(sophrologue.bio?.trim() ? { description: sophrologue.bio.trim() } : {}),
+    },
   };
 
   const sectionMeta = [
-    { id: "rpps", show: hasRpps },
+    { id: "rpps", show: hasRpps || hasSiret },
     { id: "gallery", show: showGallery },
     { id: "seances", show: showSeances },
     { id: "infos", show: showInfos },
@@ -392,7 +398,7 @@ export default async function SophrologueProfilPage({
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-200">
                   <Image
                     src={sophrologue.photo_url}
-                    alt=""
+                    alt={`${fullName}, sophrologue à ${city}`}
                     fill
                     className="object-cover"
                     sizes="64px"
@@ -411,7 +417,7 @@ export default async function SophrologueProfilPage({
                   {city || "France"}
                 </p>
                 <h1 className="text-[32px] font-semibold leading-tight text-slate-900 font-[family-name:var(--font-playfair)]">
-                  {fullName}
+                  {fullName}{city ? `, sophrologue à ${city}` : ", sophrologue"}
                 </h1>
                 {sophrologue.bio?.trim() ? (
                   <SophrologueBioExpandable bio={sophrologue.bio} />
@@ -437,9 +443,17 @@ export default async function SophrologueProfilPage({
             )}
 
             {sepBefore(0) && <hr className="my-10 border-slate-200" />}
-            {hasRpps && (
-              <div className={showGallery ? "mb-6" : ""}>
-                <SophrologueRppsLine numero={numeroRpps} />
+            {(hasRpps || hasSiret) && (
+              <div className={`space-y-2 ${showGallery ? "mb-6" : ""}`}>
+                {hasRpps ? <SophrologueRppsLine numero={numeroRpps} /> : null}
+                {hasSiret ? (
+                  <SophrologueRppsLine
+                    numero={numeroSiret}
+                    label="SIRET"
+                    tooltip="Numéro d'identification de l'entreprise (SIRET)."
+                    tooltipAriaLabel="Qu'est-ce que le SIRET ?"
+                  />
+                ) : null}
               </div>
             )}
 
@@ -449,7 +463,7 @@ export default async function SophrologueProfilPage({
                 <h2 className="text-lg font-semibold text-slate-900 font-[family-name:var(--font-playfair)]">
                   Le cabinet
                 </h2>
-                <CabinetPhotoGallery urls={photos} />
+                <CabinetPhotoGallery urls={photos} sophrologueName={fullName} />
               </section>
             )}
 

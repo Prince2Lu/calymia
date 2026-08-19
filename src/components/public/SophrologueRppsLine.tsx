@@ -8,9 +8,17 @@ const RPPS_TOOLTIP =
 
 type SophrologueRppsLineProps = {
   numero: string;
+  label?: string;
+  tooltip?: string;
+  tooltipAriaLabel?: string;
 };
 
-export function SophrologueRppsLine({ numero }: SophrologueRppsLineProps) {
+export function SophrologueRppsLine({
+  numero,
+  label = "N° RPPS",
+  tooltip = RPPS_TOOLTIP,
+  tooltipAriaLabel = "Qu'est-ce que le numéro RPPS ?",
+}: SophrologueRppsLineProps) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const open = pinned || hovered;
@@ -42,12 +50,12 @@ export function SophrologueRppsLine({ numero }: SophrologueRppsLineProps) {
     <div ref={wrapRef} className="relative text-sm text-slate-700">
       <p className="inline-flex flex-wrap items-center gap-1.5">
         <span>
-          <span className="font-medium text-slate-800">N° RPPS :</span> {numero}
+          <span className="font-medium text-slate-800">{label} :</span> {numero}
         </span>
         <button
           type="button"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#426F59] transition-colors hover:bg-[#EAF3DE] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#426F59]/40"
-          aria-label="Qu'est-ce que le numéro RPPS ?"
+          aria-label={tooltipAriaLabel}
           aria-expanded={open}
           aria-controls={tipId}
           onClick={() => {
@@ -86,7 +94,7 @@ export function SophrologueRppsLine({ numero }: SophrologueRppsLineProps) {
             placeAbove ? "bottom-full mb-2 left-0" : "top-full mt-2 left-0"
           }`}
         >
-          {RPPS_TOOLTIP}
+          {tooltip}
         </div>
       )}
     </div>
