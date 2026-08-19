@@ -24,6 +24,12 @@ type Payload = {
   patient_nom: string;
   patient_email: string;
   patient_telephone: string;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
+  utm_term?: string | null;
+  ga_client_id?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -39,6 +45,12 @@ export async function POST(request: Request) {
       patient_nom,
       patient_email,
       patient_telephone,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      ga_client_id,
     } = body;
 
     const patientEmailNorm = patient_email?.trim().toLowerCase() ?? "";
@@ -248,6 +260,25 @@ export async function POST(request: Request) {
     }
 
     console.log("Create PI - séance liée au client:", seance_id, "→ patient:", patient.id);
+
+    try {
+      const { error: trackingError } = await supabase
+        .from("seances")
+        .update({
+          utm_source: utm_source ?? null,
+          utm_medium: utm_medium ?? null,
+          utm_campaign: utm_campaign ?? null,
+          utm_content: utm_content ?? null,
+          utm_term: utm_term ?? null,
+          ga_client_id: ga_client_id ?? null,
+        })
+        .eq("id", seance_id);
+      if (trackingError) {
+        console.error("Create PI - tracking update error:", trackingError);
+      }
+    } catch (trackingErr) {
+      console.error("Create PI - tracking update exception:", trackingErr);
+    }
 
     // ── 3) Créer le PaymentIntent Stripe (montant = tarif types_seances) ─────
     const paymentIntent = await stripe.paymentIntents.create({

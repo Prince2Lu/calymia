@@ -2,13 +2,12 @@
 
 import Script from "next/script";
 import { useEffect, useState } from "react";
+import { GA_MEASUREMENT_ID } from "@/lib/analytics/config";
 import { isProductionSite } from "@/lib/config/site-url";
 import {
   CONSENT_CHANGED_EVENT,
   getStoredConsent,
 } from "@/lib/consent/cookie-consent";
-
-const GA_MEASUREMENT_ID = "G-XZQPVRGT3P";
 
 export function GoogleAnalytics() {
   const [shouldLoad, setShouldLoad] = useState(false);

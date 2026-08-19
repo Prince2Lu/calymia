@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, Suspense } from "react";
+import { UtmCapture } from "@/components/analytics/UtmCapture";
+import { ReserverButton } from "@/components/public/ReserverButton";
 import { createClient } from "@supabase/supabase-js";
 import { CreditCard, Info, Mail, MapPin, Phone } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
@@ -382,6 +383,9 @@ export default async function SophrologueProfilPage({
 
   return (
     <main className="min-h-screen bg-white">
+      <Suspense fallback={null}>
+        <UtmCapture />
+      </Suspense>
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -719,12 +723,11 @@ export default async function SophrologueProfilPage({
 
               <ProchainCreneauBadge sophrologueId={String(sophrologue.id)} />
 
-              <Link
+              <ReserverButton
                 href={reserverHref}
+                sophrologueId={String(sophrologue.id)}
                 className="flex w-full items-center justify-center rounded-full bg-[#426F59] py-3 text-center text-sm font-medium text-white transition hover:bg-[#355849]"
-              >
-                Prendre rendez-vous
-              </Link>
+              />
 
               {avisCount > 0 && (
                 <div className="flex flex-col items-center gap-1 border-t border-gray-100 pt-4 text-center">
