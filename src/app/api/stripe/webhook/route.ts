@@ -12,6 +12,8 @@ import { sendEmail } from '@/lib/emails/send'
 import { formatParisTime } from '@/lib/timezone'
 import { createDailyRoom } from '@/lib/visio/daily'
 import { upsertSeanceEvent } from '@/lib/google/calendar-sync'
+import { GA_MEASUREMENT_ID } from '@/lib/analytics/config'
+import { isProductionSite } from '@/lib/config/site-url'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,6 +70,51 @@ export async function POST(request: NextRequest) {
 
     const montant_total = paymentIntent.amount / 100
     const commission = montant_total * 0.03
+
+    try {
+      const { data: seanceData } = await supabase
+        .from('seances')
+        .select(
+          'conversion_tracked_client, utm_source, utm_medium, utm_campaign, utm_content, utm_term, ga_client_id',
+        )
+        .eq('id', seance_id)
+        .single()
+
+      if (
+        seanceData &&
+        !seanceData.conversion_tracked_client &&
+        isProductionSite() &&
+        process.env.GA_MEASUREMENT_PROTOCOL_SECRET
+      ) {
+        const clientId = seanceData.ga_client_id ?? crypto.randomUUID()
+        await fetch(
+          `https://www.google-analytics.com/mp/collect?measurement_id=${GA_MEASUREMENT_ID}&api_secret=${process.env.GA_MEASUREMENT_PROTOCOL_SECRET}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: clientId,
+              events: [
+                {
+                  name: 'reservation_confirmee',
+                  params: {
+                    value: montant_total,
+                    currency: 'EUR',
+                    sophrologue_id,
+                    source: 'server_fallback',
+                    utm_source: seanceData.utm_source ?? undefined,
+                    utm_medium: seanceData.utm_medium ?? undefined,
+                    utm_campaign: seanceData.utm_campaign ?? undefined,
+                  },
+                },
+              ],
+            }),
+          },
+        )
+      }
+    } catch (err) {
+      console.error('Erreur envoi GA4 Measurement Protocol (garde-fou):', err)
+    }
 
     const { error: paiementError } = await supabase
       .from('paiements')

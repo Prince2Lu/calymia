@@ -9,6 +9,8 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PaymentForm } from "@/components/booking/PaymentForm";
+import { getGaClientId, trackEvent } from "@/lib/analytics/gtag";
+import { getStoredUtm } from "@/lib/analytics/utm";
 import {
   addParisCalendarDays,
   formatParisTime,
@@ -452,6 +454,14 @@ export default function ReserverPage() {
     }
 
     setLoading(true);
+    let utm = {};
+    let gaClientId: string | null = null;
+    try {
+      utm = getStoredUtm();
+      gaClientId = await getGaClientId();
+    } catch {
+      // Tracking best-effort — ne jamais bloquer le paiement
+    }
     const payload = {
       seance_id: blockedSeanceId,
       sophrologue_id: sophrologue.id,
@@ -461,6 +471,8 @@ export default function ReserverPage() {
       patient_nom: patient.nom,
       patient_email: patient.email,
       patient_telephone: patient.telephone,
+      ...utm,
+      ga_client_id: gaClientId,
     };
 
     const res = await fetch("/api/reservations/create-payment-intent", {
@@ -1162,7 +1174,27 @@ export default function ReserverPage() {
                     amount={selectedTypeSeance.tarif}
                     clientSecret={clientSecret}
                     seanceId={seanceId}
-                    onSuccess={() => setStep(5)}
+                    onSuccess={async () => {
+                      setStep(5);
+                      try {
+                        trackEvent("reservation_confirmee", {
+                          value: selectedTypeSeance?.tarif,
+                          currency: "EUR",
+                          sophrologue_id: sophrologue?.id,
+                        });
+                      } catch {
+                        // Tracking best-effort
+                      }
+                      try {
+                        await fetch("/api/reservations/track-conversion", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ seance_id: seanceId }),
+                        });
+                      } catch {
+                        // Best-effort : le webhook Stripe agit en garde-fou si cet appel échoue
+                      }
+                    }}
                   />
                 ) : (
                   <p className="text-sm text-slate-600">
