@@ -20,6 +20,11 @@ export function getSiteUrl(): string {
   return url.replace(/\/$/, "");
 }
 
+/** True uniquement pour l’app PROD (app.calymia.com). DEV / preview / local = false. */
+export function isProductionSite(): boolean {
+  return getSiteUrl() === "https://app.calymia.com";
+}
+
 export function getSophrologueUrl(
   departement: string,
   ville: string,
