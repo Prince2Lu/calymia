@@ -61,6 +61,7 @@ type SophrologuePublicRow = {
   certifications: string[] | null;
   syndicats: string[] | null;
   specialites: string[] | null;
+  specialites_categories: string[] | null;
   numero_rpps: string | null;
   siret: string | null;
   email: string | null;
@@ -92,6 +93,7 @@ const PUBLIC_SELECT = `
   certifications,
   syndicats,
   specialites,
+  specialites_categories,
   numero_rpps,
   siret,
   email,
@@ -172,6 +174,22 @@ function slugifyVille(ville: string) {
 function normalizeSpecialites(value: string[] | null | undefined): string[] {
   if (!value?.length) return [];
   return value.filter(Boolean);
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  "pratique-quotidien": "Pratique & quotidien",
+  "publics-specifiques": "Publics spécifiques",
+  "sante-mentale": "Santé mentale",
+  "sommeil": "Sommeil",
+  "stress-anxiete": "Stress & anxiété",
+  "therapies-bien-etre": "Thérapies & bien-être",
+};
+
+const BLOG_CATEGORY_BASE_URL = "https://www.calymia.com/category";
+
+function normalizeCategories(value: string[] | null | undefined): string[] {
+  if (!value?.length) return [];
+  return value.filter((v) => Boolean(v) && v in CATEGORY_LABELS);
 }
 
 function specialtyLabel(raw: string) {
@@ -291,6 +309,7 @@ export default async function SophrologueProfilPage({
   const specialites = normalizeSpecialites(sophrologue.specialites).map(
     specialtyLabel,
   );
+  const categories = normalizeCategories(sophrologue.specialites_categories);
   const photos = (sophrologue.photos_cabinet ?? []).filter(Boolean);
   const modes = (sophrologue.modes_paiement ?? []).filter(Boolean);
 
@@ -442,6 +461,22 @@ export default async function SophrologueProfilPage({
                   >
                     {s}
                   </span>
+                ))}
+              </div>
+            )}
+
+            {categories.length > 0 && (
+              <div className="mb-8 flex flex-wrap gap-2">
+                {categories.map((slug) => (
+                  <a
+                    key={slug}
+                    href={`${BLOG_CATEGORY_BASE_URL}/${slug}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white transition hover:bg-[#365a49]"
+                  >
+                    {CATEGORY_LABELS[slug]}
+                  </a>
                 ))}
               </div>
             )}
