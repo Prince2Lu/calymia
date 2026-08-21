@@ -466,18 +466,21 @@ export default async function SophrologueProfilPage({
             )}
 
             {categories.length > 0 && (
-              <div className="mb-8 flex flex-wrap gap-2">
-                {categories.map((slug) => (
-                  <a
-                    key={slug}
-                    href={`${BLOG_CATEGORY_BASE_URL}/${slug}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white transition hover:bg-[#365a49]"
-                  >
-                    {CATEGORY_LABELS[slug]}
-                  </a>
-                ))}
+              <div className="mb-8">
+                <p className="mb-2 text-xs text-slate-500">À lire sur notre blog :</p>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((slug) => (
+                    <a
+                      key={slug}
+                      href={`${BLOG_CATEGORY_BASE_URL}/${slug}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white transition hover:bg-[#365a49]"
+                    >
+                      {CATEGORY_LABELS[slug]}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
