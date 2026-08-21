@@ -35,11 +35,14 @@ type Specialty =
 
 type DayKey = "lundi" | "mardi" | "mercredi" | "jeudi" | "vendredi" | "samedi";
 
+type ModeSeance = "presentiel" | "visio";
+
 type SessionType = {
   id: number;
   name: string;
   duration: "30" | "45" | "60" | "90";
   price: string;
+  mode: ModeSeance;
 };
 
 type OnboardingState = {
@@ -319,6 +322,7 @@ export default function OnboardingPage() {
           name: "",
           duration: "60",
           price: "",
+          mode: "presentiel",
         },
       ],
     }));
@@ -517,6 +521,7 @@ export default function OnboardingPage() {
               nom: s.name.trim(),
               duree_minutes: Number(s.duration),
               tarif: Number(s.price),
+              mode: s.mode,
             }),
           }),
         ),
@@ -1024,7 +1029,7 @@ export default function OnboardingPage() {
                     {state.sessionTypes.map((session) => (
                       <div
                         key={session.id}
-                        className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm md:grid-cols-[2fr,1fr,1fr,auto]"
+                        className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr),minmax(0,1fr),minmax(0,1fr),minmax(0,1fr),auto]"
                       >
                         <Input
                           placeholder="Nom de la séance"
@@ -1036,6 +1041,7 @@ export default function OnboardingPage() {
                               e.target.value,
                             )
                           }
+                          className="sm:col-span-2 lg:col-span-1"
                         />
                         <select
                           className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-800"
@@ -1052,6 +1058,20 @@ export default function OnboardingPage() {
                           <option value="45">45 min</option>
                           <option value="60">60 min</option>
                           <option value="90">90 min</option>
+                        </select>
+                        <select
+                          className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-800"
+                          value={session.mode}
+                          onChange={(e) =>
+                            updateSessionType(
+                              session.id,
+                              "mode",
+                              e.target.value,
+                            )
+                          }
+                        >
+                          <option value="presentiel">Présentiel</option>
+                          <option value="visio">Visio</option>
                         </select>
                         <div className="flex items-center gap-1">
                           <Input
