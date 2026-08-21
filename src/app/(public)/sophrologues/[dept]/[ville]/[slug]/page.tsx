@@ -7,7 +7,7 @@ import { ReserverButton } from "@/components/public/ReserverButton";
 import { createClient } from "@supabase/supabase-js";
 import { CreditCard, Info, Mail, MapPin, Phone } from "lucide-react";
 import { SophrologueBioExpandable } from "@/components/public/SophrologueBioExpandable";
-import { SophrologueRppsLine } from "@/components/public/SophrologueRppsLine";
+import { SophrologueInfoLine } from "@/components/public/SophrologueInfoLine";
 import { ProchainCreneauBadge } from "@/components/public/ProchainCreneauBadge";
 import { CabinetPhotoGallery } from "@/components/public/PhotoLightbox";
 import { AvisPublicList } from "@/components/avis/AvisPublicList";
@@ -62,7 +62,7 @@ type SophrologuePublicRow = {
   syndicats: string[] | null;
   specialites: string[] | null;
   specialites_categories: string[] | null;
-  numero_rpps: string | null;
+  certification_rncp: boolean;
   siret: string | null;
   email: string | null;
   telephone: string | null;
@@ -94,7 +94,7 @@ const PUBLIC_SELECT = `
   syndicats,
   specialites,
   specialites_categories,
-  numero_rpps,
+  certification_rncp,
   siret,
   email,
   telephone,
@@ -315,8 +315,7 @@ export default async function SophrologueProfilPage({
 
   const hasAdresse = Boolean(sophrologue.adresse?.trim());
   const hasInfosPratiques = Boolean(sophrologue.infos_pratiques?.trim());
-  const numeroRpps = sophrologue.numero_rpps?.trim() ?? "";
-  const hasRpps = numeroRpps.length > 0;
+  const hasCertificationRncp = sophrologue.certification_rncp === true;
   const numeroSiret = sophrologue.siret?.trim() ?? "";
   const hasSiret = numeroSiret.length > 0;
   const publicEmail = sophrologue.email?.trim() ?? "";
@@ -387,7 +386,7 @@ export default async function SophrologueProfilPage({
   };
 
   const sectionMeta = [
-    { id: "rpps", show: hasRpps || hasSiret },
+    { id: "certification-rncp", show: hasCertificationRncp || hasSiret },
     { id: "gallery", show: showGallery },
     { id: "seances", show: showSeances },
     { id: "infos", show: showInfos },
@@ -485,11 +484,15 @@ export default async function SophrologueProfilPage({
             )}
 
             {sepBefore(0) && <hr className="my-10 border-slate-200" />}
-            {(hasRpps || hasSiret) && (
+            {(hasCertificationRncp || hasSiret) && (
               <div className={`space-y-2 ${showGallery ? "mb-6" : ""}`}>
-                {hasRpps ? <SophrologueRppsLine numero={numeroRpps} /> : null}
+                {hasCertificationRncp ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#426F59] px-3 py-1 text-xs font-medium text-white">
+                    ✓ Certification RNCP
+                  </span>
+                ) : null}
                 {hasSiret ? (
-                  <SophrologueRppsLine
+                  <SophrologueInfoLine
                     numero={numeroSiret}
                     label="SIRET"
                     tooltip="Numéro d'identification de l'entreprise (SIRET)."

@@ -154,7 +154,7 @@ export default function DashboardPage() {
       const { data: sophrologue } = await supabase
         .from("sophrologues")
         .select(
-          "id, photo_url, bio, specialites, horaires, photos_cabinet, formations, numero_rpps, syndicats",
+          "id, photo_url, bio, specialites, horaires, photos_cabinet, formations, syndicats",
         )
         .eq("user_id", user.id)
         .maybeSingle<SophrologueRow>();

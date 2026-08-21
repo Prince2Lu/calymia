@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       nom,
       bio,
       specialties,
-      rpps,
+      certification_rncp,
       teleconsultationUrl,
       address,
       city,
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       nom?: string;
       bio?: string;
       specialties?: string[];
-      rpps?: string;
+      certification_rncp?: boolean;
       teleconsultationUrl?: string;
       address?: string;
       city?: string;
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
 
     console.log("[sophrologue/update] userId reçu :", userId);
     console.log("[sophrologue/update] payload complet :", {
-      prenom, nom, bio, specialties, rpps,
+      prenom, nom, bio, specialties, certification_rncp,
       teleconsultationUrl, address, city, departement, postalCode, phone, photo_url,
     });
 
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       ...(nom !== undefined && { nom }),
       ...(bio !== undefined && { bio }),
       ...(specialties !== undefined && { specialites: specialties }),
-      ...(rpps !== undefined && { numero_rpps: rpps }),
+      ...(certification_rncp !== undefined && { certification_rncp }),
       ...(teleconsultationUrl !== undefined && { lien_teleconsultation: teleconsultationUrl }),
       ...(address !== undefined && { adresse: address }),
       ...(city !== undefined && { ville: city }),

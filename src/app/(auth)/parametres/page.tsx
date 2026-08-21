@@ -39,7 +39,7 @@ type Sophrologue = {
   telephone: string | null;
   bio: string | null;
   specialites: string[] | null;
-  numero_rpps: string | null;
+  certification_rncp: boolean;
   siret: string | null;
   lien_teleconsultation: string | null;
   adresse: string | null;
@@ -61,7 +61,7 @@ type Sophrologue = {
 };
 
 const SOPHROLOGUE_SELECT =
-  "id, user_id, prenom, nom, email, telephone, bio, specialites, numero_rpps, siret, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats, afficher_email, afficher_telephone";
+  "id, user_id, prenom, nom, email, telephone, bio, specialites, certification_rncp, siret, lien_teleconsultation, adresse, ville, departement, slug, code_postal, photo_url, photos_cabinet, horaires, horaires_texte, infos_pratiques, modes_paiement, formations, certifications, syndicats, afficher_email, afficher_telephone";
 
 type ModeSeance = "presentiel" | "visio";
 
@@ -197,7 +197,7 @@ function TabProfil({
     telephone: sophrologue.telephone ?? "",
     bio: sophrologue.bio ?? "",
     specialites: (sophrologue.specialites ?? []).join(", "),
-    numero_rpps: sophrologue.numero_rpps ?? "",
+    certification_rncp: sophrologue.certification_rncp ?? false,
     siret: sophrologue.siret ?? "",
     lien_teleconsultation: sophrologue.lien_teleconsultation ?? "",
     adresse: sophrologue.adresse ?? "",
@@ -259,7 +259,7 @@ function TabProfil({
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
-        rpps: form.numero_rpps,
+        certification_rncp: form.certification_rncp,
         siret: form.siret.trim(),
         teleconsultationUrl: form.lien_teleconsultation,
         address: form.adresse,
@@ -299,7 +299,7 @@ function TabProfil({
 
   const field = (
     label: string,
-    key: keyof typeof form,
+    key: Exclude<keyof typeof form, "certification_rncp">,
     opts?: { type?: string; placeholder?: string },
   ) => (
     <div className="space-y-1">
@@ -438,7 +438,22 @@ function TabProfil({
         </div>
         {field("Ville", "ville", { placeholder: "Paris" })}
         {field("Code postal", "code_postal", { placeholder: "75001" })}
-        {field("N° RPPS", "numero_rpps", { placeholder: "10 chiffres" })}
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+            <input
+              type="checkbox"
+              checked={form.certification_rncp}
+              onChange={(e) =>
+                setForm({ ...form, certification_rncp: e.target.checked })
+              }
+              className="h-4 w-4 rounded border-slate-300 text-[#426F59]"
+            />
+            Je détiens une certification reconnue RNCP
+          </label>
+          <p className="text-xs text-slate-500 pl-6">
+            Vous pourrez préciser le détail dans vos formations ci-dessous.
+          </p>
+        </div>
         <div className="space-y-1">
           <label
             className="text-xs font-medium text-slate-600"
