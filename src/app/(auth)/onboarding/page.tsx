@@ -39,7 +39,7 @@ type OnboardingState = {
   photoUrl: string | null;
   bio: string;
   specialties: string;
-  rpps?: string;
+  certification_rncp: boolean;
   teleconsultationUrl?: string;
   // Étape 2
   address: string;
@@ -65,7 +65,7 @@ const INITIAL_STATE: OnboardingState = {
   photoUrl: null,
   bio: "",
   specialties: "",
-  rpps: "",
+  certification_rncp: false,
   teleconsultationUrl: "",
   address: "",
   city: "",
@@ -421,7 +421,7 @@ export default function OnboardingPage() {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
-        rpps: state.rpps,
+        certification_rncp: state.certification_rncp,
         teleconsultationUrl: state.teleconsultationUrl,
         address: state.address,
         city: state.city,
@@ -753,15 +753,20 @@ export default function OnboardingPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-800">
-                      Numéro RPPS (optionnel)
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={state.certification_rncp}
+                        onChange={(e) =>
+                          setState((prev) => ({ ...prev, certification_rncp: e.target.checked }))
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-[#426F59]"
+                      />
+                      Je détiens une certification reconnue RNCP
                     </label>
-                    <Input
-                      value={state.rpps ?? ""}
-                      onChange={(e) =>
-                        setState((prev) => ({ ...prev, rpps: e.target.value }))
-                      }
-                    />
+                    <p className="text-xs text-slate-500 pl-6">
+                      Vous pourrez préciser le détail dans vos formations ci-dessous.
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-slate-800">
@@ -1184,7 +1189,7 @@ export default function OnboardingPage() {
                       : "Non renseignées"}
                   </p>
                   <p className="mt-1 text-xs text-slate-600">
-                    RPPS : {state.rpps || "Non renseigné"} · Téléconsultation :{" "}
+                    Certification RNCP : {state.certification_rncp ? "Oui" : "Non"} · Téléconsultation :{" "}
                     {state.teleconsultationUrl || "Non renseignée"}
                   </p>
                 </div>

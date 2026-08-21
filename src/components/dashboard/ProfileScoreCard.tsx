@@ -4,7 +4,11 @@ import {
   ShieldCheck,
   Check,
 } from "lucide-react";
-import type { ProfileImpact, ProfileScoreItem } from "@/lib/profile-score";
+import {
+  PROFILE_SCORE_MAX,
+  type ProfileImpact,
+  type ProfileScoreItem,
+} from "@/lib/profile-score";
 
 type Props = {
   score: number;
@@ -33,10 +37,10 @@ function impactBadgeClass(impact: ProfileImpact): string {
   }
 }
 
-function progressBarClass(score: number): string {
-  if (score < 40) return "bg-red-500";
-  if (score < 70) return "bg-amber-500";
-  if (score < 100) return "bg-emerald-400";
+function progressBarClass(percent: number): string {
+  if (percent < 40) return "bg-red-500";
+  if (percent < 70) return "bg-amber-500";
+  if (percent < 100) return "bg-emerald-400";
   return "bg-emerald-500";
 }
 
@@ -47,13 +51,13 @@ function buildAmberMessage(missing: ProfileScoreItem[]): string {
 }
 
 function ContextMessage({
-  score,
+  percent,
   missing,
 }: {
-  score: number;
+  percent: number;
   missing: ProfileScoreItem[];
 }) {
-  if (score >= 100) {
+  if (percent >= 100) {
     return (
       <div className="rounded-r-md border-l-[3px] border-green-500 bg-green-50 px-4 py-3 text-sm text-green-800">
         Votre profil est complet à 100% — excellent pour votre référencement Google !
@@ -61,7 +65,7 @@ function ContextMessage({
     );
   }
 
-  if (score < 40) {
+  if (percent < 40) {
     return (
       <div className="rounded-r-md border-l-[3px] border-red-400 bg-red-50 px-4 py-3 text-sm text-red-800">
         Votre profil est incomplet — complétez-le pour apparaître dans les résultats Google.
@@ -69,7 +73,7 @@ function ContextMessage({
     );
   }
 
-  if (score < 70) {
+  if (percent < 70) {
     return (
       <div className="rounded-r-md border-l-[3px] border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         {buildAmberMessage(missing)}
@@ -135,10 +139,16 @@ function CompletedItem({
   );
 }
 
+function scoreToPercent(score: number): number {
+  if (PROFILE_SCORE_MAX <= 0) return 0;
+  return Math.round((score / PROFILE_SCORE_MAX) * 100);
+}
+
 export default function ProfileScoreCard({ score, items }: Props) {
   const missing = items.filter((item) => !item.completed);
   const completed = items.filter((item) => item.completed);
-  const isComplete = score >= 100;
+  const percent = scoreToPercent(score);
+  const isComplete = score >= PROFILE_SCORE_MAX;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -150,20 +160,20 @@ export default function ProfileScoreCard({ score, items }: Props) {
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-3xl font-medium text-[#1E3A5F] leading-none">{score}%</p>
+          <p className="text-3xl font-medium text-[#1E3A5F] leading-none">{percent}%</p>
           <p className="text-xs text-slate-400">/ 100</p>
         </div>
       </div>
 
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
         <div
-          className={`h-2 rounded-full ${progressBarClass(score)}`}
-          style={{ width: `${score}%` }}
+          className={`h-2 rounded-full ${progressBarClass(percent)}`}
+          style={{ width: `${percent}%` }}
         />
       </div>
 
       <div className="mt-4">
-        <ContextMessage score={score} missing={missing} />
+        <ContextMessage percent={percent} missing={missing} />
       </div>
 
       {missing.length > 0 && (

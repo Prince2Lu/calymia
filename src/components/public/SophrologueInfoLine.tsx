@@ -3,25 +3,22 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Info } from "lucide-react";
 
-const RPPS_TOOLTIP =
-  "Le numéro RPPS (Répertoire Partagé des Professionnels de Santé) est un identifiant unique attribué à chaque professionnel de santé en France. Il garantit que ce praticien est bien enregistré auprès des autorités sanitaires.";
-
-type SophrologueRppsLineProps = {
+type SophrologueInfoLineProps = {
   numero: string;
-  label?: string;
+  label: string;
   tooltip?: string;
   tooltipAriaLabel?: string;
 };
 
-export function SophrologueRppsLine({
+export function SophrologueInfoLine({
   numero,
-  label = "N° RPPS",
-  tooltip = RPPS_TOOLTIP,
-  tooltipAriaLabel = "Qu'est-ce que le numéro RPPS ?",
-}: SophrologueRppsLineProps) {
+  label,
+  tooltip,
+  tooltipAriaLabel = "Plus d’informations",
+}: SophrologueInfoLineProps) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const open = pinned || hovered;
+  const open = Boolean(tooltip) && (pinned || hovered);
   const [placeAbove, setPlaceAbove] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const tipId = useId();
@@ -52,41 +49,43 @@ export function SophrologueRppsLine({
         <span>
           <span className="font-medium text-slate-800">{label} :</span> {numero}
         </span>
-        <button
-          type="button"
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#426F59] transition-colors hover:bg-[#EAF3DE] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#426F59]/40"
-          aria-label={tooltipAriaLabel}
-          aria-expanded={open}
-          aria-controls={tipId}
-          onClick={() => {
-            setPinned((v) => {
-              const next = !v;
-              if (next) requestAnimationFrame(updatePlacement);
-              return next;
-            });
-          }}
-          onMouseEnter={() => {
-            if (!window.matchMedia("(hover: hover)").matches) return;
-            updatePlacement();
-            setHovered(true);
-          }}
-          onMouseLeave={() => setHovered(false)}
-          onFocus={() => {
-            updatePlacement();
-            setHovered(true);
-          }}
-          onBlur={(e) => {
-            if (!wrapRef.current?.contains(e.relatedTarget as Node | null)) {
-              setHovered(false);
-              setPinned(false);
-            }
-          }}
-        >
-          <Info className="h-4 w-4" aria-hidden />
-        </button>
+        {tooltip ? (
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#426F59] transition-colors hover:bg-[#EAF3DE] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#426F59]/40"
+            aria-label={tooltipAriaLabel}
+            aria-expanded={open}
+            aria-controls={tipId}
+            onClick={() => {
+              setPinned((v) => {
+                const next = !v;
+                if (next) requestAnimationFrame(updatePlacement);
+                return next;
+              });
+            }}
+            onMouseEnter={() => {
+              if (!window.matchMedia("(hover: hover)").matches) return;
+              updatePlacement();
+              setHovered(true);
+            }}
+            onMouseLeave={() => setHovered(false)}
+            onFocus={() => {
+              updatePlacement();
+              setHovered(true);
+            }}
+            onBlur={(e) => {
+              if (!wrapRef.current?.contains(e.relatedTarget as Node | null)) {
+                setHovered(false);
+                setPinned(false);
+              }
+            }}
+          >
+            <Info className="h-4 w-4" aria-hidden />
+          </button>
+        ) : null}
       </p>
 
-      {open && (
+      {open && tooltip && (
         <div
           id={tipId}
           role="tooltip"
