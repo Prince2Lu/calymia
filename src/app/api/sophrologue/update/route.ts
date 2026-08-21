@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { classifySpecialitesCategories } from "@/lib/ai/classify-specialites";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -132,6 +133,11 @@ export async function POST(request: Request) {
     }
 
     console.log("[sophrologue/update] Succès — ligne mise à jour :", data[0]);
+    if (specialties !== undefined && specialties.length > 0) {
+      after(() =>
+        classifySpecialitesCategories(data[0].id, specialties.join(", ")),
+      );
+    }
     return NextResponse.json({ success: true, sophrologue: data[0] });
   } catch (error) {
     console.error("[sophrologue/update] Exception inattendue :", error);
