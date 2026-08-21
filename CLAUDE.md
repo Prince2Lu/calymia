@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 12 août 2026
+Dernière mise à jour : 21 août 2026
 
 ---
 
@@ -86,14 +86,18 @@ src/
 │   │   ├── dashboard/       # KPIs + agenda + score complétude profil
 │   │   ├── seances/         # Agenda semaine + drawer détail (badge Visio + Copier/Régénérer)
 │   │   ├── clients/         # Liste + fiche client [id] — suppression client ✅ (31/07)
-│   │   ├── patient/         # Espace client — fix alignement grille séances ✅ develop only (août 2026)
-│   │   ├── parametres/      # 4 onglets dont Cabinet/Vitrine + champ SIRET (Profil, 30/07)
+│   │   ├── patient/         # Espace client — fix alignement grille séances ✅ livré PROD (août 2026,
+│   │   │                    # confirmé mergé lors du diagnostic du 21/08 — voir section 12)
+│   │   ├── parametres/      # 5 onglets : Profil (SIRET, checkbox certification RNCP — 21/08),
+│   │   │                    # Séances, Disponibilités, Cabinet/Vitrine, Intégrations (Google Agenda)
 │   │   ├── emails/          # Templates emails (Pro+)
 │   │   ├── communications/  # Journal (Pro+)
-│   │   └── abonnement/      # Plans & abonnement + historique de facturation ✅ (31/07)
+│   │   ├── abonnement/      # Plans & abonnement + historique de facturation ✅ (31/07)
+│   │   └── avis/            # Modération des avis clients (Pro+) — ✅ (voir section 6)
 │   ├── (public)/
-│   │   └── sophrologues/[dept]/[ville]/[slug]/  # Page publique SSR
-│   │       └── reserver/    # Tunnel réservation 5 étapes (+ rappel anti-spam visio à l'étape 5)
+│   │   ├── sophrologues/[dept]/[ville]/[slug]/  # Page publique SSR
+│   │   │   └── reserver/    # Tunnel réservation 5 étapes (+ rappel anti-spam visio à l'étape 5)
+│   │   └── avis/[token]/    # Formulaire avis client, accès par token unique post-séance
 │   ├── onboarding/          # Wizard 5 étapes
 │   ├── inscription/         # Création compte
 │   ├── connexion/           # Login
@@ -109,14 +113,19 @@ src/
 │       │   ├── checkout/        # Checkout Session mode "setup" (upgrade pendant trial, 30/07)
 │       │   ├── billing-portal/  # Lien vers le Billing Portal Stripe
 │       │   └── invoices/        # GET factures Stripe du sophrologue (31/07)
-│       ├── sophrologue/     # CRUD sophrologue
+│       ├── sophrologue/     # CRUD sophrologue (dont certification_rncp depuis le 21/08)
+│       ├── google/
+│       │   └── oauth/           # OAuth Google Agenda : start, callback, disconnect (voir section 6)
 │       ├── patients/
 │       │   ├── create/          # Ajout manuel client (dashboard)
 │       │   └── [id]/delete/     # Suppression client, RPC transactionnelle (31/07)
 │       ├── seances/
-│       │   └── [id]/regenerer-visio/  # POST — recrée une salle Daily.co (août 2026)
-│       ├── reservations/    # create-payment-intent, annuler
-│       ├── public/          # prochain-creneau (badge temps réel, force-dynamic)
+│       │   ├── [id]/regenerer-visio/  # POST — recrée une salle Daily.co (août 2026)
+│       │   └── bloquer-creneau/       # FreeBusy strict Google Agenda avant blocage 15 min (voir section 6)
+│       ├── avis/
+│       │   └── moderer/         # POST — approuve/masque un avis client (Pro+, voir section 6)
+│       ├── reservations/    # create-payment-intent (FreeBusy strict Google Agenda inclus), annuler
+│       ├── public/          # prochain-creneau (force-dynamic), google-busy (FreeBusy souple, voir section 6)
 │       ├── factures/        # generer (facture séance, redesign 30/07 — voir section 6)
 │       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
 ├── components/
@@ -127,7 +136,9 @@ src/
 │   │   └── InvoiceHistoryTable.tsx      # Historique de facturation abonnement (31/07)
 │   ├── factures/            # BoutonFacture.tsx
 │   ├── providers/           # SophrologueProvider.tsx
-│   ├── public/              # SophrologueRppsLine.tsx, ProchainCreneauBadge.tsx (both "use client")
+│   ├── public/              # SophrologueInfoLine.tsx (générique, sert au SIRET ; renommé le 21/08,
+│   │                        # remplaçait SophrologueRppsLine.tsx), ProchainCreneauBadge.tsx,
+│   │                        # AvisPublicList.tsx, UtmCapture.tsx — tous "use client"
 │   ├── seances/             # SeancesCalendar.tsx, types.ts
 │   ├── ui/                  # Composants partagés (cn() avec twMerge depuis le 27/07, voir section 10)
 │   └── ...
@@ -143,11 +154,22 @@ src/
     ├── billing/
     │   └── trial-status.ts  # computeTrialDaysRemaining(), getSidebarPlanBadge()
     ├── stripe/
-    │   └── billing.ts       # createStripeCustomerForSophrologue() — preferred_locales: ['fr']
+    │   └── billing.ts       # createStripeCustomerForSophrologue() — preferred_locales: ['fr'] ;
+    │                        # getPriceIdToPlan() lazy, mapping price_id → plan via env STRIPE_PRICE_*
+    │                        # (voir section 6, plus de map hardcodée)
+    ├── google/
+    │   └── oauth.ts         # OAuth Google Agenda : tokens chiffrés AES-256-GCM, getBusyIntervals()
+    │                        # (FreeBusy souple), assertPrimaryCalendarSlotAvailable() (FreeBusy strict),
+    │                        # upsertSeanceEvent() (voir section 6)
     ├── booking/
-    │   └── compute-next-slot.ts  # computeNextAvailableSlotIso() — lit sophrologues.horaires
+    │   ├── compute-next-slot.ts  # computeNextAvailableSlotIso() — lit sophrologues.horaires
+    │   └── slots.ts          # SLOT_GRID_STEP_MS = 30 min (passé de 15 à 30 min, voir section 6)
     ├── config/
-    │   └── site-url.ts      # getSiteUrl(), getSophrologueProfileUrl()
+    │   └── site-url.ts      # getSiteUrl(), getSophrologueProfileUrl(), isProductionSite() (voir section 6)
+    ├── analytics/
+    │   ├── config.ts         # GA4 (G-XZQPVRGT3P), chargé PROD only via isProductionSite() (voir section 6)
+    │   └── cookie-consent.ts # Clé localStorage calymia_cookie_consent
+    ├── utm.ts                # sessionStorage calymia_utm_params, lu par UtmCapture.tsx (voir section 6)
     ├── factures/
     │   ├── generate.tsx     # Génération PDF facture séance — redesign complet 30/07 (section 6)
     │   └── fonts/           # PlayfairDisplay-*.ttf, DMSans-*.ttf (committés, pas de fetch réseau)
@@ -158,7 +180,8 @@ src/
     │   └── send.ts          # sendEmail() — init Resend paresseuse via getResendClient() (31/07)
     ├── visio/
     │   └── daily.ts         # createDailyRoom() — salles Daily.co (août 2026)
-    ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow
+    ├── profile-score.ts     # computeProfileScore(), ProfileScoreItem, SophrologueRow, PROFILE_SCORE_MAX
+    │                        # (dérivé dynamiquement, voir section 6)
     ├── horaires.ts          # normalizeHoraires(), dispoByJsDayFromHoraires() — source unique horaires (voir section 10)
     ├── supabase/            # Clients Supabase (browser + server)
     ├── utils.ts             # cn() — twMerge (fixé le 27/07, voir section 10)
@@ -199,7 +222,7 @@ chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canoniqu
 ### Tables principales
 | Table | Colonnes clés | Notes |
 |---|---|---|
-| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet`, `siret`, `lien_teleconsultation`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `limite_clients_alerte_envoyee_at` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10). `siret` nullable, ajouté 30/07 (affiché sur la facture si renseigné). `lien_teleconsultation` = fallback profil si création Daily.co échoue (voir section 6 — Visioconférence). `limite_clients_alerte_envoyee_at` ajouté 31/07 (voir section 11) |
+| `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet`, `siret`, `certification_rncp` (boolean), `afficher_email`, `afficher_telephone`, `lien_teleconsultation`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `limite_clients_alerte_envoyee_at` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10). `siret` nullable, ajouté 30/07 (affiché sur la facture si renseigné). `certification_rncp boolean NOT NULL DEFAULT false` remplace `numero_rpps` depuis le 21/08 — simple filtre déclaratif (pas de code, pas de critère de score profil), voir section 6. `afficher_email`/`afficher_telephone` : opt-in d'affichage des coordonnées sur la page publique (voir section 6). `lien_teleconsultation` = fallback profil si création Daily.co échoue (voir section 6 — Visioconférence). `limite_clients_alerte_envoyee_at` ajouté 31/07 (voir section 11) |
 | `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus |
 | `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut`, `lien_teleconsultation` | `statut` = 'confirmee' / 'terminee' / 'annulee'. `lien_teleconsultation` **activement lue/écrite** depuis août 2026 (lien Daily.co par séance, voir section 6) — plus un champ legacy mort |
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
@@ -208,6 +231,8 @@ chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canoniqu
 | `communications` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `type`, `statut`, `sent_at`, `destinataire_email`, `destinataire_nom`, `objet`, `contenu` | ⚠️ Pas `communications_log`. Colonne date = `sent_at` (pas `created_at`). Contrainte `communications_type_check` : liste fermée de valeurs autorisées pour `type` — **toujours vérifier/étendre cette contrainte** avant d'introduire un nouveau type d'email journalisé (ajouté `limite_clients_alerte` le 31/07 ; la contrainte réelle en base contenait déjà `avis`, absent du fichier de migration d'origine — écart base/repo à garder en tête) |
 | `email_templates` | `id`, `sophrologue_id`, `type`, `sujet`, `contenu_html` | FK sur `sophrologues.user_id` (pas `.id`) |
 | `seance_notes` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `contenu_html` | Pro+ uniquement |
+| `avis` | `id`, `sophrologue_id`, `patient_id`, `seance_id`, `token`, `note`, `commentaire`, `statut`, `created_at` | Ajoutée `20260529120000_avis.sql`. Token unique généré au post-séance (Pro+), formulaire public `/avis/[token]`, modération sophrologue (`/dashboard/avis`, `POST /api/avis/moderer`), affichage public via `AvisPublicList.tsx`. Voir section 6 |
+| `google_calendar_connections` | `id`, `sophrologue_id`, `access_token`, `refresh_token`, `calendar_id`, `created_at` | Ajoutée `20260814120000_...sql`. Tokens chiffrés AES-256-GCM. Voir section 6 — Google Agenda |
 
 ### Horaires — format JSONB
 ```typescript
@@ -260,12 +285,19 @@ crash d'import Resend).
 
 `to` accepte `string | string[]` depuis le 31/07 (notifications internes à plusieurs destinataires).
 
+⚠️ **TODO cleanup identifié le 21/08** : `src/app/api/rappels/test/route.ts` appelle encore
+directement `api.sendgrid.com` (leftover, hors du chemin Resend décrit ci-dessus). Aucun email de
+prod ne passe par SendGrid (confirmé), mais cette route de test doit être migrée vers Resend ou
+supprimée. Des docs hors `CLAUDE.md` (README, `.env.example`, `docs/architecture.md`,
+`docs/infrastructure.md`, `src/docs/n8n-workflow-rappels.md`) mentionnent aussi encore SendGrid —
+non traité dans ce fichier, à corriger séparément.
+
 ### SSR — obligatoire sur les pages publiques
 Toutes les pages sous `(public)/` doivent être en SSR (Server Side Rendering).
 Ne jamais ajouter `"use client"` sur les pages publiques sophrologues. Si un bloc nécessite
 un état client (ex: infobulle toggle sur mobile, ou badge temps réel), l'isoler dans un petit
-composant `"use client"` dédié — exemples : `src/components/public/SophrologueRppsLine.tsx`,
-`src/components/public/ProchainCreneauBadge.tsx`.
+composant `"use client"` dédié — exemples : `src/components/public/SophrologueInfoLine.tsx`
+(renommé le 21/08, ex-`SophrologueRppsLine.tsx`), `src/components/public/ProchainCreneauBadge.tsx`.
 
 ### URLs — toujours centralisées
 **Ne jamais hardcoder** `app.calymia.com` ou `calymia.vercel.app`. Toujours utiliser :
@@ -312,6 +344,18 @@ que déclarative.
 - Nouveaux customers Stripe créés avec `preferred_locales: ['fr']` (`createStripeCustomerForSophrologue`,
   `src/lib/stripe/billing.ts`) — factures Stripe en français par défaut. Les comptes créés avant
   cette date restent en anglais sauf modification manuelle du customer dans Stripe Dashboard.
+- **`getPriceIdToPlan()` lazy** (`src/lib/stripe/billing.ts`) : mapping price_id → plan lu depuis
+  les env vars `STRIPE_PRICE_ESSENTIEL` / `STRIPE_PRICE_PROFESSIONNEL` / `STRIPE_PRICE_CABINET`,
+  jamais hardcodé. Remplace un ancien mapping en dur (price_ids TEST codés en dur, qui faisait
+  ignorer silencieusement les events webhook en PROD). Ne jamais réintroduire de map statique —
+  TEST et LIVE ont des price_ids différents.
+- **Pause / reprise self-service (Billing Portal)** : `trial_settings.end_behavior
+  .missing_payment_method: "pause"` sur les abonnements — un sophrologue sans moyen de paiement à
+  la fin du trial voit son abonnement passer en `paused` plutôt que d'échouer silencieusement. Le
+  webhook sait retrouver un abonnement `paused` pour le reprendre après ajout de carte. Accès via
+  `POST /api/stripe/billing-portal`. Flow confirmé fonctionnel en DEV (trial → suspension → ajout
+  carte → reprise → paiement → plan synchronisé) — non encore revérifié avec les price_ids LIVE en
+  PROD au moment d'écrire ces lignes, à valider au premier changement de formule d'un sophrologue réel.
 
 ### Stripe — deux secrets distincts
 - `STRIPE_WEBHOOK_SECRET` est différent entre DEV et PROD
@@ -373,21 +417,47 @@ route API `force-dynamic` à chaque affichage. Exemple : `ProchainCreneauBadge.t
 
 ## 6. Patterns établis
 
-### Score de complétude du profil (mis à jour 27 juillet 2026)
-- Calcul dans `src/lib/profile-score.ts` — fonction `computeProfileScore(sophrologue, supabase)`
-- 9 critères, total toujours /100 : 8 critères × 10 points + 1 critère "Horaires" × 20 points
-  (fusion des anciens critères séparés `disponibilites` + `horaires` — la table `disponibilites`
-  n'étant plus lue nulle part, ce critère unique se base sur `hasHorairesContenu(normalizeHoraires(...))`)
-- Formule : `items.reduce((sum, item) => sum + (item.completed ? (item.points ?? 10) : 0), 0)`
-  — chaque `ProfileScoreItem` peut définir `points` (défaut 10) ; permet d'ajouter/retirer des
-  critères sans casser le total /100
+### Score de complétude du profil (mis à jour 21 août 2026)
+- Calcul dans `src/lib/profile-score.ts` — fonction `computeProfileScore(sophrologue, supabase)`,
+  barème statique `PROFILE_SCORE_CRITERIA`
+- **8 critères, max dynamique `PROFILE_SCORE_MAX`** = somme des poids réels (`points ?? 10`),
+  dérivée par `.reduce()` sur le tableau des critères — **plus de `100` codé en dur** depuis le
+  21/08 (voir ci-dessous, chantier RPPS → RNCP)
+  - Actuellement 90 pts : 7 critères × 10 pts + 1 critère "Horaires" × 20 pts (fusion des anciens
+    critères séparés `disponibilites` + `horaires` — la table `disponibilites` n'étant plus lue
+    nulle part, ce critère unique se base sur `hasHorairesContenu(normalizeHoraires(...))`)
+- Critères actuels : photo_url, bio (>50 chars), specialites, types_seances actifs, horaires JSONB
+  (20 pts), photos_cabinet, formations, syndicats
+- `ProfileScoreCard.tsx` consomme `PROFILE_SCORE_MAX` (jamais `100` en dur) : "complet" si
+  `score >= PROFILE_SCORE_MAX`, pourcentage affiché = `Math.round(score / PROFILE_SCORE_MAX * 100)`
 - Affiché dans le dashboard via `ProfileScoreCardWrapper` (Client Component) → `ProfileScoreCard`
-- Critères : photo_url, bio (>50 chars), specialites, types_seances actifs, horaires JSONB (20 pts),
-  photos_cabinet, formations, numero_rpps, syndicats
 - Liens directs vers `/parametres?tab={profil|seances|disponibilites|vitrine}` — ⚠️ **pas**
   `/dashboard/parametres` (bug corrigé le 24 juillet 2026 : `/parametres` est un sibling de
   `/dashboard`, pas un sous-dossier)
 - `SophrologueRow` : type structurel défini dans `profile-score.ts` (pas de type centralisé pour l'instant)
+
+⚠️ **Historique** : le critère `numero_rpps` (10 pts, catégorie Confiance) a été **retiré sans
+remplacement** le 21/08 — RPPS est un identifiant réservé aux professions de santé réglementées,
+ne concernait pas les sophrologues (voir "Certification RNCP" ci-dessous). Le nouveau champ
+`certification_rncp` est un booléen de filtre pour un futur annuaire, pas un critère de score —
+décision volontaire de ne pas le réintégrer dans le calcul.
+
+### Certification RNCP (21 août 2026 — remplace RPPS)
+- `sophrologues.certification_rncp boolean NOT NULL DEFAULT false` — remplace `numero_rpps`
+  (colonne supprimée). Décision : RNCP identifie un **titre/diplôme**, pas un praticien (contrairement
+  à RPPS) ; deux sophrologues peuvent partager le même code RNCP. Un simple booléen déclaratif
+  suffit — pas de champ numérique.
+- Checkbox "Je détiens une certification reconnue RNCP" dans l'onboarding étape 1 et Paramètres →
+  Profil (même emplacement que l'ancien champ RPPS)
+- Page publique : pill verte "✓ Certification RNCP" (même bloc que le SIRET, composant
+  `SophrologueInfoLine.tsx` pour le SIRET uniquement — le badge RNCP est un élément séparé, pas
+  une ligne texte+infobulle)
+- Le détail (école, code RNCP, année) reste en texte libre dans la colonne `formations` existante
+  — pas de duplication, pas de nouveau champ texte
+- **N'entre pas dans le score de complétude du profil** (voir ci-dessus) — sert de futur filtre
+  d'annuaire sophrologues (V2), pas de critère de confiance
+- **JSON-LD non enrichi** pour ce champ — décision volontaire tant que l'annuaire n'existe pas
+  (voir JSON-LD ci-dessous)
 
 ### Facture PDF séance — redesign complet (30 juillet 2026)
 - Générée dans `src/lib/factures/generate.tsx` via `@react-pdf/renderer`, déclenchée par le
@@ -458,6 +528,68 @@ route API `force-dynamic` à chaque affichage. Exemple : `ProchainCreneauBadge.t
 - Infra / TODO CB : voir section 5 (Daily.co) — sans moyen de paiement sur les comptes Daily,
   le *join* échoue malgré une création de salle réussie.
 
+### Google Agenda V1 (US-34, livré 19 août 2026)
+- Sync **push uniquement** (Calymia → Google), pas encore bidirectionnelle — noté comme évolution
+  future, pas dans le scope V1
+- Table `google_calendar_connections` (migration `20260814120000_...sql`) : tokens OAuth chiffrés
+  **AES-256-GCM**, jamais en clair en base
+- OAuth : `src/lib/google/oauth.ts` + routes `POST /api/google/oauth/start|callback|disconnect`.
+  Scopes : `calendar.events`, `calendar.calendarlist`, `calendar.app.created`, `calendar.freebusy`
+- À la confirmation du paiement (webhook `payment_intent.succeeded`), `upsertSeanceEvent()` pousse
+  la séance confirmée vers un calendrier secondaire "Calymia" dédié — jamais sur le calendrier
+  principal du sophrologue
+- **Deux niveaux de vérification FreeBusy** :
+  - **Souple (affichage)** : `getBusyIntervals()`, utilisé par le tunnel de réservation et le badge
+    "prochain créneau" (`/api/public/google-busy`) — best-effort, `[]` en cas d'échec (fail-soft)
+  - **Strict (avant paiement)** : `assertPrimaryCalendarSlotAvailable()`, appelé dans
+    `bloquer-creneau` et `create-payment-intent` — bloque **uniquement cette réservation**
+    (409 sur conflit détecté, 503 si erreur Google), jamais toute la page (fail-explicit)
+- UI : onglet Paramètres → Intégrations (5ᵉ onglet, voir section 3)
+- Vérification Google : app approuvée (~24h de délai, confirmé le 19/08)
+
+### JSON-LD — `ProfessionalService` + `Person` imbriqué (SEO)
+- Page publique sophrologue : `@type: ProfessionalService`, avec un `Person` imbriqué via
+  `employee` (`jobTitle: "Sophrologue"`, etc.) — validé par Google Rich Results Test
+- Décision volontaire : **ne pas enrichir ce JSON-LD avec `certification_rncp`** tant que
+  l'annuaire filtrable n'existe pas (voir "Certification RNCP" ci-dessus) — un booléen sans détail
+  structuré n'apporte rien en `hasCredential`
+- Si `afficher_email`/`afficher_telephone` sont activés (opt-in, voir "Page publique — champs
+  affichés"), ces coordonnées apparaissent aussi dans le `Person`
+
+### `robots.ts` / `sitemap.ts` dynamiques (SEO technique)
+- `src/app/robots.ts` et `src/app/sitemap.ts` sont dynamiques, protégés par un guard
+  `isProductionSite()` (`src/lib/config/site-url.ts`, teste `getSiteUrl() === "https://app.calymia.com"`)
+- **Hors PROD** : `Disallow: /` et sitemap vide (empêche l'indexation de `calymia.vercel.app`)
+- **En PROD** : sitemap liste tous les profils `actif=true`, soumis à Search Console
+- ⚠️ Point de vigilance : ce guard compare `getSiteUrl()` à `app.calymia.com` en dur pour
+  **détecter l'environnement**, ce qui est différent de la règle "ne jamais hardcoder
+  `app.calymia.com`" (section 5, URLs) qui concerne la **construction de liens**. Les deux usages
+  ne se contredisent pas mais peuvent porter à confusion — garder la distinction en tête.
+
+### GA4 + consentement RGPD (Google Analytics)
+- Bannière de consentement (`CookieConsentBanner`, Accepter/Refuser) + `GoogleAnalytics` dans
+  `layout.tsx`, tous deux chargés **PROD only** via `isProductionSite()`
+- Choix stocké en `localStorage`, clé `calymia_cookie_consent` (`src/lib/analytics/cookie-consent.ts`)
+- GA4 (`G-XZQPVRGT3P`) ne se charge jamais hors PROD ni avant acceptation ; retrait du consentement
+  → rechargement de page
+- Config centralisée dans `src/lib/analytics/config.ts`
+
+### Tracking UTM
+- Composant `UtmCapture.tsx` ("use client") sur la page publique sophrologue, capture les
+  paramètres UTM de l'URL d'arrivée
+- Stockage en `sessionStorage`, clé `calymia_utm_params` (`src/lib/utm.ts`) — sert le suivi de
+  conversion (canal d'acquisition → inscription)
+
+### Avis clients (US-33, livré)
+- Table `avis` (migration `20260529120000_avis.sql`), colonne `communications.type` incluait déjà
+  `avis` en base avant même le fichier de migration d'origine (écart base/repo à garder en tête,
+  voir section 4)
+- **Pro+ uniquement** : le cron `post-seance` (20h UTC) génère un token unique et envoie le lien
+  d'avis, **skip explicite pour le plan `essentiel`**
+- Formulaire public `/avis/[token]` (accès par token, pas d'auth)
+- Modération sophrologue : `/dashboard/avis` (approuver/masquer), `POST /api/avis/moderer`
+- Affichage public : `AvisPublicList.tsx` sur la page publique sophrologue
+
 ### Reset mot de passe — callback PKCE (fix août 2026)
 - Symptôme : lien email de reset → `/auth/callback` → redirection incorrecte vers `/dashboard`
   au lieu de `/reinitialiser-mot-de-passe`.
@@ -488,6 +620,9 @@ affichés comme fermés mais réservables quand même).
 - L'onboarding étape 3 écrit désormais `horaires` via `/api/sophrologue/update` (au lieu de
   `disponibilites` via `/api/sophrologue/disponibilites`) ; le délai minimum de réservation reste
   géré séparément via ce dernier endpoint avec `{ delaiOnly: true }`.
+- **Pas de grille des créneaux passé de 15 à 30 minutes** : constante partagée
+  `SLOT_GRID_STEP_MS` extraite dans `src/lib/booking/slots.ts`, utilisée à la fois par
+  `reserver/page.tsx` (tunnel) et `compute-next-slot.ts` (badge), pour éviter toute désynchronisation.
 - **Le badge "prochain créneau"** sur la page publique est un Client Component dédié
   (`ProchainCreneauBadge.tsx`, route `/api/public/prochain-creneau`, `force-dynamic`) — la page
   publique elle-même reste en ISR (`revalidate: 3600`), mais ce badge recalcule en temps réel à
@@ -501,9 +636,14 @@ affichés comme fermés mais réservables quand même).
   avec étape 3.
 
 ### Page publique — champs affichés
-- `numero_rpps` : affiché au-dessus de la section photos cabinet, uniquement si renseigné, avec infobulle définition
-- Tél, email, adresse : **non affichés** sur la page publique (force la réservation en ligne, protège la commission 3%)
-- Ces coordonnées sont transmises uniquement dans l'email de confirmation client
+- `certification_rncp` : pill "✓ Certification RNCP" au-dessus de la section photos cabinet, dans
+  le même bloc que le SIRET, uniquement si `true` (remplace l'ancien affichage `numero_rpps` —
+  voir section 6)
+- Tél, email, adresse : **masqués par défaut** — affichage conditionné à l'opt-in `afficher_email`
+  / `afficher_telephone` (colonnes ajoutées sur `sophrologues`) réglable dans Paramètres → Vitrine.
+  Par défaut ces coordonnées restent masquées (force la réservation en ligne, protège la commission
+  3%) ; si le sophrologue active l'opt-in, elles apparaissent aussi dans le JSON-LD `Person`
+- Ces coordonnées sont dans tous les cas transmises dans l'email de confirmation client
 - URL publique affichée dans l'onboarding étape 5 (confirmation) ET dans l'email de bienvenue
 
 ### Statut trial Stripe
@@ -749,11 +889,12 @@ processus de déploiement PROD. Détail technique déjà intégré dans les sect
 - Migration SQL `types_seances.mode` appliquée sur PROD **après** un premier deploy code-only
   (incident documenté section 2)
 
-### Livré sur `develop` uniquement (pas encore mergé `main` / PROD)
+### Livré et déployé en PROD (mise à jour 21/08 — confirmé mergé depuis)
 - **Fix alignement colonnes** « Historique des séances » (`src/app/(auth)/patient/page.tsx`) :
   grids par ligne indépendants remplacés par un grid CSS partagé (`display: contents`),
   padding par cellule (plus de `gap-x-4` créant des bandes blanches), titre « Reçu » centré
-  sur la dernière colonne du header
+  sur la dernière colonne du header — confirmé présent sur `main` lors du diagnostic du 21/08,
+  la mention "develop only" de l'arborescence (section 3) est corrigée en conséquence
 
 ### Infra / ops clos
 - Redirect URLs Supabase DEV : Site URL + Redirect URLs du projet `cdfltpuzlkyoymjgdhcr`
@@ -767,6 +908,49 @@ processus de déploiement PROD. Détail technique déjà intégré dans les sect
 ### Leçon déploiement
 - Ne jamais pousser sur `main` du code qui dépend d'une migration SQL tant que cette migration
   n'est pas appliquée et vérifiée sur la base PROD (checklist section 2, étape 4).
+
+---
+
+## 13. Session du 21 août 2026 — synthèse
+
+Chantier RPPS → certification_rncp, suivi d'un diagnostic complet de l'écart entre ce fichier et
+l'état réel du code (accumulé depuis le 12 août).
+
+### Livré — chantier RPPS → certification_rncp
+- Migration DEV validée : `DROP COLUMN numero_rpps`, `ADD COLUMN certification_rncp boolean
+  NOT NULL DEFAULT false` — **migration PROD à confirmer/vérifier** (checklist section 2 avant
+  tout merge `develop` → `main` incluant ce changement)
+- Checkbox RNCP dans l'onboarding étape 1, récap étape 5, et Paramètres → Profil
+- Badge public "✓ Certification RNCP" (SIRET inchangé)
+- Score de complétude du profil : critère RPPS retiré **sans remplacement**, `PROFILE_SCORE_MAX`
+  désormais dérivé dynamiquement (voir section 6) — corrige au passage un bug latent où
+  `ProfileScoreCard` comparait à `100` en dur
+- `SophrologueRppsLine.tsx` renommé `SophrologueInfoLine.tsx` (générique, ne sert plus qu'au SIRET)
+
+### Diagnostic doc vs code — écarts comblés dans cette mise à jour
+Fonctionnalités livrées en code depuis le 12 août mais absentes (ou mal décrites) dans ce fichier
+jusqu'ici, toutes documentées dans les sections correspondantes ci-dessus :
+- Google Agenda V1 (US-34) — section 6
+- JSON-LD `ProfessionalService`/`Person`, `robots.ts`/`sitemap.ts` dynamiques — section 6
+- GA4 + consentement RGPD, tracking UTM — section 6
+- `getPriceIdToPlan()` lazy, pause/reprise Stripe Billing self-service — section 5
+- Avis clients (US-33) — section 6
+- Slot grid réservation 15 → 30 min — section 6
+- Opt-in `afficher_email`/`afficher_telephone` — section 6
+- 5ᵉ onglet Paramètres "Intégrations" — section 3
+- Fix grille "Historique des séances" confirmé en PROD (n'était plus "develop only") — section 12
+
+### Zones signalées mais non traitées dans cette mise à jour (hors scope `CLAUDE.md`)
+- `src/app/api/rappels/test/route.ts` appelle encore directement l'API SendGrid — à migrer vers
+  Resend ou supprimer (voir section 5)
+- Mentions SendGrid dans des docs hors `CLAUDE.md` (README, `.env.example`,
+  `docs/architecture.md`, `docs/infrastructure.md`, `src/docs/n8n-workflow-rappels.md`)
+- Écart bucket `factures` public vs privé (déjà signalé section 4, toujours ouvert)
+- `calymia-prd.docx` : US-33 et US-34 à recorriger (statuts `📋 V2` obsolètes), plusieurs US
+  manquantes pour les livraisons ci-dessus — traité séparément, pas dans ce fichier
+- `calymia-infrastructure-v2-final.docx` : document de bascule pré-lancement (avril 2026), décrit
+  la création d'un "nouveau projet Supabase prod" déjà créé depuis — à considérer comme référence
+  historique du jour de lancement plutôt qu'à corriger ligne par ligne
 
 ---
 
