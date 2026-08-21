@@ -21,18 +21,6 @@ import {
   type HorairesSophrologue,
 } from "@/lib/horaires";
 
-type Specialty =
-  | "stress"
-  | "sommeil"
-  | "confiance"
-  | "douleur"
-  | "sport"
-  | "grossesse"
-  | "enfants"
-  | "preparation"
-  | "arret_tabac"
-  | "autres";
-
 type DayKey = "lundi" | "mardi" | "mercredi" | "jeudi" | "vendredi" | "samedi";
 
 type ModeSeance = "presentiel" | "visio";
@@ -50,7 +38,7 @@ type OnboardingState = {
   /** Public URL after upload to Storage (`avatars` bucket) */
   photoUrl: string | null;
   bio: string;
-  specialties: Specialty[];
+  specialties: string;
   rpps?: string;
   teleconsultationUrl?: string;
   // Étape 2
@@ -76,7 +64,7 @@ type OnboardingState = {
 const INITIAL_STATE: OnboardingState = {
   photoUrl: null,
   bio: "",
-  specialties: [],
+  specialties: "",
   rpps: "",
   teleconsultationUrl: "",
   address: "",
@@ -96,19 +84,6 @@ const INITIAL_STATE: OnboardingState = {
   minBookingDelay: "24",
   vitrine: createInitialVitrineData(),
 };
-
-const SPECIALTY_OPTIONS: { value: Specialty; label: string }[] = [
-  { value: "stress", label: "Stress" },
-  { value: "sommeil", label: "Sommeil" },
-  { value: "confiance", label: "Confiance en soi" },
-  { value: "douleur", label: "Douleur" },
-  { value: "sport", label: "Sport" },
-  { value: "grossesse", label: "Grossesse" },
-  { value: "enfants", label: "Enfants" },
-  { value: "preparation", label: "Préparation mentale" },
-  { value: "arret_tabac", label: "Arrêt tabac" },
-  { value: "autres", label: "Autres" },
-];
 
 const DAYS: { key: DayKey; label: string }[] = [
   { key: "lundi", label: "Lundi" },
@@ -239,18 +214,6 @@ export default function OnboardingPage() {
     }));
   };
   const goBack = () => setStep((s) => Math.max(1, s - 1));
-
-  const toggleSpecialty = (value: Specialty) => {
-    setState((prev) => {
-      const exists = prev.specialties.includes(value);
-      return {
-        ...prev,
-        specialties: exists
-          ? prev.specialties.filter((s) => s !== value)
-          : [...prev.specialties, value],
-      };
-    });
-  };
 
   const updateDayEnabled = (day: DayKey, enabled: boolean) => {
     setState((prev) => ({
@@ -454,7 +417,10 @@ export default function OnboardingPage() {
         prenom: prenomPayload,
         nom: nomPayload,
         bio: state.bio,
-        specialties: state.specialties,
+        specialties: state.specialties
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
         rpps: state.rpps,
         teleconsultationUrl: state.teleconsultationUrl,
         address: state.address,
@@ -771,29 +737,18 @@ export default function OnboardingPage() {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-800">
-                    Spécialités
+                    Spécialités{" "}
+                    <span className="font-normal text-slate-400">(séparées par des virgules)</span>
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {SPECIALTY_OPTIONS.map((option) => {
-                      const active = state.specialties.includes(option.value);
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => toggleSpecialty(option.value)}
-                          className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                            active
-                              ? "border-[#426F59] bg-[#426F59] text-white"
-                              : "border-slate-200 bg-white text-slate-700 hover:border-[#426F59]"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <Input
+                    placeholder="Stress, Sommeil, Préparation mentale"
+                    value={state.specialties}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, specialties: e.target.value }))
+                    }
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1224,14 +1179,8 @@ export default function OnboardingPage() {
                   </p>
                   <p className="mt-1 text-xs text-slate-600">
                     Spécialités :{" "}
-                    {state.specialties.length > 0
-                      ? state.specialties
-                          .map(
-                            (s) =>
-                              SPECIALTY_OPTIONS.find((o) => o.value === s)
-                                ?.label ?? s,
-                          )
-                          .join(", ")
+                    {state.specialties.trim()
+                      ? state.specialties.trim()
                       : "Non renseignées"}
                   </p>
                   <p className="mt-1 text-xs text-slate-600">
