@@ -42,6 +42,25 @@ function resolvePaiement(
   return row ?? null;
 }
 
+type ReglementInfo =
+  | { kind: "en_ligne" }
+  | { kind: "hors_plateforme"; montant: number }
+  | { kind: "lien_attente" }
+  | { kind: "lien_paye"; montant: number };
+
+function resolveReglement(seance: Seance): ReglementInfo | null {
+  if (seance.origine !== "manuelle") return null;
+  if (seance.montant_declare !== null) {
+    const montant = Number(seance.montant_declare);
+    if (Number.isFinite(montant)) {
+      return { kind: "hors_plateforme", montant };
+    }
+  }
+  const montantPaye = resolvePaiement(seance.paiement)?.montant_total ?? null;
+  if (montantPaye !== null) return { kind: "lien_paye", montant: Number(montantPaye) };
+  return { kind: "lien_attente" };
+}
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8h → 19h
@@ -189,6 +208,7 @@ function SeanceDrawer({
   const paiementRow = resolvePaiement(seance.paiement);
   const montant = paiementRow?.montant_total ?? null;
   const factureUrl = paiementRow?.facture_url ?? null;
+  const reglement = resolveReglement(seance);
 
   const { nom: typeNom, mode: typeMode } = resolveTypeSeance(seance.type_seance);
   const isVisio = typeMode === "visio";
@@ -321,7 +341,21 @@ function SeanceDrawer({
               value={`${formatTime(seance.debut_at)} – ${formatTime(seance.fin_at)}`}
               icon={<Clock className="h-4 w-4 text-slate-400" />}
             />
-            {montant !== null && (
+            {reglement && (
+              <DrawerRow
+                label="Règlement"
+                value={
+                  reglement.kind === "hors_plateforme"
+                    ? `Hors plateforme — ${reglement.montant.toFixed(2)} € déclarés`
+                    : reglement.kind === "lien_attente"
+                      ? "Lien de paiement envoyé — en attente"
+                      : reglement.kind === "lien_paye"
+                        ? `Lien de paiement — ${reglement.montant.toFixed(2)} € payés`
+                        : ""
+                }
+              />
+            )}
+            {montant !== null && reglement?.kind !== "hors_plateforme" && reglement?.kind !== "lien_paye" && (
               <DrawerRow label="Montant" value={`${montant.toFixed(2)} €`} />
             )}
             {(seance.statut === "confirmee" || seance.statut === "terminee") && (
