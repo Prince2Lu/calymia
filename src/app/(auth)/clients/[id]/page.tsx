@@ -20,6 +20,7 @@ import { formatParisTime } from "@/lib/timezone";
 import { planAllowsSeanceNotes } from "@/lib/email-templates/placeholders";
 import { seanceNoteHtmlIsNonEmpty } from "@/lib/seance-notes";
 import { BoutonFacture } from "@/components/factures/BoutonFacture";
+import { BoutonRecu } from "@/components/seances/BoutonRecu";
 import NoteSeance from "@/components/dashboard/NoteSeance";
 import { PlanGuard } from "@/components/plan/PlanGuard";
 import { normalizePlan } from "@/hooks/usePlan";
@@ -40,6 +41,9 @@ type Seance = {
   id: string;
   debut_at: string;
   statut: string;
+  origine: string;
+  montant_declare: number | null;
+  recu_url: string | null;
   type_seance: { nom: string | null } | null;
   paiement:
     | { montant_total: number | null; facture_url: string | null }
@@ -216,7 +220,7 @@ export default function FichePatientPage() {
       const { data: seancesData } = await supabase
         .from("seances")
         .select(
-          "id, debut_at, statut, type_seance:types_seances(nom), paiement:paiements(montant_total, facture_url)",
+          "id, debut_at, statut, origine, montant_declare, recu_url, type_seance:types_seances(nom), paiement:paiements(montant_total, facture_url)",
         )
         .eq("patient_id", params.id)
         .order("debut_at", { ascending: false })
@@ -403,6 +407,14 @@ export default function FichePatientPage() {
                           )}
                           {montant !== null && (
                             <BoutonFacture seanceId={s.id} factureUrl={factureUrl} />
+                          )}
+                          {s.origine === "manuelle" && s.montant_declare !== null && (
+                            <>
+                              <span className="text-sm font-medium text-slate-700">
+                                {s.montant_declare.toFixed(2)} € (déclaré)
+                              </span>
+                              <BoutonRecu seanceId={s.id} recuUrl={s.recu_url} />
+                            </>
                           )}
                           {sophrologue && (
                             <button
