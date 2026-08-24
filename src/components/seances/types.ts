@@ -4,6 +4,9 @@ export type Seance = {
   debut_at: string;
   fin_at: string;
   statut: string;
+  origine: string;
+  montant_declare: number | null;
+  recu_url: string | null;
   lien_teleconsultation: string | null;
   patient: {
     prenom: string | null;
@@ -19,4 +22,4 @@ export type Seance = {
 };
 
 export const SEANCES_SELECT =
-  "id, patient_id, debut_at, fin_at, statut, lien_teleconsultation, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom, mode), paiement:paiements(montant_total, facture_url)";
+  "id, patient_id, debut_at, fin_at, statut, origine, montant_declare, recu_url, lien_teleconsultation, patient:patients(prenom, nom, email, telephone), type_seance:types_seances(nom, mode), paiement:paiements(montant_total, facture_url)";

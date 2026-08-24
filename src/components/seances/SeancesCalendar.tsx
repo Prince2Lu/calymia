@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BoutonFacture } from "@/components/factures/BoutonFacture";
+import { BoutonRecu } from "@/components/seances/BoutonRecu";
 import NoteSeance from "@/components/dashboard/NoteSeance";
 import { PlanGuard } from "@/components/plan/PlanGuard";
 import { normalizePlan } from "@/hooks/usePlan";
@@ -40,6 +41,25 @@ function resolvePaiement(
   if (!paiement) return null;
   const row = Array.isArray(paiement) ? paiement[0] : paiement;
   return row ?? null;
+}
+
+type ReglementInfo =
+  | { kind: "en_ligne" }
+  | { kind: "hors_plateforme"; montant: number }
+  | { kind: "lien_attente" }
+  | { kind: "lien_paye"; montant: number };
+
+function resolveReglement(seance: Seance): ReglementInfo | null {
+  if (seance.origine !== "manuelle") return null;
+  if (seance.montant_declare !== null) {
+    const montant = Number(seance.montant_declare);
+    if (Number.isFinite(montant)) {
+      return { kind: "hors_plateforme", montant };
+    }
+  }
+  const montantPaye = resolvePaiement(seance.paiement)?.montant_total ?? null;
+  if (montantPaye !== null) return { kind: "lien_paye", montant: Number(montantPaye) };
+  return { kind: "lien_attente" };
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -189,6 +209,7 @@ function SeanceDrawer({
   const paiementRow = resolvePaiement(seance.paiement);
   const montant = paiementRow?.montant_total ?? null;
   const factureUrl = paiementRow?.facture_url ?? null;
+  const reglement = resolveReglement(seance);
 
   const { nom: typeNom, mode: typeMode } = resolveTypeSeance(seance.type_seance);
   const isVisio = typeMode === "visio";
@@ -310,7 +331,14 @@ function SeanceDrawer({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Séance
             </p>
-            <DrawerRow label="Type" value={typeNom} />
+            <DrawerRow
+              label="Type"
+              value={
+                seance.origine === "manuelle"
+                  ? `${typeNom} · Séance manuelle`
+                  : typeNom
+              }
+            />
             <DrawerRow
               label="Date"
               value={formatDateLong(seance.debut_at)}
@@ -321,7 +349,26 @@ function SeanceDrawer({
               value={`${formatTime(seance.debut_at)} – ${formatTime(seance.fin_at)}`}
               icon={<Clock className="h-4 w-4 text-slate-400" />}
             />
-            {montant !== null && (
+            {reglement && (
+              <DrawerRow
+                label="Règlement"
+                value={
+                  reglement.kind === "hors_plateforme"
+                    ? `Hors plateforme — ${reglement.montant.toFixed(2)} €`
+                    : reglement.kind === "lien_attente"
+                      ? "Lien de paiement envoyé — en attente"
+                      : reglement.kind === "lien_paye"
+                        ? `Lien de paiement — ${reglement.montant.toFixed(2)} € payés`
+                        : ""
+                }
+              />
+            )}
+            {reglement?.kind === "hors_plateforme" && (
+              <div className="pt-2">
+                <BoutonRecu seanceId={seance.id} recuUrl={seance.recu_url} />
+              </div>
+            )}
+            {montant !== null && reglement?.kind !== "hors_plateforme" && reglement?.kind !== "lien_paye" && (
               <DrawerRow label="Montant" value={`${montant.toFixed(2)} €`} />
             )}
             {(seance.statut === "confirmee" || seance.statut === "terminee") && (
