@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Plus, Search, X } from "lucide-react";
+import { AlertCircle, Loader2, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -793,6 +793,12 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                     />
                   </div>
                 </div>
+                {slotInPast && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                    <p>Vous enregistrez une séance déjà réalisée.</p>
+                  </div>
+                )}
               </section>
 
               <section className="space-y-2">
@@ -854,12 +860,6 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                     </span>
                   </span>
                 </label>
-
-                {modeReglement === "hors_plateforme" && slotInPast && (
-                  <p className="text-[11px] text-slate-500">
-                    Vous enregistrez une séance déjà réalisée.
-                  </p>
-                )}
 
                 {modeReglement === "hors_plateforme" && (
                   <div className="space-y-1 pt-1">
