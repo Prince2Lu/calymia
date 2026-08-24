@@ -422,7 +422,7 @@ export async function POST(request: Request) {
 
           const sent = await sendEmail({
             to: emailConfirm,
-            subject: "Votre séance a été notée sur Calymia",
+            subject: "Votre séance a été enregistrée sur Calymia",
             html,
             log: {
               sophrologue_id: sophrologueId,
