@@ -390,7 +390,7 @@ export function confirmationSeanceManuelle({
   const nomComplet = `${prenom_sophrologue} ${nom_sophrologue}`.trim();
   const content = `
     <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
-    <p style="margin:0 0 16px;">Votre séance a été notée par ${prenom_sophrologue}.</p>
+    <p style="margin:0 0 16px;">Votre séance a été enregistrée par ${prenom_sophrologue}.</p>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
       <tr>
         <td style="font-size:14px;color:#374151;line-height:1.8;">
