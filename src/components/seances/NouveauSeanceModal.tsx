@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { parisYmdHmToUtc } from "@/lib/timezone";
+import { cn } from "@/lib/utils";
 import { SEANCES_SELECT, type Seance } from "@/components/seances/types";
+import type {
+  ExtractionConfiance,
+  ExtractionResult,
+} from "@/lib/ai/extract-seance-from-message";
 
 type PatientLite = {
   id: string;
@@ -25,6 +30,34 @@ type TypeSeanceLite = {
 };
 
 type ModeReglement = "hors_plateforme" | "lien_en_ligne";
+type EntryMode = "manuel" | "coller";
+
+const EMPTY_CONFIANCE: ExtractionConfiance = {
+  prenom: false,
+  nom: false,
+  email: false,
+  telephone: false,
+  date: false,
+  heure: false,
+  type_seance_id: false,
+};
+
+function digitsOnly(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function DetectedHint({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span className="ml-1.5 text-[10px] font-medium text-[#426F59]">
+      détecté — à vérifier
+    </span>
+  );
+}
+
+function detectedInputClass(detected: boolean) {
+  return detected ? "ring-1 ring-[#426F59]/50" : undefined;
+}
 
 type Props = {
   sophrologueId: string;
@@ -78,6 +111,13 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [entryMode, setEntryMode] = useState<EntryMode>("manuel");
+  const [pasteText, setPasteText] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [detected, setDetected] = useState<ExtractionConfiance>(EMPTY_CONFIANCE);
+  const [patientMatched, setPatientMatched] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,8 +195,95 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
       (modeReglement === "hors_plateforme" || canLienEnLigne),
   );
 
+  const clearDetected = (key: keyof ExtractionConfiance) => {
+    setDetected((prev) => (prev[key] ? { ...prev, [key]: false } : prev));
+  };
+
+  const applyExtraction = (result: Extract<ExtractionResult, { ok: true }>) => {
+    const email = result.patient.email?.toLowerCase() ?? "";
+    const phone = digitsOnly(result.patient.telephone);
+    const match =
+      (email
+        ? patients.find((p) => (p.email ?? "").toLowerCase() === email)
+        : undefined) ??
+      (phone.length >= 8
+        ? patients.find((p) => digitsOnly(p.telephone) === phone)
+        : undefined);
+
+    if (match) {
+      setSelectedPatient(match);
+      setNewPatientOpen(false);
+      setSearch("");
+      setPatientMatched(true);
+    } else {
+      setSelectedPatient(null);
+      setNewPatientOpen(true);
+      setPatientMatched(false);
+      setNewPatient({
+        prenom: result.patient.prenom ?? "",
+        nom: result.patient.nom ?? "",
+        email: result.patient.email ?? "",
+        telephone: result.patient.telephone ?? "",
+      });
+    }
+
+    if (result.seance.date) setDate(result.seance.date);
+    if (result.seance.heure) setTime(result.seance.heure);
+    if (result.seance.type_seance_id) setTypeId(result.seance.type_seance_id);
+
+    setDetected(result.confiance);
+    setExtractError(null);
+    setError(null);
+    setEntryMode("manuel");
+  };
+
+  const handleAnalyze = async () => {
+    setExtractError(null);
+    const trimmed = pasteText.trim();
+    if (!trimmed) {
+      setExtractError("Message vide");
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/seances/extract-from-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: pasteText }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | ExtractionResult
+        | { error?: string }
+        | null;
+
+      if (!json || typeof json !== "object") {
+        setExtractError("Réponse invalide du serveur. Réessayez.");
+        return;
+      }
+      if ("ok" in json && json.ok === true) {
+        applyExtraction(json);
+        return;
+      }
+      if ("ok" in json && json.ok === false) {
+        setExtractError(json.error);
+        return;
+      }
+      setExtractError(
+        ("error" in json && typeof json.error === "string"
+          ? json.error
+          : null) ?? "L'analyse a échoué. Réessayez ou passez en saisie manuelle.",
+      );
+    } catch {
+      setExtractError(
+        "Erreur réseau. Réessayez ou passez en saisie manuelle.",
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current && !submitting) onClose();
+    if (e.target === overlayRef.current && !submitting && !analyzing) onClose();
   };
 
   const stubSeance = useCallback(
@@ -190,7 +317,7 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !selectedType) return;
+    if (entryMode !== "manuel" || !canSubmit || !selectedType) return;
     setError(null);
 
     const [y, m, d] = date.split("-").map(Number);
@@ -288,7 +415,7 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
           <button
             type="button"
             onClick={onClose}
-            disabled={submitting}
+            disabled={submitting || analyzing}
             className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="h-5 w-5" />
@@ -305,15 +432,121 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
             </div>
           ) : (
             <>
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryMode("manuel");
+                    setExtractError(null);
+                  }}
+                  disabled={analyzing}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    entryMode === "manuel"
+                      ? "bg-white text-[#1E3A5F] shadow-sm"
+                      : "text-slate-500 hover:text-slate-700",
+                  )}
+                >
+                  Remplir manuellement
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEntryMode("coller");
+                    setExtractError(null);
+                  }}
+                  disabled={analyzing}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    entryMode === "coller"
+                      ? "bg-white text-[#1E3A5F] shadow-sm"
+                      : "text-slate-500 hover:text-slate-700",
+                  )}
+                >
+                  Coller un message client
+                </button>
+              </div>
+
+              {entryMode === "coller" ? (
+                <section className="space-y-3">
+                  <p className="text-sm text-slate-600">
+                    Collez un email, SMS ou message WhatsApp. Les champs du
+                    formulaire seront pré-remplis — à vérifier avant de créer
+                    la séance.
+                  </p>
+                  <textarea
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    disabled={analyzing}
+                    rows={8}
+                    placeholder="Bonjour, je m'appelle… je voudrais un rendez-vous jeudi prochain à 14h…"
+                    className="w-full resize-y rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#426F59] focus:outline-none focus:ring-1 focus:ring-[#426F59]/40 disabled:bg-slate-50"
+                  />
+                  {extractError && (
+                    <div className="space-y-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                      <p>{extractError}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-[#426F59] hover:underline"
+                          onClick={() => {
+                            setExtractError(null);
+                            void handleAnalyze();
+                          }}
+                          disabled={analyzing}
+                        >
+                          Réessayer
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-[#426F59] hover:underline"
+                          onClick={() => {
+                            setEntryMode("manuel");
+                            setExtractError(null);
+                          }}
+                        >
+                          Saisie manuelle
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => void handleAnalyze()}
+                    disabled={analyzing || !pasteText.trim()}
+                  >
+                    {analyzing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analyse en cours…
+                      </>
+                    ) : (
+                      "Analyser"
+                    )}
+                  </Button>
+                </section>
+              ) : (
+                <>
               <section className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Patient
                 </p>
                 {selectedPatient && !newPatientOpen ? (
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div
+                    className={cn(
+                      "flex items-center justify-between rounded-xl border bg-slate-50 px-3 py-2",
+                      patientMatched
+                        ? "border-[#426F59] ring-1 ring-[#426F59]/40"
+                        : "border-slate-200",
+                    )}
+                  >
                     <div>
                       <p className="text-sm font-medium text-slate-800">
                         {fullName(selectedPatient.prenom, selectedPatient.nom)}
+                        {patientMatched ? (
+                          <DetectedHint show />
+                        ) : null}
                       </p>
                       <p className="text-xs text-slate-500">
                         {selectedPatient.email ||
@@ -324,7 +557,10 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                     <button
                       type="button"
                       className="text-xs text-[#426F59] hover:underline"
-                      onClick={() => setSelectedPatient(null)}
+                      onClick={() => {
+                        setSelectedPatient(null);
+                        setPatientMatched(false);
+                      }}
                     >
                       Changer
                     </button>
@@ -354,6 +590,7 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                               setSelectedPatient(p);
                               setNewPatientOpen(false);
                               setSearch("");
+                              setPatientMatched(false);
                             }}
                             className="flex w-full flex-col items-start border-b border-slate-100 px-3 py-2 text-left last:border-0 hover:bg-slate-50"
                           >
@@ -375,6 +612,7 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                       onClick={() => {
                         setNewPatientOpen(true);
                         setSelectedPatient(null);
+                        setPatientMatched(false);
                       }}
                     >
                       <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -389,57 +627,69 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-slate-600">
                           Prénom <span className="text-red-500">*</span>
+                          <DetectedHint show={detected.prenom} />
                         </label>
                         <Input
                           value={newPatient.prenom}
-                          onChange={(e) =>
-                            setNewPatient({ ...newPatient, prenom: e.target.value })
-                          }
+                          onChange={(e) => {
+                            clearDetected("prenom");
+                            setNewPatient({ ...newPatient, prenom: e.target.value });
+                          }}
                           placeholder="Marie"
                           autoFocus
+                          className={detectedInputClass(detected.prenom)}
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-slate-600">
                           Nom <span className="text-red-500">*</span>
+                          <DetectedHint show={detected.nom} />
                         </label>
                         <Input
                           value={newPatient.nom}
-                          onChange={(e) =>
-                            setNewPatient({ ...newPatient, nom: e.target.value })
-                          }
+                          onChange={(e) => {
+                            clearDetected("nom");
+                            setNewPatient({ ...newPatient, nom: e.target.value });
+                          }}
                           placeholder="Dupont"
+                          className={detectedInputClass(detected.nom)}
                         />
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">
-                        Email
-                      </label>
-                      <Input
-                        type="email"
-                        value={newPatient.email}
-                        onChange={(e) =>
-                          setNewPatient({ ...newPatient, email: e.target.value })
-                        }
-                        placeholder="marie.dupont@email.com"
-                      />
+                        <label className="text-xs font-medium text-slate-600">
+                          Email
+                          <DetectedHint show={detected.email} />
+                        </label>
+                        <Input
+                          type="email"
+                          value={newPatient.email}
+                          onChange={(e) => {
+                            clearDetected("email");
+                            setNewPatient({ ...newPatient, email: e.target.value });
+                          }}
+                          placeholder="marie.dupont@email.com"
+                          className={detectedInputClass(detected.email)}
+                        />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">
-                        Téléphone
-                      </label>
-                      <Input
-                        type="tel"
-                        value={newPatient.telephone}
-                        onChange={(e) =>
-                          setNewPatient({
-                            ...newPatient,
-                            telephone: e.target.value,
-                          })
-                        }
-                        placeholder="06 12 34 56 78"
-                      />
+                        <label className="text-xs font-medium text-slate-600">
+                          Téléphone
+                          <DetectedHint show={detected.telephone} />
+                        </label>
+                        <Input
+                          type="tel"
+                          value={newPatient.telephone}
+                          onChange={(e) => {
+                            clearDetected("telephone");
+                            setNewPatient({
+                              ...newPatient,
+                              telephone: e.target.value,
+                            });
+                          }}
+                          placeholder="06 12 34 56 78"
+                          className={detectedInputClass(detected.telephone)}
+                        />
                     </div>
                     <p className="text-[11px] text-slate-400">
                       Email ou téléphone requis pour identifier le client.
@@ -464,16 +714,24 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                         <button
                           key={t.id}
                           type="button"
-                          onClick={() => setTypeId(t.id)}
-                          className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left ${
+                          onClick={() => {
+                            clearDetected("type_seance_id");
+                            setTypeId(t.id);
+                          }}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left",
                             active
                               ? "border-[#426F59] bg-[#F0F7F4]"
-                              : "border-slate-200 hover:bg-slate-50"
-                          }`}
+                              : "border-slate-200 hover:bg-slate-50",
+                            active && detected.type_seance_id && "ring-1 ring-[#426F59]/50",
+                          )}
                         >
                           <span>
                             <span className="block text-sm font-medium text-slate-800">
                               {t.nom}
+                              {active ? (
+                                <DetectedHint show={detected.type_seance_id} />
+                              ) : null}
                             </span>
                             <span className="text-xs text-slate-500">
                               {t.duree_minutes} min ·{" "}
@@ -498,21 +756,31 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-slate-600">
                       Date
+                      <DetectedHint show={detected.date} />
                     </label>
                     <Input
                       type="date"
                       value={date}
-                      onChange={(e) => setDate(e.target.value)}
+                      onChange={(e) => {
+                        clearDetected("date");
+                        setDate(e.target.value);
+                      }}
+                      className={detectedInputClass(detected.date)}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-slate-600">
                       Heure
+                      <DetectedHint show={detected.heure} />
                     </label>
                     <Input
                       type="time"
                       value={time}
-                      onChange={(e) => setTime(e.target.value)}
+                      onChange={(e) => {
+                        clearDetected("heure");
+                        setTime(e.target.value);
+                      }}
+                      className={detectedInputClass(detected.heure)}
                     />
                   </div>
                 </div>
@@ -595,10 +863,12 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                   </div>
                 )}
               </section>
+                </>
+              )}
             </>
           )}
 
-          {error && (
+          {error && entryMode === "manuel" && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {error}
             </p>
@@ -609,17 +879,19 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={submitting || analyzing}
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={!canSubmit || submitting}>
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Créer la séance"
-              )}
-            </Button>
+            {entryMode === "manuel" && (
+              <Button type="submit" disabled={!canSubmit || submitting}>
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Créer la séance"
+                )}
+              </Button>
+            )}
           </div>
         </form>
       </div>
