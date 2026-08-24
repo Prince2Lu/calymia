@@ -331,7 +331,14 @@ function SeanceDrawer({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Séance
             </p>
-            <DrawerRow label="Type" value={typeNom} />
+            <DrawerRow
+              label="Type"
+              value={
+                seance.origine === "manuelle"
+                  ? `${typeNom} · Séance manuelle`
+                  : typeNom
+              }
+            />
             <DrawerRow
               label="Date"
               value={formatDateLong(seance.debut_at)}
