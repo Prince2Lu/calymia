@@ -82,6 +82,13 @@ function defaultDateParis(): string {
   return `${y}-${m}-${d}`;
 }
 
+function isPastSlot(date: string, time: string): boolean {
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = (time || "00:00").split(":").map(Number);
+  if (!y || !m || !d || Number.isNaN(hh) || Number.isNaN(mm)) return false;
+  return parisYmdHmToUtc(y, m, d, hh, mm).getTime() < Date.now();
+}
+
 export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -175,7 +182,9 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
   const resolvedEmail = newPatientOpen
     ? newPatient.email.trim()
     : (selectedPatient?.email ?? "").trim();
-  const canLienEnLigne = resolvedEmail.length > 0;
+  const hasEmailForLien = resolvedEmail.length > 0;
+  const slotInPast = isPastSlot(date, time);
+  const canLienEnLigne = hasEmailForLien && !slotInPast;
 
   useEffect(() => {
     if (modeReglement === "lien_en_ligne" && !canLienEnLigne) {
@@ -837,12 +846,20 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
                       Envoyer un lien de paiement par email
                     </span>
                     <span className="text-xs text-slate-500">
-                      {canLienEnLigne
-                        ? "Le client reçoit un lien pour régler en ligne"
-                        : "Email requis pour cette option"}
+                      {slotInPast
+                        ? "Non disponible pour une date passée"
+                        : hasEmailForLien
+                          ? "Le client reçoit un lien pour régler en ligne"
+                          : "Email requis pour cette option"}
                     </span>
                   </span>
                 </label>
+
+                {modeReglement === "hors_plateforme" && slotInPast && (
+                  <p className="text-[11px] text-slate-500">
+                    Vous enregistrez une séance déjà réalisée.
+                  </p>
+                )}
 
                 {modeReglement === "hors_plateforme" && (
                   <div className="space-y-1 pt-1">

@@ -6,7 +6,7 @@ import { assertPrimaryCalendarSlotAvailable } from "@/lib/google/freebusy";
 import { upsertSeanceEvent } from "@/lib/google/calendar-sync";
 import { createDailyRoom } from "@/lib/visio/daily";
 import { sendEmail } from "@/lib/emails/send";
-import { lienPaiementManuel } from "@/lib/emails/templates";
+import { confirmationSeanceManuelle, lienPaiementManuel } from "@/lib/emails/templates";
 import { getSiteUrl } from "@/lib/config/site-url";
 import { formatParisTime } from "@/lib/timezone";
 
@@ -98,6 +98,16 @@ export async function POST(request: Request) {
     if (Number.isNaN(debut.getTime())) {
       return NextResponse.json(
         { error: "debut_at n'est pas une date ISO valide." },
+        { status: 400 },
+      );
+    }
+
+    if (modeReglement === "lien_en_ligne" && debut.getTime() < Date.now()) {
+      return NextResponse.json(
+        {
+          error:
+            "Impossible de créer une séance dans le passé avec paiement en ligne",
+        },
         { status: 400 },
       );
     }
@@ -379,6 +389,63 @@ export async function POST(request: Request) {
         await upsertSeanceEvent(seance.id);
       } catch (googleErr) {
         console.error("[seances/create] Google Agenda:", googleErr);
+      }
+
+      const emailConfirm = patient.email?.trim().toLowerCase() || emailIn;
+      if (emailConfirm) {
+        try {
+          const { data: sophrologue } = await supabase
+            .from("sophrologues")
+            .select("prenom, nom")
+            .eq("id", sophrologueId)
+            .maybeSingle<{ prenom: string | null; nom: string | null }>();
+
+          let lienVisio: string | null = null;
+          if (typeMode === "visio") {
+            const { data: seanceLien } = await supabase
+              .from("seances")
+              .select("lien_teleconsultation")
+              .eq("id", seance.id)
+              .maybeSingle<{ lien_teleconsultation: string | null }>();
+            lienVisio = seanceLien?.lien_teleconsultation?.trim() || null;
+          }
+
+          const html = confirmationSeanceManuelle({
+            prenom_client:
+              (patient.prenom ?? prenom ?? "").trim() || "cher client",
+            prenom_sophrologue: sophrologue?.prenom ?? "",
+            nom_sophrologue: sophrologue?.nom ?? "",
+            type_seance: typeRow.nom ?? "Séance",
+            date_heure: formatParisTime(debutAt, "dateTimeLong"),
+            lien_visio: lienVisio,
+          });
+
+          const sent = await sendEmail({
+            to: emailConfirm,
+            subject: "Votre séance a été notée sur Calymia",
+            html,
+            log: {
+              sophrologue_id: sophrologueId,
+              patient_id: patient.id,
+              seance_id: seance.id,
+              type: "confirmation_seance_manuelle",
+              destinataire_nom:
+                [patient.prenom, patient.nom].filter(Boolean).join(" ").trim() ||
+                null,
+            },
+          });
+          if (!sent.success) {
+            console.error(
+              "[seances/create] Envoi email confirmation manuelle:",
+              sent.error,
+            );
+          }
+        } catch (emailErr) {
+          console.error(
+            "[seances/create] Email confirmation manuelle:",
+            emailErr,
+          );
+        }
       }
     }
 
