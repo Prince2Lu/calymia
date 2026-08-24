@@ -391,7 +391,10 @@ export default function FichePatientPage() {
                           <p className="text-sm font-medium text-slate-900">
                             {formatDate(s.debut_at)} — {formatTime(s.debut_at)}
                           </p>
-                          <p className="text-xs text-slate-500">{typeNom}</p>
+                          <p className="text-xs text-slate-500">
+                            {typeNom}
+                            {s.origine === "manuelle" ? " · Séance manuelle" : null}
+                          </p>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                           {planAllowsSeanceNotes(sophrologue?.plan) &&
