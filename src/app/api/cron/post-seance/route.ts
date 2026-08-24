@@ -41,6 +41,7 @@ type SeancePostRow = {
   id: string;
   debut_at: string;
   fin_at: string;
+  created_at: string | null;
   patient_id: string | null;
   sophrologue_id: string;
   type_seance_id: string | null;
@@ -60,6 +61,29 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Écart max created_at − fin_at pour rester éligible au cron.
+ * Une séance notée longtemps après coup (rattrapage historique) ne doit pas
+ * déclencher les emails « merci » / avis — le client a déjà reçu la
+ * confirmation à la création, pas besoin de le spammer.
+ * Pas de colonne générée côté seances pour cet écart : filtre applicatif.
+ */
+const MAX_CREATION_DELAY_AFTER_SEANCE_HOURS = 48;
+
+function wasCreatedSoonEnoughAfterSeance(
+  createdAt: string | null,
+  finAt: string,
+): boolean {
+  if (!createdAt) return true;
+  const createdMs = new Date(createdAt).getTime();
+  const finMs = new Date(finAt).getTime();
+  if (Number.isNaN(createdMs) || Number.isNaN(finMs)) return true;
+  return (
+    createdMs - finMs <=
+    MAX_CREATION_DELAY_AFTER_SEANCE_HOURS * 60 * 60 * 1000
+  );
+}
 
 /** Récupère l'ensemble des seance_id déjà présents dans `communications` pour les types donnés. */
 async function fetchCommunicationSets(
@@ -99,7 +123,7 @@ async function sendPostSeanceMails(): Promise<number> {
   const { data: rows, error } = await supabase
     .from("seances")
     .select(
-      `id, debut_at, fin_at, patient_id, sophrologue_id, type_seance_id,
+      `id, debut_at, fin_at, created_at, patient_id, sophrologue_id, type_seance_id,
        patient:patients(email, prenom, nom),
        sophrologue:sophrologues(prenom, nom, email_pro),
        type_seance:types_seances(nom)`,
@@ -113,7 +137,9 @@ async function sendPostSeanceMails(): Promise<number> {
     return 0;
   }
 
-  const all = rows ?? [];
+  const all = (rows ?? []).filter((r) =>
+    wasCreatedSoonEnoughAfterSeance(r.created_at, r.fin_at),
+  );
   const sets = await fetchCommunicationSets(
     all.map((r) => String(r.id)),
     ["post_seance"],
@@ -236,7 +262,7 @@ async function sendAvisMails(): Promise<number> {
   const { data: rows, error } = await supabase
     .from("seances")
     .select(
-      `id, debut_at, fin_at, patient_id, sophrologue_id, type_seance_id,
+      `id, debut_at, fin_at, created_at, patient_id, sophrologue_id, type_seance_id,
        patient:patients(email, prenom, nom),
        sophrologue:sophrologues(prenom, nom, email_pro),
        type_seance:types_seances(nom)`,
@@ -250,7 +276,9 @@ async function sendAvisMails(): Promise<number> {
     return 0;
   }
 
-  const all = rows ?? [];
+  const all = (rows ?? []).filter((r) =>
+    wasCreatedSoonEnoughAfterSeance(r.created_at, r.fin_at),
+  );
   const sets = await fetchCommunicationSets(
     all.map((r) => String(r.id)),
     ["post_seance", "avis"],
