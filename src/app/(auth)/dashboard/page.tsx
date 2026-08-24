@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Info,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import {
@@ -46,6 +47,7 @@ type Patient = {
 type KpiData = {
   rdvMois: number;
   caMois: number;
+  caTotalDeclare: number;
   tauxOccupation: number;
   nouveauxPatients: number;
 };
@@ -94,19 +96,38 @@ function KpiCard({
   value,
   sub,
   accent,
+  hint,
 }: {
   icon: React.ReactNode;
   title: string;
   value: string;
   sub: string;
   accent: string;
+  hint?: string;
 }) {
   return (
     <Card className="flex flex-col gap-3 p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-600">{title}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1 text-sm font-medium text-slate-600">
+          {title}
+          {hint ? (
+            <button
+              type="button"
+              className="group relative inline-flex rounded-full p-0.5 text-slate-400 hover:text-[#426F59] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#426F59]/40"
+              aria-label={hint}
+            >
+              <Info className="h-3.5 w-3.5" aria-hidden />
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-56 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-[11px] font-normal leading-relaxed text-slate-600 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+              >
+                {hint}
+              </span>
+            </button>
+          ) : null}
+        </span>
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${accent}`}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${accent}`}
         >
           {icon}
         </div>
@@ -125,6 +146,7 @@ export default function DashboardPage() {
   const [kpi, setKpi] = useState<KpiData>({
     rdvMois: 0,
     caMois: 0,
+    caTotalDeclare: 0,
     tauxOccupation: 0,
     nouveauxPatients: 0,
   });
@@ -199,6 +221,31 @@ export default function DashboardPage() {
         0,
       );
 
+      // 4b) KPI « CA total déclaré » = CA net + montants saisis hors plateforme.
+      // Point d'attention : le CA net est filtré sur paiements.created_at
+      // (date du paiement Stripe réussi), alors que les montants déclarés le
+      // sont sur seances.debut_at (date de la séance). Même mois calendaire
+      // Paris, mais deux axes de date — un encaissement de septembre pour une
+      // séance d'août n'est pas comparable 1:1 à une déclaration datée sur
+      // debut_at. Les séances lien_en_ligne ont montant_declare NULL : pas de
+      // double comptage avec le CA net.
+      const { data: seancesDeclarees } = await supabase
+        .from("seances")
+        .select("montant_declare")
+        .eq("sophrologue_id", sid)
+        .eq("statut", "confirmee")
+        .eq("origine", "manuelle")
+        .not("montant_declare", "is", null)
+        .gte("debut_at", debutMois.toISOString())
+        .lt("debut_at", finMoisExcl.toISOString())
+        .returns<{ montant_declare: number | null }[]>();
+
+      const totalDeclare = (seancesDeclarees ?? []).reduce(
+        (sum, s) => sum + (s.montant_declare ?? 0),
+        0,
+      );
+      const caTotalDeclare = Math.round((caMois + totalDeclare) * 100) / 100;
+
       // 5) KPI 3 : Taux occupation (base 20 créneaux/mois)
       const rdvCount = rdvMois ?? 0;
       const tauxOccupation = Math.min(Math.round((rdvCount / 20) * 100), 100);
@@ -242,6 +289,7 @@ export default function DashboardPage() {
         setKpi({
           rdvMois: rdvCount,
           caMois: Math.round(caMois * 100) / 100,
+          caTotalDeclare,
           tauxOccupation,
           nouveauxPatients: nouveauxPatients ?? 0,
         });
@@ -281,7 +329,7 @@ export default function DashboardPage() {
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Ce mois-ci
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <KpiCard
                   icon={<Calendar className="h-5 w-5 text-[#2E75B6]" />}
                   title="RDV confirmés"
@@ -295,6 +343,14 @@ export default function DashboardPage() {
                   value={`${kpi.caMois.toFixed(0)} €`}
                   sub="après commission Calymia"
                   accent="bg-[#27AE60]/10"
+                />
+                <KpiCard
+                  icon={<Euro className="h-5 w-5 text-[#426F59]" />}
+                  title="CA total déclaré"
+                  value={`${kpi.caTotalDeclare.toFixed(0)} €`}
+                  sub="CA net + hors plateforme"
+                  accent="bg-[#426F59]/10"
+                  hint="Inclut les montants saisis pour les séances réglées hors plateforme. Ces déclarations ne sont pas vérifiées."
                 />
                 <KpiCard
                   icon={<TrendingUp className="h-5 w-5 text-[#1E3A5F]" />}
