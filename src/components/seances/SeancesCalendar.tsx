@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BoutonFacture } from "@/components/factures/BoutonFacture";
+import { BoutonRecu } from "@/components/seances/BoutonRecu";
 import NoteSeance from "@/components/dashboard/NoteSeance";
 import { PlanGuard } from "@/components/plan/PlanGuard";
 import { normalizePlan } from "@/hooks/usePlan";
@@ -354,6 +355,11 @@ function SeanceDrawer({
                         : ""
                 }
               />
+            )}
+            {reglement?.kind === "hors_plateforme" && (
+              <div className="pt-2">
+                <BoutonRecu seanceId={seance.id} recuUrl={seance.recu_url} />
+              </div>
             )}
             {montant !== null && reglement?.kind !== "hors_plateforme" && reglement?.kind !== "lien_paye" && (
               <DrawerRow label="Montant" value={`${montant.toFixed(2)} €`} />

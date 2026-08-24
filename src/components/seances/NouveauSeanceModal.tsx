@@ -304,6 +304,7 @@ export function NouveauSeanceModal({ sophrologueId, onClose, onCreated }: Props)
       statut,
       origine: "manuelle",
       montant_declare: null,
+      recu_url: null,
       lien_teleconsultation: null,
       patient: selectedPatient
         ? {
