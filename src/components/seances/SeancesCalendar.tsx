@@ -16,6 +16,7 @@ import {
   Copy,
   Video,
   RefreshCw,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BoutonFacture } from "@/components/factures/BoutonFacture";
@@ -31,6 +32,7 @@ import {
   startOfWeekParisMonday,
 } from "@/lib/timezone";
 import { type Seance, SEANCES_SELECT } from "@/components/seances/types";
+import { NouveauSeanceModal } from "@/components/seances/NouveauSeanceModal";
 
 function resolvePaiement(
   paiement: Seance["paiement"],
@@ -476,6 +478,7 @@ export default function SeancesCalendar({
     () => new Date(initialWeekStartIso),
   );
   const [selected, setSelected] = useState<Seance | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -591,6 +594,10 @@ export default function SeancesCalendar({
           <h1 className="text-2xl font-semibold text-[#1E3A5F]">Mon agenda</h1>
 
           <div className="flex items-center gap-2">
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Nouvelle séance
+            </Button>
             <Button variant="outline" onClick={goToday}>
               Aujourd&apos;hui
             </Button>
@@ -716,6 +723,28 @@ export default function SeancesCalendar({
           </div>
         )}
       </div>
+
+      {showCreate && (
+        <NouveauSeanceModal
+          sophrologueId={sophrologueId}
+          onClose={() => setShowCreate(false)}
+          onCreated={(seance) => {
+            setShowCreate(false);
+            showToast(
+              seance.statut === "en_attente"
+                ? "Séance créée, lien de paiement envoyé"
+                : "Séance créée",
+              "success",
+            );
+            const targetWeek = startOfWeekParisMonday(new Date(seance.debut_at));
+            if (targetWeek.getTime() !== weekStart.getTime()) {
+              setWeekStart(targetWeek);
+            } else {
+              void loadSeances(sophrologueId, weekStart, weekEnd);
+            }
+          }}
+        />
+      )}
 
       {selected && (
         <SeanceDrawer

@@ -371,6 +371,78 @@ export function postSeance({
   return baseLayout(content);
 }
 
+export function confirmationSeanceManuelle({
+  prenom_client,
+  prenom_sophrologue,
+  nom_sophrologue,
+  type_seance,
+  date_heure,
+  lien_visio,
+}: {
+  prenom_client: string;
+  prenom_sophrologue: string;
+  nom_sophrologue: string;
+  type_seance: string;
+  date_heure: string;
+  lien_visio?: string | null;
+}): string {
+  const visioBlock = buildLienVisioBlock(lien_visio);
+  const nomComplet = `${prenom_sophrologue} ${nom_sophrologue}`.trim();
+  const content = `
+    <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
+    <p style="margin:0 0 16px;">Votre séance a été enregistrée par ${prenom_sophrologue}.</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 8px;">📅 <strong>${date_heure}</strong></p>
+          <p style="margin:0 0 8px;">🧘 <strong>${type_seance}</strong></p>
+          <p style="margin:0;">👤 Avec <strong>${nomComplet}</strong></p>
+        </td>
+      </tr>
+    </table>
+    ${visioBlock}
+    <p style="margin:24px 0 0;">À bientôt,<br><strong>${nomComplet}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
+  `;
+  return baseLayout(content);
+}
+
+export function lienPaiementManuel({
+  prenom_client,
+  prenom_sophrologue,
+  nom_sophrologue,
+  type_seance,
+  date_heure,
+  montant,
+  url,
+}: {
+  prenom_client: string;
+  prenom_sophrologue: string;
+  nom_sophrologue: string;
+  type_seance: string;
+  date_heure: string;
+  montant: number;
+  url: string;
+}): string {
+  const content = `
+    <p style="margin:0 0 16px;">Bonjour ${prenom_client},</p>
+    <p style="margin:0 0 16px;">${prenom_sophrologue} ${nom_sophrologue} a noté une séance pour vous sur Calymia. Il ne reste plus qu'à régler en ligne pour confirmer le rendez-vous.</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EAF3DE;border-radius:8px;padding:20px 24px;margin:20px 0;">
+      <tr>
+        <td style="font-size:14px;color:#374151;line-height:1.8;">
+          <p style="margin:0 0 8px;">📅 <strong>${date_heure}</strong></p>
+          <p style="margin:0 0 8px;">🧘 <strong>${type_seance}</strong></p>
+          <p style="margin:0 0 8px;">👤 Avec <strong>${prenom_sophrologue} ${nom_sophrologue}</strong></p>
+          <p style="margin:0;">💶 <strong>${montant.toFixed(2)} €</strong></p>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:16px 0 0;"><a href="${url}" style="display:inline-block;background:${BRAND};color:#ffffff!important;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;">Régler en ligne</a></p>
+    <p style="margin:16px 0;font-size:13px;color:#6b7280;">Ce créneau reste réservé pendant <strong>7 jours</strong> le temps de finaliser le paiement. Passé ce délai, la séance pourra être libérée.</p>
+    <p style="margin:24px 0 0;">À bientôt,<br><strong>${prenom_sophrologue} ${nom_sophrologue}</strong><br><span style="color:#6b7280;font-size:13px;">via Calymia</span></p>
+  `;
+  return baseLayout(content);
+}
+
 /** Fragment HTML sophrologue → email complet (en-tête / pied Calymia). */
 export function wrapSophrologueEmailHtml(fragment: string): string {
   return baseLayout(fragment);

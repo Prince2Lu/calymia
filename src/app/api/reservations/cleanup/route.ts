@@ -37,7 +37,8 @@ async function runCleanup(): Promise<NextResponse> {
     const { count: totalEnAttente, error: errTotal } = await supabase
       .from("seances")
       .select("*", { count: "exact", head: true })
-      .eq("statut", "en_attente");
+      .eq("statut", "en_attente")
+      .eq("origine", "en_ligne");
 
     if (errTotal) {
       console.error("[cleanup] count en_attente error:", errTotal);
@@ -51,6 +52,7 @@ async function runCleanup(): Promise<NextResponse> {
       .from("seances")
       .select("*", { count: "exact", head: true })
       .eq("statut", "en_attente")
+      .eq("origine", "en_ligne")
       .not("expire_at", "is", null);
 
     if (errExpireSet) {
@@ -65,6 +67,7 @@ async function runCleanup(): Promise<NextResponse> {
       .from("seances")
       .select("*", { count: "exact", head: true })
       .eq("statut", "en_attente")
+      .eq("origine", "en_ligne")
       .not("expire_at", "is", null)
       .lt("expire_at", now);
 
@@ -76,11 +79,12 @@ async function runCleanup(): Promise<NextResponse> {
       withExpireAtPast ?? 0,
     );
 
-    // 1a) Blocs temporaires dont expire_at est dépassé
+    // 1a) Blocs temporaires tunnel public (origine en_ligne) dont expire_at est dépassé
     const { data: expiredByExpireAt, error: errExpiredRows } = await supabase
       .from("seances")
       .select("id, expire_at")
       .eq("statut", "en_attente")
+      .eq("origine", "en_ligne")
       .not("expire_at", "is", null)
       .lt("expire_at", now)
       .returns<{ id: string; expire_at: string }[]>();
@@ -89,11 +93,12 @@ async function runCleanup(): Promise<NextResponse> {
       console.error("[cleanup] select expiredByExpireAt error:", errExpiredRows);
     }
 
-    // 1b) Anciennes séances en_attente sans expire_at (créées avant la colonne)
+    // 1b) Anciennes séances tunnel public en_attente sans expire_at (créées avant la colonne)
     const { data: staleWithoutExpireAt, error: errStaleRows } = await supabase
       .from("seances")
       .select("id, created_at")
       .eq("statut", "en_attente")
+      .eq("origine", "en_ligne")
       .is("expire_at", null)
       .lt("created_at", staleCreatedBeforeIso)
       .returns<{ id: string; created_at: string }[]>();
@@ -139,7 +144,7 @@ async function runCleanup(): Promise<NextResponse> {
     }
 
     console.log(
-      `[cleanup] ${expiredIds.length} créneau(x) supprimé(s) (expire_at dépassé ou sans expire_at > ${HOLD_MINUTES} min)`,
+      `[cleanup] ${expiredIds.length} créneau(x) en_ligne supprimé(s) (expire_at dépassé ou sans expire_at > ${HOLD_MINUTES} min)`,
     );
     return NextResponse.json({ deleted_count: expiredIds.length });
   } catch (err) {
