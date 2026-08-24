@@ -414,7 +414,7 @@ export default function FichePatientPage() {
                           {s.origine === "manuelle" && s.montant_declare !== null && (
                             <>
                               <span className="text-sm font-medium text-slate-700">
-                                {s.montant_declare.toFixed(2)} € (déclaré)
+                                {s.montant_declare.toFixed(2)} €
                               </span>
                               <BoutonRecu seanceId={s.id} recuUrl={s.recu_url} />
                             </>

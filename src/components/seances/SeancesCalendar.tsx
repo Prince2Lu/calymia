@@ -354,7 +354,7 @@ function SeanceDrawer({
                 label="Règlement"
                 value={
                   reglement.kind === "hors_plateforme"
-                    ? `Hors plateforme — ${reglement.montant.toFixed(2)} € déclarés`
+                    ? `Hors plateforme — ${reglement.montant.toFixed(2)} €`
                     : reglement.kind === "lien_attente"
                       ? "Lien de paiement envoyé — en attente"
                       : reglement.kind === "lien_paye"
