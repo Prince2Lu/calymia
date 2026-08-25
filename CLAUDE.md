@@ -2,7 +2,7 @@
 
 Fichier de contexte pour Claude Code. À lire en priorité avant toute modification du repo.
 
-Dernière mise à jour : 21 août 2026
+Dernière mise à jour : 24 août 2026
 
 ---
 
@@ -97,7 +97,8 @@ src/
 │   ├── (public)/
 │   │   ├── sophrologues/[dept]/[ville]/[slug]/  # Page publique SSR
 │   │   │   └── reserver/    # Tunnel réservation 5 étapes (+ rappel anti-spam visio à l'étape 5)
-│   │   └── avis/[token]/    # Formulaire avis client, accès par token unique post-séance
+│   │   ├── avis/[token]/    # Formulaire avis client, accès par token unique post-séance
+│   │   └── paiement/[token]/  # Page paiement création manuelle (24/08, noindex, voir section 6)
 │   ├── onboarding/          # Wizard 5 étapes
 │   ├── inscription/         # Création compte
 │   ├── connexion/           # Login
@@ -121,24 +122,40 @@ src/
 │       │   └── [id]/delete/     # Suppression client, RPC transactionnelle (31/07)
 │       ├── seances/
 │       │   ├── [id]/regenerer-visio/  # POST — recrée une salle Daily.co (août 2026)
-│       │   └── bloquer-creneau/       # FreeBusy strict Google Agenda avant blocage 15 min (voir section 6)
+│       │   ├── create/                # POST — création manuelle (24/08, voir section 6),
+│       │   │                          # ne réutilise PAS bloquer-creneau (hold 15 min sans patient)
+│       │   └── extract-from-message/  # POST — extraction Claude depuis message collé (24/08)
 │       ├── avis/
 │       │   └── moderer/         # POST — approuve/masque un avis client (Pro+, voir section 6)
-│       ├── reservations/    # create-payment-intent (FreeBusy strict Google Agenda inclus), annuler
-│       ├── public/          # prochain-creneau (force-dynamic), google-busy (FreeBusy souple, voir section 6)
+│       ├── reservations/    # create-payment-intent, annuler,
+│       │                    # bloquer-creneau/ (FreeBusy strict — PAS sous /api/seances/, erreur
+│       │                    # d'arborescence corrigée le 24/08)
+│       ├── public/          # prochain-creneau (force-dynamic), google-busy (FreeBusy souple, voir section 6),
+│       │   └── paiement-manuel/[token]/  # GET affichage + create-intent (24/08, voir section 6)
 │       ├── factures/        # generer (facture séance, redesign 30/07 — voir section 6)
-│       └── cron/            # Endpoints n8n (rappels-j1, post-seance, cleanup-seances)
+│       ├── recus/
+│       │   └── generer/         # POST — reçu PDF hors plateforme, distinct de factures/ (24/08, voir section 6)
+│       └── cron/            # Endpoints n8n (rappels-j1, post-seance — filtre 48h anti-spam
+│                             # depuis le 24/08, voir section 6 —, cleanup-seances)
 ├── components/
 │   ├── dashboard/
 │   │   ├── ProfileScoreCard.tsx         # Widget score complétude (Server Component)
 │   │   ├── ProfileScoreCardWrapper.tsx  # Wrapper client pour ProfileScoreCard
 │   │   ├── PlanCheckoutButtons.tsx      # Boutons "Choisir Essentiel/Professionnel"
 │   │   └── InvoiceHistoryTable.tsx      # Historique de facturation abonnement (31/07)
-│   ├── factures/            # BoutonFacture.tsx
+│   ├── seances/
+│   │   ├── SeancesCalendar.tsx      # Grille agenda + drawer détail (Client Component)
+│   │   ├── NouveauSeanceModal.tsx   # Création manuelle (24/08, voir section 6) — extrait pour
+│   │   │                            # ne pas alourdir SeancesCalendar.tsx (~750 lignes)
+│   │   └── BoutonRecu.tsx           # Reçu PDF hors plateforme (24/08) — génère au clic si absent,
+│   │                                # sinon télécharge (contrairement à BoutonFacture, display-only)
+│   ├── factures/            # BoutonFacture.tsx — libellé "Télécharger la facture" (renommé 24/08,
+│   │                        # évite la confusion avec BoutonRecu)
 │   ├── providers/           # SophrologueProvider.tsx
 │   ├── public/              # SophrologueInfoLine.tsx (générique, sert au SIRET ; renommé le 21/08,
 │   │                        # remplaçait SophrologueRppsLine.tsx), ProchainCreneauBadge.tsx,
-│   │                        # AvisPublicList.tsx, UtmCapture.tsx — tous "use client"
+│   │                        # AvisPublicList.tsx, UtmCapture.tsx, PaiementManuelCheckout.tsx (24/08,
+│   │                        # voir section 6) — tous "use client"
 │   ├── seances/             # SeancesCalendar.tsx, types.ts
 │   ├── ui/                  # Composants partagés (cn() avec twMerge depuis le 27/07, voir section 10)
 │   └── ...
@@ -163,7 +180,12 @@ src/
     │                        # upsertSeanceEvent() (voir section 6)
     ├── booking/
     │   ├── compute-next-slot.ts  # computeNextAvailableSlotIso() — lit sophrologues.horaires
-    │   └── slots.ts          # SLOT_GRID_STEP_MS = 30 min (passé de 15 à 30 min, voir section 6)
+    │   ├── slots.ts          # SLOT_GRID_STEP_MS = 30 min (passé de 15 à 30 min, voir section 6)
+    │   └── paiement-manuel.ts  # Helper token paiement différé (24/08, voir section 6)
+    ├── ai/
+    │   ├── classify-specialites.ts       # Classification specialites_categories via after()
+    │   └── extract-seance-from-message.ts  # Extraction création manuelle (24/08, voir section 6) —
+    │                                        # ATTENTION thinking: {type:"disabled"} obligatoire sur Sonnet 5
     ├── config/
     │   └── site-url.ts      # getSiteUrl(), getSophrologueProfileUrl(), isProductionSite() (voir section 6)
     ├── analytics/
@@ -173,6 +195,9 @@ src/
     ├── factures/
     │   ├── generate.tsx     # Génération PDF facture séance — redesign complet 30/07 (section 6)
     │   └── fonts/           # PlayfairDisplay-*.ttf, DMSans-*.ttf (committés, pas de fetch réseau)
+    ├── recus/
+    │   └── generate.tsx     # Reçu PDF hors plateforme (24/08) — réutilise fonts/palette de
+    │                        # factures/ sans en réutiliser le contenu (voir section 6)
     ├── notifications/
     │   └── limite-clients-alerte.ts  # Alerte dépassement 15 clients (plan Essentiel) — 31/07
     ├── emails/
@@ -223,8 +248,8 @@ chez qui il a réservé (`sophrologue_id` renseigné), plus une fiche **canoniqu
 | Table | Colonnes clés | Notes |
 |---|---|---|
 | `sophrologues` | `id`, `user_id`, `slug`, `plan`, `horaires` (JSONB), `photos_cabinet`, `siret`, `certification_rncp` (boolean), `afficher_email`, `afficher_telephone`, `lien_teleconsultation`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `limite_clients_alerte_envoyee_at` | `plan` = 'essentiel' / 'professionnel' / 'cabinet'. `horaires` = **seule source de vérité** pour l'affichage ET le booking depuis le 27/07 (voir section 10). `siret` nullable, ajouté 30/07 (affiché sur la facture si renseigné). `certification_rncp boolean NOT NULL DEFAULT false` remplace `numero_rpps` depuis le 21/08 — simple filtre déclaratif (pas de code, pas de critère de score profil), voir section 6. `afficher_email`/`afficher_telephone` : opt-in d'affichage des coordonnées sur la page publique (voir section 6). `lien_teleconsultation` = fallback profil si création Daily.co échoue (voir section 6 — Visioconférence). `limite_clients_alerte_envoyee_at` ajouté 31/07 (voir section 11) |
-| `patients` | `id`, `user_id`, `sophrologue_id` | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus |
-| `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut`, `lien_teleconsultation` | `statut` = 'confirmee' / 'terminee' / 'annulee'. `lien_teleconsultation` **activement lue/écrite** depuis août 2026 (lien Daily.co par séance, voir section 6) — plus un champ legacy mort |
+| `patients` | `id`, `user_id`, `sophrologue_id`, `email` (nullable depuis 24/08) | Pas `clients` — toujours `patients`. Voir modèle d'identité ci-dessus. `email` nullable depuis le chantier création manuelle (contact WhatsApp/SMS sans email, voir section 6) |
+| `seances` | `id`, `sophrologue_id`, `patient_id`, `debut_at`, `fin_at`, `statut`, `origine`, `lien_teleconsultation`, `montant_declare`, `token_paiement_manuel`, `recu_url` | `statut` = 'confirmee' / 'terminee' / 'annulee' / 'en_attente'. `origine` = 'en_ligne' / 'manuelle' (contrainte `seances_origine_check`). `lien_teleconsultation` **activement lue/écrite** depuis août 2026 (lien Daily.co par séance, voir section 6). `montant_declare`, `token_paiement_manuel` et `recu_url` ajoutés le 24/08 pour la création manuelle de séance (voir section 6) |
 | `paiements` | `id`, `seance_id`, `sophrologue_id`, `statut`, `montant_total`, `facture_url` | `statut` = 'reussi' / 'rembourse' |
 | `types_seances` | `id`, `sophrologue_id`, `nom`, `duree_minutes`, `tarif`, `actif`, `mode` | `mode` = `'presentiel'` \| `'visio'` (défaut `presentiel`), migration `20260810180000_types_seances_mode.sql` — août 2026 |
 | `disponibilites` | `id`, `sophrologue_id`, `jour_semaine`, `heure_debut`, `heure_fin`, `actif` | ⚠️ **Legacy** — plus lue ni écrite pour le booking depuis le 27/07 (voir section 10). Reste en base, non supprimée |
@@ -658,6 +683,132 @@ affichés comme fermés mais réservables quand même).
 - La sidebar charge `trial_ends_at` dans sa propre requête Supabase
 - Voir section 5 pour le fix du 30/07 sur l'upgrade pendant le trial (mode `setup`)
 
+### Création manuelle de séance (chantier complet, 24 août 2026)
+Permet au sophrologue de créer une séance depuis son dashboard suite à un contact client hors
+plateforme (email/SMS/WhatsApp) — pas d'intégration WhatsApp/email/SMS, copier-coller manuel
+uniquement. Livré en 4 étapes + 1 KPI + 3 correctifs post-tests, tout en PROD.
+
+**Schéma (migrations du 24/08)** :
+- `patients.email` devient **nullable** (un contact WhatsApp/SMS n'a pas toujours d'email)
+- `seances.montant_declare numeric(10,2)` — montant perçu hors plateforme, purement déclaratif,
+  jamais vérifié, **jamais utilisé pour la commission Calymia**
+- `seances.token_paiement_manuel text` (index unique partiel) — pour le lien de paiement différé
+- `seances.origine` : `'manuelle'` déjà couverte par la contrainte `seances_origine_check`
+  existante (pas de migration nécessaire sur ce point précis)
+- `communications_type_check` étendue deux fois : `'lien_paiement_manuel'` puis
+  `'confirmation_seance_manuelle'`
+
+**`POST /api/seances/create`** — nouvelle route, ne réutilise pas `bloquer-creneau` (hold 15 min
+sans patient, pas adapté). Logique : valide le type de séance (tarif **toujours** lu depuis
+`types_seances`, jamais du payload client), résout le patient (lookup email/téléphone sur ce
+`sophrologue_id`, ne réécrit jamais une fiche existante, création à la volée si besoin — email
+optionnel désormais), vérifie les conflits (overlap Calymia + `assertPrimaryCalendarSlotAvailable()`
+strict, jamais contourné même en création manuelle). Deux branches selon `mode_reglement` :
+- **`hors_plateforme`** : `statut: "confirmee"` immédiat, `montant_declare` (saisi ou tarif par
+  défaut). Visio (`createDailyRoom`) + push Google Agenda (`upsertSeanceEvent`) déclenchés
+  **à la création**, chacun dans un `try/catch` isolé (jamais bloquant). Email de confirmation
+  client (`confirmationSeanceManuelle`, voir plus bas) si le patient a un email.
+  **Dates passées autorisées** — cas légitime : rattraper la saisie d'une séance déjà réalisée.
+- **`lien_en_ligne`** : `statut: "en_attente"`, `expire_at: now + 7 jours` (constante
+  `MANUAL_LINK_EXPIRY_DAYS`), token unique généré, email avec lien vers `/paiement/[token]`.
+  **Email obligatoire** pour ce mode (400 explicite sinon). **Dates passées interdites**
+  (400 explicite : "Impossible de créer une séance dans le passé avec paiement en ligne") —
+  n'a pas de sens de bloquer un créneau ou d'envoyer un lien de paiement pour une séance déjà passée.
+
+**Page publique `/paiement/[token]`** (`noindex`, SSR) — `GET /api/public/paiement-manuel/[token]`
+pour l'affichage (4 états : introuvable / expiré / déjà payé / en attente), `POST
+.../create-intent` pour générer le `PaymentIntent` (mêmes metadata que le tunnel classique).
+Réutilise **`PaymentForm` tel quel** (déjà découplé du tunnel, props `{ amount, clientSecret,
+seanceId, onSuccess }`) — pas de nouveau composant de paiement. Le webhook
+`payment_intent.succeeded` existant n'a pas eu besoin d'être modifié : il traite déjà n'importe
+quelle séance via `metadata.seance_id`, peu importe son `origine`.
+
+**`NouveauSeanceModal.tsx`** (`src/components/seances/`, extrait pour ne pas alourdir
+`SeancesCalendar.tsx`) — bouton "Nouvelle séance" dans le header agenda. Deux onglets : "Remplir
+manuellement" / "Coller un message client". Recherche/sélection patient existant + création à la
+volée (email optionnel, contrairement à l'ancien modal `Mes clients`). Rafraîchissement agenda
+après création : `loadSeances(...)` (pas de mutation locale, la séance n'existe pas encore dans
+le state), avec navigation automatique vers la semaine du créneau si hors de la semaine affichée.
+Bandeau ambre "Vous enregistrez une séance dans le passé." sous les champs Date/Heure dès que
+`isPastSlot()` est vrai, indépendamment du mode de règlement.
+
+**Extraction Claude** (`src/lib/ai/extract-seance-from-message.ts`) — même squelette que
+`classify-specialites.ts` (fetch brut, `claude-sonnet-5`) mais **ne reste jamais silencieuse**
+(appelée en direct depuis l'UI, pas via `after()`) : retourne toujours `{ ok: true, ... }` ou
+`{ ok: false, error }`. `thinking: { type: "disabled" }` **obligatoire** — sans ça, Sonnet 5
+consomme son budget de tokens dans le raisonnement interne et l'extraction JSON reste vide.
+Dates relatives ("jeudi prochain") résolues via `nowIso` (Europe/Paris) passé explicitement dans
+le prompt. `type_seance_id` hors whitelist forcé à `null`, jamais halluciné. **Le texte brut du
+message n'est jamais stocké ni loggé** (peut contenir des données de santé) — logs limités à la
+longueur du texte et au code d'erreur. Pré-remplit le formulaire avec un liseré "détecté — à
+vérifier" par champ ; le sophrologue reste seul maître de la soumission finale.
+
+**Cron post-séance — filtre anti-spam (24/08)** : `src/app/api/cron/post-seance/route.ts` (n8n,
+`*/15 * * * *`, deux passes : "merci pour votre séance" puis "demande d'avis" 24h après) ne
+filtrait à l'origine ni sur `origine` ni sur l'ancienneté de la création. Une séance manuelle
+très rétroactive (rattrapage de plusieurs jours/semaines) était donc éligible dès le tick
+suivant sa création, déclenchant les deux passes en quelques minutes — spam pour le client, en
+plus de l'email de confirmation immédiat. Correctif : `MAX_CREATION_DELAY_AFTER_SEANCE_HOURS = 48`,
+appliqué en filtre applicatif (JS, pas de colonne générée) sur les deux passes — une séance dont
+`created_at` dépasse 48h après `fin_at` est exclue du cron (reste un enregistrement historique,
+seul l'email de création a été envoyé). Dates invalides/`created_at` absent → laissé passer
+(fail-open, pour ne jamais casser un cas légitime par erreur).
+
+**Nouveau template email** `confirmationSeanceManuelle` (`src/lib/emails/templates.ts`) — envoyé
+au patient à la création d'une séance hors plateforme (si email dispo). Volontairement différent
+de `confirmationReservation` : pas de politique d'annulation, pas de lien facture, lien visio
+seulement si pertinent. Objet et corps : "Votre séance a été **enregistrée**..." — le mot
+"notée" a été évité (collision avec la fonctionnalité Avis clients, où le client note
+littéralement sa séance).
+
+**KPI dashboard "CA total déclaré"** — 5e carte dans `src/app/(auth)/dashboard/page.tsx` (grille
+`lg:grid-cols-3`, 3+2). `CA net` (existant) + somme de `seances.montant_declare` (`statut =
+confirmee`, `origine = manuelle`, non null) sur le mois calendaire Paris. Comptabilisé au statut
+`confirmee`, pas `terminee` — cohérent avec "CA net" qui compte dès la confirmation du paiement,
+pas à la réalisation effective. ⚠️ Mélange deux colonnes de date par nécessité : `paiements.created_at`
+pour la partie CA net, `seances.debut_at` pour la partie déclarée (pas de ligne `paiements` pour
+une séance hors plateforme) — commenté explicitement dans le code pour ne pas être relu comme un bug.
+
+### Reçu PDF pour les séances hors plateforme (24 août 2026)
+Distinct de la facture — les séances `origine = 'manuelle'` avec un `montant_declare` (hors
+plateforme) n'ont pas de ligne `paiements`, donc pas de vraie transaction vérifiée. Générer une
+"facture" avec l'habillage officiel actuel (mandat KLS3, SIRET, TVA) aurait engagé KLS3 sur un
+montant purement déclaratif — décision : un document séparé, plus simple, non fiscal.
+
+- **`src/lib/recus/generate.tsx`** (nouveau module, ne touche pas `src/lib/factures/`) — réutilise
+  les polices déjà committées (`src/lib/factures/fonts/*.ttf`, Playfair Display + DM Sans) et la
+  palette de couleurs, mais contenu dédié : titre "Reçu", numérotation `REC-AAAA-xxxxx` (jamais
+  `CAL-`), pas de carte Vendeur/SIRET/mandat, un seul "Montant déclaré" (pas de TVA/HT-TTC), et
+  un bandeau d'avertissement explicite ("récapitulatif fourni par le praticien, pas une facture
+  émise par Calymia, montant non vérifié")
+- `seances.recu_url text` (nullable) — persistance séparée de `paiements.facture_url`
+- `POST /api/recus/generer` : génère à la demande (pas automatique comme la facture au paiement),
+  upload dans le bucket Storage `factures` existant, sous-chemin `recus/`
+- `BoutonRecu.tsx` (`src/components/seances/`) : génère au clic si `recu_url` est absent, sinon
+  télécharge directement — contrairement à `BoutonFacture` qui n'a jamais de logique de génération
+- **`BoutonFacture` renommé** : "Télécharger le reçu" → "Télécharger la facture", pour lever
+  l'ambiguïté avec le nouveau bouton reçu (les deux ne doivent jamais porter le même libellé)
+- Affiché à deux endroits : drawer de l'agenda (`SeancesCalendar.tsx`) et historique de la fiche
+  client (`src/app/(auth)/clients/[id]/page.tsx`) — ce dernier a son **propre** type `Seance`
+  local et son propre `.select()`, distincts de `src/components/seances/types.ts` ; toute future
+  évolution touchant les séances doit vérifier les deux endroits séparément (piège déjà rencontré
+  deux fois dans ce chantier — `stubSeance()` dans `NouveauSeanceModal.tsx` et cette fiche client
+  ont chacun leur propre construction d'objet `Seance`, pas de source unique)
+- Label "· Séance manuelle" ajouté sous le type de séance (drawer agenda ET fiche client),
+  visible dès que `origine === 'manuelle'`, indépendamment du mode de règlement. Le montant du
+  mode hors plateforme s'affiche **sans** qualificatif ("Hors plateforme — 60.00 €", pas "...
+  déclarés") pour éviter la redondance avec ce label
+
+⚠️ **Incident PROD résolu (24/08)** : bucket Storage nommé `factures` sur DEV mais `invoices` sur
+PROD — écart jamais détecté auparavant car aucune facture n'avait encore été générée en PROD
+(`SELECT count(*) FROM paiements WHERE facture_url IS NOT NULL` = 0 au moment de l'incident).
+Résolu en supprimant `invoices` (vide, sans risque) et recréant `factures` (public) en PROD.
+**Leçon** : les noms de bucket Storage ne sont jamais garantis identiques entre DEV et PROD s'ils
+ont été créés manuellement dans l'UI Supabase plutôt que documentés/scriptés — un audit de
+config Storage (buckets, policies) entre les deux environnements est à prévoir avant le prochain
+chantier qui introduit un nouveau bucket ou réutilise un bucket existant pour la première fois
+en conditions réelles PROD.
+
 ### Suppression d'un compte sophrologue en base (ordre FK)
 ```sql
 DO $$
@@ -953,6 +1104,64 @@ jusqu'ici, toutes documentées dans les sections correspondantes ci-dessus :
   historique du jour de lancement plutôt qu'à corriger ligne par ligne
 
 ---
+
+## 14. Session du 24 août 2026 — synthèse
+
+Chantier complet "création manuelle de séance" (contact client hors plateforme), livré et
+testé de bout en bout en DEV puis PROD, en 4 étapes + 1 KPI + 3 correctifs post-tests. Détail
+technique complet en section 6 ("Création manuelle de séance").
+
+### Livré et déployé
+- Migration : `patients.email` nullable, `seances.montant_declare` + `token_paiement_manuel` +
+  `recu_url`
+- `POST /api/seances/create` : deux branches (hors plateforme / lien de paiement en ligne)
+- Page publique `/paiement/[token]` — réutilise `PaymentForm` tel quel
+- `NouveauSeanceModal.tsx` dans l'agenda, avec extraction Claude optionnelle depuis un message
+  collé (`thinking` désactivé sur Sonnet 5 — sinon extraction vide)
+- KPI dashboard "CA total déclaré" (5e carte, `lg:grid-cols-3`)
+- Cron post-séance : filtre 48h anti-spam sur les séances manuelles rétroactives
+- Template email `confirmationSeanceManuelle` ("enregistrée", pas "notée" — évite la collision
+  avec la fonctionnalité Avis clients)
+- Ligne "Règlement" dans le drawer agenda (hors plateforme / lien en attente / lien payé),
+  dérivée de `origine` + `montant_declare`, sans nouvelle colonne dédiée
+- **Reçu PDF** pour les séances hors plateforme — chantier complet, voir section 6 ("Reçu PDF")
+
+### Corrections d'arborescence apportées à ce fichier à cette occasion
+- `bloquer-creneau` est sous `/api/reservations/`, pas `/api/seances/` (erreur historique)
+
+### Incident de process (sans conséquence, résolu)
+Un `git merge develop → main` a semblé "Already up to date" de façon inattendue en fin de
+chantier RPPS/RNCP (session du 21/08) — le commit avait en réalité déjà été fait et mergé plus
+tôt sans confirmation explicite dans le fil. Vérifié via `git log --all` et `git reflog`, aucune
+perte de travail. **Leçon** : en cas de doute sur l'état d'un merge, toujours vérifier
+`git log --oneline --all` avant de supposer un problème — un stash oublié sans rapport (chantier
+RPPS legacy jamais mergé, retrouvé au passage) a failli être appliqué par erreur ; il a été
+identifié comme non pertinent et supprimé (`git stash drop`).
+
+### Incident PROD — bucket Storage `factures` vs `invoices` (résolu)
+Voir détail en section 6 ("Reçu PDF"). Le déploiement du reçu en PROD a échoué (`Bucket not
+found`) car le bucket s'appelait `invoices` en PROD, `factures` en DEV — écart de config jamais
+détecté faute d'usage antérieur en PROD. Résolu par suppression/recréation (bucket vide, sans
+risque). Audit Storage DEV/PROD à prévoir en amont du prochain chantier touchant ce domaine.
+
+### Backlog ouvert à l'issue de cette session
+- Suppression sophrologue : pas d'équivalent de `delete_patient_cascade` — sujet ouvert pour le
+  futur dashboard admin (voir ci-dessous)
+- Reconnexion Google Agenda : un refresh token peut expirer/être révoqué (`invalid_grant`)
+  même après une "resynchronisation" partielle — seule une déconnexion/reconnexion OAuth
+  complète régénère un token valide. Pas de détection proactive de token mort côté produit
+  aujourd'hui (le sophrologue le découvre seulement à l'échec d'une vérification FreeBusy)
+- Audit config Storage (buckets, policies) DEV vs PROD — écart déjà trouvé une fois
+  (`factures`/`invoices`), probablement pas le seul si les buckets ont tous été créés
+  manuellement dans l'UI Supabase sans script/migration
+
+### Prochain chantier identifié
+Dashboard administrateur (Eric) : KPIs globaux plateforme (au-delà d'un sophrologue), gestion/
+suppression de clients et de sophrologues. Points déjà identifiés comme sensibles avant de
+commencer : authentification admin séparée du système de session sophrologue, absence totale
+d'un flow de suppression/désactivation de compte sophrologue aujourd'hui (séances futures,
+abonnement Stripe actif, page publique indexée), besoin d'un log d'audit sur les actions
+destructrices.
 
 ## Note finale
 
